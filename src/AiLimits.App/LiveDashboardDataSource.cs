@@ -117,6 +117,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
 
     private DateTimeOffset? _resetCreditsFetchedAt;
 
+    private bool _scanInFlight;
     private int _scannerCount;
 
     private int _successfulScannerCount;
@@ -166,7 +167,11 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         _catalog = new ModelsDevPricingCatalog(_httpClient, Path.Combine(text, "pricing"), _clock);
     }
 
-    public async Task<DashboardData> LoadAsync(bool forceRefresh, IProgress<RefreshProgress>? progress, CancellationToken cancellationToken)
+    public async Task<DashboardData> LoadAsync(
+        bool forceRefresh,
+        IProgress<RefreshProgress>? progress,
+        IProgress<DashboardData>? interim,
+        CancellationToken cancellationToken)
     {
         await _loadGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -179,12 +184,35 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                 _lastRefreshHadTransientFailure = false;
                 progress?.Report(new RefreshProgress(0, 0, string.Empty, RefreshStage.DiscoveringAccounts));
                 accounts = await DiscoverAccountsAsync(cancellationToken).ConfigureAwait(false);
-                await ScanTelemetryIfDueAsync(accounts, progress, cancellationToken).ConfigureAwait(false);
+                // The history scan and the limit fetch share nothing but this
+                // account list: one reads local logs off disk, the other calls
+                // provider APIs. Awaiting the scan first made every number on
+                // screen wait behind it, and a first run over a large history
+                // takes minutes — so the plan limits, which are two seconds of
+                // network, did not appear until the disk work was done.
+                Task scanTask = ScanTelemetryIfDueAsync(accounts, progress, cancellationToken);
                 Task task = RefreshLimitsAsync(accounts, progress, cancellationToken);
                 Task<PricingCatalogSnapshot?> catalogTask = _catalog.RefreshIfStaleAsync(cancellationToken);
                 Task<IReadOnlyDictionary<string, ProviderServiceStatus>> providerStatusTask =
                     _providerStatusClient.PollAsync(cancellationToken);
                 await task.ConfigureAwait(false);
+                // Fetching finished first on a cold start. Relabel the bar so it
+                // stops claiming "8 / 8 providers" while the scan still runs,
+                // and put the limits on screen now instead of holding them
+                // hostage to the history scan.
+                if (!scanTask.IsCompleted)
+                {
+                    progress?.Report(new RefreshProgress(0, 0, string.Empty, RefreshStage.ScanningHistory));
+                    if (interim is not null)
+                    {
+                        interim.Report(await ProjectAsync(
+                            await _accounts.ListAsync(cancellationToken).ConfigureAwait(false),
+                            await _catalog.GetCurrentAsync(cancellationToken).ConfigureAwait(false),
+                            fromCache: false,
+                            cancellationToken).ConfigureAwait(false));
+                    }
+                }
+                await scanTask.ConfigureAwait(false);
                 catalog = await catalogTask.ConfigureAwait(false);
                 IReadOnlyDictionary<string, ProviderServiceStatus> statuses =
                     await providerStatusTask.ConfigureAwait(false);
@@ -211,6 +239,9 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         }
         finally
         {
+            // Belt and braces: a cancelled scan leaves the flag set otherwise,
+            // and a stale "still indexing" caption would outlive the scan.
+            _scanInFlight = false;
             _loadGate.Release();
         }
     }
@@ -336,6 +367,9 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             }
         }
         progress?.Report(new RefreshProgress(0, 0, string.Empty, RefreshStage.ScanningHistory));
+        // Read by ProjectAsync: a projection taken while this runs has real
+        // limits but incomplete usage totals, and has to say so.
+        _scanInFlight = true;
         int total = 0;
         int successful = 0;
         int emitted = 0;
@@ -402,6 +436,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                 }
             }
         }
+        _scanInFlight = false;
         _lastScanAt = _clock.UtcNow;
         _scannerCount = total;
         _successfulScannerCount = successful;
@@ -529,13 +564,26 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         // The cached pass must say what it is: data as old as the last fetch,
         // with a fresh one already underway — never pretend it is live.
         DateTimeOffset? cachedAt = latest.Values.Where((ProviderSnapshot snapshot) => snapshot is not null).Select((ProviderSnapshot snapshot) => (DateTimeOffset?)snapshot.ObservedAt).DefaultIfEmpty(null).Max();
+        // Nothing cached and nothing fetched yet is a first run, not a fault.
+        // "Not loaded" over a row of zeros read as a broken app; say that the
+        // history is being indexed, because that is what the wait is.
+        bool firstRun = !cachedAt.HasValue && totalTokens == 0;
         string lastUpdated = fromCache
-            ? (cachedAt.HasValue ? F("Data_CachedFetched", cachedAt.Value.ToLocalTime()) : L("Dashboard_NotLoaded"))
+            ? (cachedAt.HasValue
+                ? F("Data_CachedFetched", cachedAt.Value.ToLocalTime())
+                : firstRun ? L("Data_FirstRun") : L("Dashboard_NotLoaded"))
             : F("Data_Updated", DateTimeOffset.Now);
         // The steady live state needs no caption (the account/snapshot counts
         // used to render as a cryptic "7 · 6" here); only the cached pass and
         // transient refresh states say anything.
-        string statusMessage = fromCache ? L("Data_ShowingSaved") : string.Empty;
+        // "Showing saved data" is a lie on a first run: there is none to show.
+        // And a live projection taken mid-scan has real limits but partial
+        // usage totals, which needs saying or the numbers look wrong.
+        string statusMessage = _scanInFlight
+            ? L("Data_IndexingHistory")
+            : fromCache
+                ? (firstRun ? L("Data_FirstRunSaved") : L("Data_ShowingSaved"))
+                : string.Empty;
         string pricingCatalogStatus = catalog is null ? L("Data_UnavailableUpper") : L("Data_ValidUpper");
         // The catalog's SHA-256 prefix used to sit here. It is still recorded
         // with every API-equivalent figure, but on screen it read as noise; the

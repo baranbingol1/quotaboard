@@ -10,6 +10,6 @@
     <!-- One version for every assembly. The release workflow refuses to build
          a tag whose name disagrees with this, so the number in Windows'
          file-properties dialog always matches the release it came from. -->
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
   </PropertyGroup>
 </Project>

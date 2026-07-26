@@ -289,6 +289,9 @@
   <data name="Dashboard_InitializingDatabase" xml:space="preserve"><value>Initializing the local database</value></data>
   <data name="Dashboard_LoadingProviderData" xml:space="preserve"><value>Loading provider data…</value></data>
   <data name="Dashboard_NotLoaded" xml:space="preserve"><value>Not loaded</value></data>
+  <data name="Data_FirstRun" xml:space="preserve"><value>First run · indexing your local history</value></data>
+  <data name="Data_FirstRunSaved" xml:space="preserve"><value>Reading local history for the first time; this can take a few minutes</value></data>
+  <data name="Data_IndexingHistory" xml:space="preserve"><value>Limits are live · still indexing local history, so usage totals will fill in</value></data>
   <data name="Dashboard_RefreshingProviders" xml:space="preserve"><value>Refreshing providers…</value></data>
   <data name="Dashboard_ReadingProviderData" xml:space="preserve"><value>Reading saved provider data…</value></data>
   <data name="Dashboard_RefreshFailed" xml:space="preserve"><value>Refresh failed. Check Diagnostics for details.</value></data>

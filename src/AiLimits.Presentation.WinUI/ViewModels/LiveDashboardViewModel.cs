@@ -224,7 +224,11 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
         try
         {
             var progress = new Progress<RefreshProgress>(OnRefreshProgressReported);
-            Apply(await _dataSource.LoadAsync(forceRefresh, progress, _lifetime.Token).ConfigureAwait(true));
+            // Progress<T> posts to the captured UI context, so an early
+            // projection lands on the same thread Apply requires. The data
+            // source reports at most one, minutes before it returns.
+            var interim = new Progress<DashboardData>(Apply);
+            Apply(await _dataSource.LoadAsync(forceRefresh, progress, interim, _lifetime.Token).ConfigureAwait(true));
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
         catch (Exception) { StatusMessage = L("Dashboard_RefreshFailed"); }

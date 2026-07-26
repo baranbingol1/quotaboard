@@ -6,7 +6,17 @@ namespace AiLimits.Presentation.WinUI.ViewModels;
 
 public interface IDashboardDataSource
 {
-    Task<DashboardData> LoadAsync(bool forceRefresh, IProgress<RefreshProgress>? progress, CancellationToken cancellationToken);
+    /// <param name="interim">
+    /// Receives an early projection when part of a refresh finishes well ahead
+    /// of the rest — a first run spends seconds fetching limits and minutes
+    /// indexing local history, and the limits should not wait for the history.
+    /// Reported at most once per run, and never when everything finishes together.
+    /// </param>
+    Task<DashboardData> LoadAsync(
+        bool forceRefresh,
+        IProgress<RefreshProgress>? progress,
+        IProgress<DashboardData>? interim,
+        CancellationToken cancellationToken);
 
     /// <summary>Current model-catalog state for the Settings card; reads the cache only.</summary>
     Task<ModelCatalogStatus> GetModelCatalogStatusAsync(CancellationToken cancellationToken);

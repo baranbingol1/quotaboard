@@ -289,6 +289,9 @@
   <data name="Dashboard_InitializingDatabase" xml:space="preserve"><value>Yerel veritabanı hazırlanıyor</value></data>
   <data name="Dashboard_LoadingProviderData" xml:space="preserve"><value>Sağlayıcı verileri yükleniyor…</value></data>
   <data name="Dashboard_NotLoaded" xml:space="preserve"><value>Yüklenmedi</value></data>
+  <data name="Data_FirstRun" xml:space="preserve"><value>İlk çalıştırma · yerel geçmişiniz taranıyor</value></data>
+  <data name="Data_FirstRunSaved" xml:space="preserve"><value>Yerel geçmiş ilk kez okunuyor; bu birkaç dakika sürebilir</value></data>
+  <data name="Data_IndexingHistory" xml:space="preserve"><value>Limitler güncel · yerel geçmiş hâlâ taranıyor, kullanım toplamları birazdan dolacak</value></data>
   <data name="Dashboard_RefreshingProviders" xml:space="preserve"><value>Sağlayıcılar yenileniyor…</value></data>
   <data name="Dashboard_ReadingProviderData" xml:space="preserve"><value>Kayıtlı sağlayıcı verileri okunuyor…</value></data>
   <data name="Dashboard_RefreshFailed" xml:space="preserve"><value>Yenileme başarısız. Ayrıntılar için Tanılama'yı denetleyin.</value></data>
