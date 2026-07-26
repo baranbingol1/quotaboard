@@ -1,0 +1,20 @@
+<Project>
+  <!-- The WinUI compiler emits PRI/XBF files into TargetDir, while the SDK's
+       file-system publish omits them. An unpackaged app cannot initialize XAML
+       without this layout, so copy it as part of every Publish target. -->
+  <Target Name="CopyWinUiLayoutToPublishDirectory" AfterTargets="Publish">
+    <ItemGroup>
+      <AppWinUiLayout Include="$(TargetDir)$(AssemblyName).pri;$(TargetDir)App.xbf;$(TargetDir)MainWindow.xbf" />
+      <PresentationWinUiLayout Include="$(TargetDir)AiLimits.Presentation.WinUI\**\*.xbf" />
+    </ItemGroup>
+
+    <Copy
+      SourceFiles="@(AppWinUiLayout)"
+      DestinationFolder="$(PublishDir)"
+      SkipUnchangedFiles="true" />
+    <Copy
+      SourceFiles="@(PresentationWinUiLayout)"
+      DestinationFiles="@(PresentationWinUiLayout->'$(PublishDir)AiLimits.Presentation.WinUI\%(RecursiveDir)%(Filename)%(Extension)')"
+      SkipUnchangedFiles="true" />
+  </Target>
+</Project>

@@ -1,0 +1,524 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="Shell_Brand.Text" xml:space="preserve">
+    <value>QUOTABOARD</value>
+  </data>
+  <data name="Shell_Overview.Content" xml:space="preserve">
+    <value>Genel Bakış</value>
+  </data>
+  <data name="Shell_Usage.Content" xml:space="preserve">
+    <value>Kullanım</value>
+  </data>
+  <data name="Shell_Connections.Content" xml:space="preserve">
+    <value>Bağlantılar</value>
+  </data>
+  <data name="Shell_Diagnostics.Content" xml:space="preserve">
+    <value>Tanılama</value>
+  </data>
+
+  <data name="Overview_Eyebrow.Text" xml:space="preserve">
+    <value>GENEL BAKIŞ</value>
+  </data>
+  <data name="Overview_Title.Text" xml:space="preserve">
+    <value>Limitler ve kullanım</value>
+  </data>
+  <data name="Overview_Refresh.Content" xml:space="preserve">
+    <value>Yenile</value>
+  </data>
+  <data name="Overview_TotalTokens30Days.Text" xml:space="preserve">
+    <value>TOPLAM TOKEN · 30 GÜN</value>
+  </data>
+  <data name="Overview_ApiEquivalent30Days.Text" xml:space="preserve">
+    <value>API EŞDEĞERİ · 30 GÜN</value>
+  </data>
+  <data name="Overview_PlanValue.Text" xml:space="preserve">
+    <value>PLAN DEĞERİ</value>
+  </data>
+  <data name="Overview_Input.Text" xml:space="preserve">
+    <value>GİRDİ</value>
+  </data>
+  <data name="Overview_Output.Text" xml:space="preserve">
+    <value>ÇIKTI</value>
+  </data>
+  <data name="Overview_CacheRead.Text" xml:space="preserve">
+    <value>ÖNBELLEK OKUMA</value>
+  </data>
+  <data name="Overview_CacheWrite.Text" xml:space="preserve">
+    <value>ÖNBELLEK YAZMA</value>
+  </data>
+  <data name="Overview_Reasoning.Text" xml:space="preserve">
+    <value>AKIL YÜRÜTME</value>
+  </data>
+  <data name="Overview_UsageByAuthProvider.Text" xml:space="preserve">
+    <value>SAĞLAYICIYA GÖRE KULLANIM</value>
+  </data>
+  <data name="Overview_GroupBy.Text" xml:space="preserve">
+    <value>GRUPLAMA</value>
+  </data>
+  <data name="Overview_GroupByProvider.Content" xml:space="preserve">
+    <value>Sağlayıcı</value>
+  </data>
+  <data name="Overview_GroupByHarness.Content" xml:space="preserve">
+    <value>Araç</value>
+  </data>
+  <data name="Overview_TokenLanes.Text" xml:space="preserve">
+    <value>TOKEN DAĞILIMI</value>
+  </data>
+  <data name="Overview_Tokens.Text" xml:space="preserve">
+    <value>TOKENLER</value>
+  </data>
+  <data name="Overview_ApiEstimate.Text" xml:space="preserve">
+    <value>API TAHMİNİ</value>
+  </data>
+  <data name="Overview_VerifiedPlanLimits.Text" xml:space="preserve">
+    <value>DOĞRULANMIŞ PLAN LİMİTLERİ</value>
+  </data>
+  <data name="Overview_VerifiedPlanLimitsDescription.Text" xml:space="preserve">
+    <value>Yalnızca gerçek kota veya bakiye verisi döndüren sağlayıcılar. Yerel kayıtlar tek başına abonelik kanıtı değildir.</value>
+  </data>
+  <data name="Overview_NextResets.Text" xml:space="preserve">
+    <value>SONRAKİ SIFIRLAMALAR</value>
+  </data>
+  <data name="Overview_NextResetsDescription.Text" xml:space="preserve">
+    <value>Her sağlayıcının bildirdiği sıfırlama zamanları.</value>
+  </data>
+  <data name="Overview_ResetCredits.Text" xml:space="preserve">
+    <value>SIFIRLAMA HAKLARI</value>
+  </data>
+  <data name="Overview_ResetCreditsDescription.Text" xml:space="preserve">
+    <value>Henüz kullanmadığınız limit sıfırlamaları</value>
+  </data>
+
+  <data name="Providers_LoadingStatus.Text" xml:space="preserve">
+    <value>Yerel sağlayıcı durumu okunuyor...</value>
+  </data>
+  <data name="Providers_Title.Text" xml:space="preserve">
+    <value>Bağlantılar</value>
+  </data>
+  <data name="Providers_Description.Text" xml:space="preserve">
+    <value>Mevcut CLI oturumları otomatik algılanır. Bağlantılar her sağlayıcının kendi kullanım panelini açar.</value>
+  </data>
+  <data name="Providers_Search.PlaceholderText" xml:space="preserve">
+    <value>Bağlantılarda ara</value>
+  </data>
+  <data name="Providers_RefreshDetection.Content" xml:space="preserve">
+    <value>Algılamayı yenile</value>
+  </data>
+  <data name="Providers_AuthSource.Text" xml:space="preserve">
+    <value>YETKİLENDİRME KAYNAĞI</value>
+  </data>
+  <data name="Providers_WhatThisMeans.Text" xml:space="preserve">
+    <value>BU NE ANLAMA GELİYOR</value>
+  </data>
+  <data name="Providers_ColumnConnection.Text" xml:space="preserve">
+    <value>BAĞLANTI</value>
+  </data>
+  <data name="Providers_ColumnStatus.Text" xml:space="preserve">
+    <value>DURUM</value>
+  </data>
+
+  <data name="Diagnostics_Eyebrow.Text" xml:space="preserve"><value>UYGULAMA SAĞLIĞI</value></data>
+  <data name="Diagnostics_Title.Text" xml:space="preserve">
+    <value>Tanılama</value>
+  </data>
+  <data name="Diagnostics_Description.Text" xml:space="preserve"><value>Her sayının nereden geldiği, neyin başarısız olduğu ve bu konuda ne yapmanız gerektiği.</value></data>
+  <data name="Diagnostics_Refresh.Content" xml:space="preserve">
+    <value>Tanılamayı yenile</value>
+  </data>
+  <data name="Diagnostics_PricingCatalog.Text" xml:space="preserve"><value>MODEL FİYATLARI</value></data>
+  <data name="Diagnostics_Loading.Text" xml:space="preserve">
+    <value>YÜKLENİYOR</value>
+  </data>
+  <data name="Diagnostics_CheckingLocalCache.Text" xml:space="preserve">
+    <value>Yerel önbellek denetleniyor</value>
+  </data>
+  <data name="Diagnostics_Scanners.Text" xml:space="preserve"><value>YEREL KULLANIM KAYITLARI</value></data>
+  <data name="Diagnostics_DiscoveringTelemetry.Text" xml:space="preserve"><value>Yerel kullanım kayıtları aranıyor</value></data>
+  <data name="Diagnostics_Database.Text" xml:space="preserve"><value>YEREL VERİTABANI</value></data>
+  <data name="Diagnostics_Opening.Text" xml:space="preserve">
+    <value>AÇILIYOR</value>
+  </data>
+  <data name="Diagnostics_InitializingDatabase.Text" xml:space="preserve">
+    <value>Yerel veritabanı başlatılıyor</value>
+  </data>
+  <data name="Diagnostics_AttemptsProvider" xml:space="preserve">
+    <value>SAĞLAYICI</value>
+  </data>
+  <data name="Diagnostics_AttemptsDuration" xml:space="preserve"><value>SÜRE</value></data>
+  <data name="Diagnostics_AttemptsResult" xml:space="preserve"><value>SONUÇ</value></data>
+  <data name="Diagnostics_AttemptsMeaning" xml:space="preserve"><value>BU NE ANLAMA GELİYOR</value></data>
+  <data name="Diagnostics_NoAttempts" xml:space="preserve"><value>Henüz hiçbir sağlayıcı denetlenmedi. Bir denetim çalıştırmak için Yenile'yi seçin.</value></data>
+  <data name="Diagnostics_AttemptsTitle.Text" xml:space="preserve"><value>Son denetimler</value></data>
+  <data name="Diagnostics_AttemptsCaption.Text" xml:space="preserve"><value>En yenisi üstte olmak üzere son 8 deneme. Her satır, QuotaBoard'ın bir sağlayıcının limitlerini aradığı bir yeri gösterir.</value></data>
+
+  <data name="ProviderCard_ShowFewerLimits" xml:space="preserve">
+    <value>Daha az limit göster</value>
+  </data>
+  <data name="Language_SystemDefault" xml:space="preserve">
+    <value>Windows dilini kullan (Önerilen)</value>
+  </data>
+  <data name="Language_English" xml:space="preserve">
+    <value>İngilizce</value>
+  </data>
+  <data name="Language_Turkish" xml:space="preserve">
+    <value>Türkçe</value>
+  </data>
+  <data name="Language_RestartRequired" xml:space="preserve">
+    <value>Dili her yerde uygulamak için QuotaBoard'u yeniden başlatın.</value>
+  </data>
+  <data name="Language_RestartFailed" xml:space="preserve">
+    <value>QuotaBoard otomatik olarak yeniden başlatılamadı. Dili uygulamak için uygulamayı kapatıp yeniden açın.</value>
+  </data>
+  <data name="Settings_Eyebrow.Text" xml:space="preserve"><value>YEREL TERCİHLER</value></data>
+  <data name="Settings_Title.Text" xml:space="preserve"><value>Ayarlar</value></data>
+  <data name="Settings_Description.Text" xml:space="preserve"><value>Görünüm, yenileme, sistem tepsisi, uyarılar, gizlilik ve dil.</value></data>
+  <data name="Settings_AppearanceLifecycle.Text" xml:space="preserve"><value>Görünüm ve yaşam döngüsü</value></data>
+  <data name="Settings_ThemeName.Text" xml:space="preserve"><value>Tema</value></data>
+  <data name="Settings_ThemeNameDescription.Text" xml:space="preserve"><value>Uygulama genelinde kullanılan renk paleti</value></data>
+  <data name="Settings_ThemeMode.Text" xml:space="preserve"><value>Görünüm modu</value></data>
+  <data name="Settings_ThemeModeDescription.Text" xml:space="preserve"><value>Windows'u izleyin ya da açık/koyu olarak zorlayın</value></data>
+  <data name="Settings_ThemeSystem.Content" xml:space="preserve"><value>Sistemi kullan</value></data>
+  <data name="Settings_ThemeLight.Content" xml:space="preserve"><value>Açık</value></data>
+  <data name="Settings_ThemeDark.Content" xml:space="preserve"><value>Koyu</value></data>
+  <data name="Settings_ContentFont.Text" xml:space="preserve"><value>Arayüz yazı tipi</value></data>
+  <data name="Settings_ContentFontDescription.Text" xml:space="preserve"><value>Başlıklar ve gövde metni için yazı tipi</value></data>
+  <data name="Settings_MetricFont.Text" xml:space="preserve"><value>Sayısal yazı tipi</value></data>
+  <data name="Settings_MetricFontDescription.Text" xml:space="preserve"><value>Metrikler ve etiketler için tek aralıklı yazı tipi</value></data>
+  <data name="Settings_FontMatchTheme" xml:space="preserve"><value>Temaya uy</value></data>
+  <data name="Settings_LanguageLabel.Text" xml:space="preserve"><value>Dil</value></data>
+  <data name="Settings_LanguageDescription.Text" xml:space="preserve"><value>Windows dilini izleyin veya görüntüleme dilini geçersiz kılın</value></data>
+  <data name="Settings_StartWithWindowsLabel.Text" xml:space="preserve"><value>Windows ile başlat</value></data>
+  <data name="Settings_StartWithWindowsDescription.Text" xml:space="preserve"><value>Oturum açtığınızda sistem tepsisine küçültülmüş olarak başlat</value></data>
+  <data name="Settings_StartToggle.OffContent" xml:space="preserve"><value>Kapalı</value></data>
+  <data name="Settings_StartToggle.OnContent" xml:space="preserve"><value>Açık</value></data>
+  <data name="Settings_TrayLabel.Text" xml:space="preserve"><value>Sistem tepsisi izleyicisini çalışır tut</value></data>
+  <data name="Settings_TrayDescription.Text" xml:space="preserve"><value>Pencereyi kapatınca kota izlemeyi etkin tut</value></data>
+  <data name="Settings_TrayToggle.OffContent" xml:space="preserve"><value>Kapalı</value></data>
+  <data name="Settings_TrayToggle.OnContent" xml:space="preserve"><value>Açık</value></data>
+  <data name="Settings_Display.Text" xml:space="preserve"><value>Sayaç görünümü</value></data>
+  <data name="Settings_RemainingLabel.Text" xml:space="preserve"><value>Kullanımı kalan olarak göster</value></data>
+  <data name="Settings_RemainingDescription.Text" xml:space="preserve"><value>Kalan kotayı göstermek için yüzdeleri ve ilerleme çubuklarını ters çevir</value></data>
+  <data name="Settings_RemainingToggle.OffContent" xml:space="preserve"><value>Kullanılan</value></data>
+  <data name="Settings_RemainingToggle.OnContent" xml:space="preserve"><value>Kalan</value></data>
+  <data name="Settings_AbsoluteResetLabel.Text" xml:space="preserve"><value>Kesin sıfırlama saatini göster</value></data>
+  <data name="Settings_AbsoluteResetDescription.Text" xml:space="preserve"><value>“3 sa 12 dk içinde” ile yerel saat arasında geçiş yap</value></data>
+  <data name="Settings_AbsoluteToggle.OffContent" xml:space="preserve"><value>Göreli</value></data>
+  <data name="Settings_AbsoluteToggle.OnContent" xml:space="preserve"><value>Kesin</value></data>
+  <data name="Settings_HideZeroLabel.Text" xml:space="preserve"><value>Boş sayaçları gizle</value></data>
+  <data name="Settings_HideZeroDescription.Text" xml:space="preserve"><value>Sıfır kullanımlı ve uygulanamaz sayaçları sağlayıcı kartlarından gizle</value></data>
+  <data name="Settings_HideZeroToggle.OffContent" xml:space="preserve"><value>Göster</value></data>
+  <data name="Settings_HideZeroToggle.OnContent" xml:space="preserve"><value>Gizle</value></data>
+  <data name="Settings_OverviewProviders.Text" xml:space="preserve"><value>Genel bakış sağlayıcıları</value></data>
+  <data name="Settings_OverviewProvidersDescription.Text" xml:space="preserve"><value>Genel bakışta kart olarak görünecek sağlayıcıları seçin. Gizlenen sağlayıcılar yenilenmeye devam eder; Bağlantılar ve Kullanım sayfalarında görünür kalır.</value></data>
+  <data name="Settings_VisibilityOn" xml:space="preserve"><value>Görünür</value></data>
+  <data name="Settings_VisibilityOff" xml:space="preserve"><value>Gizli</value></data>
+  <data name="Settings_ModelPricing.Text" xml:space="preserve"><value>Model fiyatlandırması</value></data>
+  <data name="Settings_ModelPricingDescription.Text" xml:space="preserve"><value>Katalogun fiyatlandıramadığı modeller için 1M token başına USD girin. Bunlar yalnızca boşlukları doldurur; katalog fiyatlandırması asla geçersiz kılınmaz. Boş bırakılan önbellek yazma girdi fiyatından hesaplanır; ücretsiz yapmak için 0 girin.</value></data>
+  <data name="Settings_ModelPricingEmpty.Text" xml:space="preserve"><value>Son 30 günde fiyatlandırılmamış model yok.</value></data>
+  <data name="Settings_ModelPricingSearch.PlaceholderText" xml:space="preserve"><value>Model ara</value></data>
+  <data name="Settings_InputPer1M.Header" xml:space="preserve"><value>Giriş / 1M</value></data>
+  <data name="Settings_OutputPer1M.Header" xml:space="preserve"><value>Çıkış / 1M</value></data>
+  <data name="Settings_CacheReadPer1M.Header" xml:space="preserve"><value>Önbellek okuma / 1M</value></data>
+  <data name="Settings_CacheWritePer1M.Header" xml:space="preserve"><value>Önbellek yazma / 1M</value></data>
+  <data name="Settings_PlanValue.Text" xml:space="preserve"><value>Plan değeri</value></data>
+  <data name="Settings_PlanValueDescription.Text" xml:space="preserve"><value>Bağlı her sağlayıcıya aylık ne kadar ödediğinizi girin. Yalnızca bu makinede algılanan sağlayıcılar listelenir; Genel Bakış'taki plan değeri bunların toplamını API eşdeğeri tahminle karşılaştırır.</value></data>
+  <data name="Settings_NoProviders.Text" xml:space="preserve"><value>Henüz bağlı sağlayıcı algılanmadı. Önce Genel Bakış'ta canlı verileri yenileyin.</value></data>
+  <data name="Settings_Alerts.Text" xml:space="preserve"><value>Uyarılar</value></data>
+  <data name="Settings_QuotaAlertsLabel.Text" xml:space="preserve"><value>Kota uyarıları</value></data>
+  <data name="Settings_QuotaAlertsDescription.Text" xml:space="preserve"><value>%80, %95 ve sıfırlamadan 30 dakika önce bildirim gönder</value></data>
+  <data name="Settings_AlertsToggle.OffContent" xml:space="preserve"><value>Kapalı</value></data>
+  <data name="Settings_AlertsToggle.OnContent" xml:space="preserve"><value>Açık</value></data>
+  <data name="Settings_AlertDedup.Message" xml:space="preserve"><value>Her sağlayıcı, hesap, sayaç, eşik ve sıfırlama döngüsü tam bir kez bildirilir.</value></data>
+  <data name="Settings_Privacy.Text" xml:space="preserve"><value>Gizlilik</value></data>
+  <data name="Settings_BlurEmailsLabel.Text" xml:space="preserve"><value>Hesap e-postalarını gizle</value></data>
+  <data name="Settings_BlurEmailsDescription.Text" xml:space="preserve"><value>Ekran görüntüleri güvenle paylaşılabilsin diye hesap e-postalarını maskeler</value></data>
+  <data name="Settings_BlurEmailsToggle.OffContent" xml:space="preserve"><value>Kapalı</value></data>
+  <data name="Settings_BlurEmailsToggle.OnContent" xml:space="preserve"><value>Açık</value></data>
+  <data name="Usage_Eyebrow.Text" xml:space="preserve"><value>YEREL KULLANIM DEFTERİ</value></data>
+  <data name="Usage_Title.Text" xml:space="preserve"><value>Kullanım, yetkilendiren hesaba göre ilişkilendirilir.</value></data>
+  <data name="Usage_Description.Text" xml:space="preserve"><value>Arac, isteği kaydeden CLI'dır. Sağlayıcı erişimi sunan hesap veya rotadır.</value></data>
+  <data name="Usage_WindowLabel.Text" xml:space="preserve"><value>GEÇMİŞ ARALIĞI</value></data>
+  <data name="Usage_Window7.Content" xml:space="preserve"><value>Son 7 gün</value></data>
+  <data name="Usage_Window30.Content" xml:space="preserve"><value>Son 30 gün</value></data>
+  <data name="Usage_Window90.Content" xml:space="preserve"><value>Son 90 gün</value></data>
+  <data name="Usage_Window365.Content" xml:space="preserve"><value>Son 365 gün</value></data>
+  <data name="Usage_WindowCustom.Content" xml:space="preserve"><value>Özel…</value></data>
+  <data name="Usage_ApplyWindow.Content" xml:space="preserve"><value>Aralığı uygula</value></data>
+  <data name="Usage_TrendTitle.Text" xml:space="preserve"><value>Token kullanımı ve API eşdeğeri maliyet</value></data>
+  <data name="Usage_TokensLegend.Text" xml:space="preserve"><value>Tokenlar</value></data>
+  <data name="Usage_CostLegend.Text" xml:space="preserve"><value>API maliyeti</value></data>
+  <data name="Usage_HeatmapWindow.Text" xml:space="preserve"><value>SON 12 HAFTA</value></data>
+  <data name="Usage_HeatmapTitle.Text" xml:space="preserve"><value>Etkinlik ısı haritası</value></data>
+  <data name="Usage_HeatmapDescription.Text" xml:space="preserve"><value>Kaydedilmiş yerel kullanımın her günü. Koyu renk daha fazla token kullanımı demektir; tam günü görmek için hücrenin üzerine gelin.</value></data>
+  <data name="Usage_ProviderBreakdown.Text" xml:space="preserve"><value>YETKİLENDİRME SAĞLAYICISI DAĞILIMI</value></data>
+  <data name="Usage_ProviderBreakdownDescription.Text" xml:space="preserve"><value>API tahmini, gözlenen token kullanımının genel API fiyatı eşdeğeridir. Abonelik faturası değildir.</value></data>
+  <data name="Usage_AuthProviderColumn.Text" xml:space="preserve"><value>YETKİLENDİRME SAĞLAYICISI</value></data>
+  <data name="Usage_TokensColumn.Text" xml:space="preserve"><value>TOKEN</value></data>
+  <data name="Usage_ApiEstimateColumn.Text" xml:space="preserve"><value>API TAHMİNİ</value></data>
+  <data name="Usage_PricingCoverageColumn.Text" xml:space="preserve"><value>FİYAT KAPSAMI</value></data>
+  <data name="Usage_SourcesColumn.Text" xml:space="preserve"><value>KAYNAKLAR</value></data>
+  <data name="Usage_TokenShare.Text" xml:space="preserve"><value>TOKEN PAYI</value></data>
+  <data name="Usage_ProjectBreakdown.Text" xml:space="preserve"><value>PROJE / WORKTREE BAZINDA</value></data>
+  <data name="Usage_SortTokens.Content" xml:space="preserve"><value>Sırala: token</value></data>
+  <data name="Usage_SortCost.Content" xml:space="preserve"><value>Sırala: maliyet</value></data>
+  <data name="Usage_SortProject.Content" xml:space="preserve"><value>Sırala: proje</value></data>
+  <data name="Usage_ProjectColumn.Text" xml:space="preserve"><value>PROJE</value></data>
+  <data name="Usage_WorktreePathColumn.Text" xml:space="preserve"><value>ÇALIŞMA AĞACI YOLU</value></data>
+  <data name="Usage_RepositoryColumn.Text" xml:space="preserve"><value>PAYLAŞILAN DEPO</value></data>
+  <data name="Usage_ProjectTokensColumn.Text" xml:space="preserve"><value>TOKEN</value></data>
+  <data name="Usage_ProjectCostColumn.Text" xml:space="preserve"><value>API TAHMİNİ</value></data>
+  <data name="Usage_ModelLedger.Text" xml:space="preserve"><value>MODEL DEFTERİ</value></data>
+  <data name="Usage_ModelLedgerDescription.Text" xml:space="preserve"><value>Her model için kayıt kaynağı, yetkilendiren sağlayıcı, token kullanımı ve katalog fiyatlandırma durumu gösterilir.</value></data>
+  <data name="Usage_SourceColumn.Text" xml:space="preserve"><value>KAYNAK</value></data>
+  <data name="Usage_ModelColumn.Text" xml:space="preserve"><value>MODEL</value></data>
+  <data name="Usage_ModelAuthProviderColumn.Text" xml:space="preserve"><value>YETKİLENDİRME SAĞLAYICISI</value></data>
+  <data name="Usage_ModelTokensColumn.Text" xml:space="preserve"><value>TOKEN</value></data>
+  <data name="Usage_ModelApiEstimateColumn.Text" xml:space="preserve"><value>API TAHMİNİ</value></data>
+  <data name="Common_Unknown" xml:space="preserve"><value>Bilinmiyor</value></data>
+  <data name="Countdown_Now" xml:space="preserve"><value>şimdi</value></data>
+  <data name="Countdown_Minutes" xml:space="preserve"><value>{0} dk içinde</value></data>
+  <data name="Countdown_HoursMinutes" xml:space="preserve"><value>{0} sa {1} dk içinde</value></data>
+  <data name="Countdown_DaysHours" xml:space="preserve"><value>{0} gün {1} sa içinde</value></data>
+  <data name="Dashboard_Discovering" xml:space="preserve"><value>Kesin token kaynakları aranıyor</value></data>
+  <data name="Dashboard_SetPlanSpend" xml:space="preserve"><value>Aylık plan harcamasını Ayarlar'da belirleyin</value></data>
+  <data name="Dashboard_CatalogNotLoaded" xml:space="preserve"><value>Fiyat kataloğu yüklenmedi</value></data>
+  <data name="Dashboard_LoadingUpper" xml:space="preserve"><value>YÜKLENİYOR</value></data>
+  <data name="Dashboard_CheckingCache" xml:space="preserve"><value>Yerel fiyat önbelleği denetleniyor</value></data>
+  <data name="Dashboard_DiscoveringTelemetry" xml:space="preserve"><value>Yerel telemetri aranıyor</value></data>
+  <data name="Dashboard_OpeningUpper" xml:space="preserve"><value>AÇILIYOR</value></data>
+  <data name="Dashboard_InitializingDatabase" xml:space="preserve"><value>Yerel veritabanı hazırlanıyor</value></data>
+  <data name="Dashboard_LoadingProviderData" xml:space="preserve"><value>Sağlayıcı verileri yükleniyor…</value></data>
+  <data name="Dashboard_NotLoaded" xml:space="preserve"><value>Yüklenmedi</value></data>
+  <data name="Dashboard_RefreshingProviders" xml:space="preserve"><value>Sağlayıcılar yenileniyor…</value></data>
+  <data name="Dashboard_ReadingProviderData" xml:space="preserve"><value>Kayıtlı sağlayıcı verileri okunuyor…</value></data>
+  <data name="Dashboard_RefreshFailed" xml:space="preserve"><value>Yenileme başarısız. Ayrıntılar için Tanılama'yı denetleyin.</value></data>
+  <data name="Data_ScannerNotRun" xml:space="preserve"><value>Henüz kullanım kaydı okunmadı</value></data>
+  <data name="Data_NoTelemetrySource" xml:space="preserve"><value>Yerel kullanım kaydı bulunamadı</value></data>
+  <data name="Data_EventsInspected" xml:space="preserve"><value>{0:N0} kullanım olayı okundu</value></data>
+  <data name="Data_ScannerFailed" xml:space="preserve"><value>{1} kayıttan {0} tanesi okunamadı: {2}</value></data>
+  <data name="Data_CacheSavings" xml:space="preserve"><value>Önbellek tasarrufu {0}</value></data>
+  <data name="Data_SetPlanSpend" xml:space="preserve"><value>Aylık plan harcamasını Ayarlar'da belirleyin</value></data>
+  <data name="Data_NoPricedUsage30" xml:space="preserve"><value>Son 30 günde fiyatlandırılmış kullanım yok</value></data>
+  <data name="Data_NoPlanUsage30" xml:space="preserve"><value>Son 30 günde abonelikle ilişkilendirilmiş kullanım yok</value></data>
+  <data name="Data_PlanValueDetail" xml:space="preserve"><value>Yapılandırılmış aylık planlarda {0}</value></data>
+  <data name="Data_CachedFetched" xml:space="preserve"><value>Önbellekte · {0:g} tarihinde alındı</value></data>
+  <data name="Data_Updated" xml:space="preserve"><value>{0:t} tarihinde güncellendi</value></data>
+  <data name="Data_RefreshProgressLabel" xml:space="preserve"><value>{0} / {1} sağlayıcı yenileniyor</value></data>
+  <data name="Data_RefreshProgressDetail" xml:space="preserve"><value>{0} getiriliyor…</value></data>
+  <data name="Data_RefreshStageDiscovering" xml:space="preserve"><value>Hesaplar keşfediliyor…</value></data>
+  <data name="Data_RefreshStageScanning" xml:space="preserve"><value>Yerel geçmiş taranıyor…</value></data>
+  <data name="Data_ShowingSaved" xml:space="preserve"><value>Kayıtlı veriler gösteriliyor</value></data>
+  <data name="Data_UnavailableUpper" xml:space="preserve"><value>KULLANILAMIYOR</value></data>
+  <data name="Data_ValidUpper" xml:space="preserve"><value>GEÇERLİ</value></data>
+  <data name="Data_NoPricingCache" xml:space="preserve"><value>Fiyat önbelleği bulunmuyor</value></data>
+  <data name="Data_CatalogAge" xml:space="preserve"><value>models.dev'den {0} önce alındı</value></data>
+  <data name="Data_HealthyUpper" xml:space="preserve"><value>SAĞLIKLI</value></data>
+  <data name="Data_CatalogUnavailable" xml:space="preserve"><value>Katalog kullanılamıyor</value></data>
+  <data name="Data_ModelsDevAge" xml:space="preserve"><value>models.dev · {0} önce</value></data>
+  <data name="Data_ExactSources" xml:space="preserve"><value>{0} kesin kaynak</value></data>
+  <data name="Data_SchemaHealthy" xml:space="preserve"><value>Bu bilgisayarda saklanıyor · şema v5 · WAL</value></data>
+  <data name="Data_NoCatalogMatch" xml:space="preserve"><value>Katalog eşleşmesi yok</value></data>
+  <data name="Data_RateIncomplete" xml:space="preserve"><value>Fiyatlandırma oranı eksik</value></data>
+  <data name="Data_PricedAlias" xml:space="preserve"><value>Açık takma adla fiyatlandırıldı</value></data>
+  <data name="Data_DerivedMultiplier" xml:space="preserve"><value>Türetilmiş çarpanla fiyatlandırıldı</value></data>
+  <data name="Data_PricedExact" xml:space="preserve"><value>Tam eşleşmeyle fiyatlandırıldı</value></data>
+  <data name="Data_PricedManual" xml:space="preserve"><value>Elle fiyat</value></data>
+  <data name="Data_ModelsPriced" xml:space="preserve"><value>{1:N0} modelin {0:N0} tanesi fiyatlandırıldı</value></data>
+  <data name="Data_ModelCount" xml:space="preserve"><value>{0:N0} model</value></data>
+  <data name="Data_DayNoUsage" xml:space="preserve"><value>{0}&#xA;Kullanım yok</value></data>
+  <data name="Data_Others" xml:space="preserve"><value>Diğerleri — {0}</value></data>
+  <data name="Data_DayUsage" xml:space="preserve"><value>{0}&#xA;{1} token&#xA;{2}</value></data>
+  <data name="Data_OneResetCredit" xml:space="preserve"><value>1 sıfırlama kredisi</value></data>
+  <data name="Data_ResetCredits" xml:space="preserve"><value>{0:N0} sıfırlama kredisi</value></data>
+  <data name="Data_NoResetCredits" xml:space="preserve"><value>Kullanılabilir sıfırlama kredisi yok</value></data>
+  <data name="Data_NoExpiry" xml:space="preserve"><value>Son kullanma tarihi yok</value></data>
+  <data name="Data_Expires" xml:space="preserve"><value>Son kullanma: {0}</value></data>
+  <data name="Data_WithoutExpiry" xml:space="preserve"><value> · {0:N0} tanesinde son kullanma yok</value></data>
+  <data name="Data_NewActivityWeek" xml:space="preserve"><value>Bu hafta yeni etkinlik var</value></data>
+  <data name="Data_VsPriorWeek" xml:space="preserve"><value>{0} önceki haftaya göre %{1:0}</value></data>
+  <data name="Data_NoUsage" xml:space="preserve"><value>Kullanım yok</value></data>
+  <data name="Data_Tokens" xml:space="preserve"><value>{0} token</value></data>
+  <data name="Data_ExactTokens" xml:space="preserve"><value>Kesin tokenlar</value></data>
+  <data name="Data_NoTokenData" xml:space="preserve"><value>Token verisi yok</value></data>
+  <data name="Data_LimitsOnly" xml:space="preserve"><value>Yalnızca limitler</value></data>
+  <data name="Data_NoLocalHistory" xml:space="preserve"><value>Yerel kullanım geçmişi bulunamadı</value></data>
+  <data name="Data_NoFactorySession" xml:space="preserve"><value>Factory CLI oturumu algılanmadı</value></data>
+  <data name="Data_NoLocalAccount" xml:space="preserve"><value>Yerel hesap algılanmadı</value></data>
+  <data name="Data_HistoryNotDetected" xml:space="preserve"><value>Geçmiş algılanmadı</value></data>
+  <data name="Data_NotConnected" xml:space="preserve"><value>Bağlı değil</value></data>
+  <data name="Data_LocalHistoryDetected" xml:space="preserve"><value>Yerel geçmiş algılandı</value></data>
+  <data name="Data_FactorySessionDetected" xml:space="preserve"><value>Factory CLI oturumu algılandı</value></data>
+  <data name="Data_OpenCodeCoverage" xml:space="preserve"><value>Kullanım her model sağlayıcısına ayrı ayrı atanır. OpenCode Go veya Zen aboneliği varsayılmaz.</value></data>
+  <data name="Data_ExactLocalTokens" xml:space="preserve"><value>Kesin yerel tokenlar</value></data>
+  <data name="Data_ViewUsageOn" xml:space="preserve"><value>{0} kullanımı</value></data>
+  <data name="Data_ViewCopilotSettings" xml:space="preserve"><value>Copilot ayarları</value></data>
+  <data name="Data_FreshVia" xml:space="preserve"><value>Güncel · {0}</value></data>
+  <data name="Data_SignInRequiredAge" xml:space="preserve"><value>Oturum açmak gerekiyor · {0}</value></data>
+  <data name="Data_CachedAge" xml:space="preserve"><value>Önbellekte · {0}</value></data>
+  <data name="Data_RateLimitedAge" xml:space="preserve"><value>Hız sınırlı · {0}</value></data>
+  <data name="Data_OfflineAge" xml:space="preserve"><value>Çevrimdışı · {0}</value></data>
+  <data name="Data_UnsupportedAge" xml:space="preserve"><value>Desteklenmeyen yanıt · {0}</value></data>
+  <data name="Card_StatusLive" xml:space="preserve"><value>CANLI</value></data>
+  <data name="Card_StatusStale" xml:space="preserve"><value>ESKİ</value></data>
+  <data name="Card_StatusOffline" xml:space="preserve"><value>ÇEVRİMDIŞI</value></data>
+  <data name="Card_StatusRateLimited" xml:space="preserve"><value>HIZ SINIRI</value></data>
+  <data name="Card_StatusSignIn" xml:space="preserve"><value>OTURUM AÇ</value></data>
+  <data name="Card_StatusNoQuota" xml:space="preserve"><value>KOTA YOK</value></data>
+  <data name="Card_StatusError" xml:space="preserve"><value>HATA</value></data>
+  <data name="Data_SignInRequired" xml:space="preserve"><value>Oturum açmak gerekiyor</value></data>
+  <data name="Data_RateLimited" xml:space="preserve"><value>Hız sınırlandı</value></data>
+  <data name="Data_Offline" xml:space="preserve"><value>Çevrimdışı</value></data>
+  <data name="Data_Unsupported" xml:space="preserve"><value>Desteklenmeyen yanıt</value></data>
+  <data name="Data_FetchFailed" xml:space="preserve"><value>Getirme başarısız</value></data>
+  <data name="Data_ConnectedNoQuota" xml:space="preserve"><value>Bağlı · kota verisi yok</value></data>
+  <data name="Data_Success" xml:space="preserve"><value>Başarılı</value></data>
+  <data name="Data_Credits" xml:space="preserve"><value>{0:0.##} kredi</value></data>
+  <data name="Data_AuthCodex" xml:space="preserve"><value>ChatGPT OAuth / API anahtarı</value></data>
+  <data name="Data_AuthClaude" xml:space="preserve"><value>Claude OAuth / API anahtarı</value></data>
+  <data name="Data_AuthOpenCode" xml:space="preserve"><value>Yerel OpenCode geçmişi</value></data>
+  <data name="Data_AuthDroid" xml:space="preserve"><value>Factory CLI oturumu</value></data>
+  <data name="Data_AuthCopilot" xml:space="preserve"><value>GitHub hesabı / Copilot API</value></data>
+  <data name="Data_CoverageCodex" xml:space="preserve"><value>Kota limitleri ve kesin yerel Codex tokenları</value></data>
+  <data name="Data_CoverageClaude" xml:space="preserve"><value>Kota limitleri ve kesin yerel Claude tokenları</value></data>
+  <data name="Data_CoverageOpenCode" xml:space="preserve"><value>Her model sağlayıcısına atanan kesin yerel tokenlar</value></data>
+  <data name="Data_CoverageDroid" xml:space="preserve"><value>Factory kota limitleri ve kesin yerel Droid tokenları</value></data>
+  <data name="Data_CoverageCopilot" xml:space="preserve"><value>Copilot kota limitleri ve varsa kesin yerel kullanım</value></data>
+  <data name="Meter_PercentUsed" xml:space="preserve"><value>%{0:0.#} kullanıldı</value></data>
+  <data name="Meter_MeasureUsed" xml:space="preserve"><value>{0} kullanıldı</value></data>
+  <data name="Meter_PercentRemaining" xml:space="preserve"><value>%{0:0.#} kaldı</value></data>
+  <data name="Meter_MeasureRemaining" xml:space="preserve"><value>{0} kaldı</value></data>
+  <data name="Meter_NoScheduledReset" xml:space="preserve"><value>Planlanmış sıfırlama yok</value></data>
+  <data name="Meter_ResetsIn" xml:space="preserve"><value>{0} sıfırlanır</value></data>
+  <data name="Meter_ResetsAt" xml:space="preserve"><value>{0:g} tarihinde sıfırlanır</value></data>
+  <data name="Meter_PaceExhaustNow" xml:space="preserve"><value>Bu hızla şimdi tükenecek</value></data>
+  <data name="Meter_PaceExhaustBeforeReset" xml:space="preserve"><value>Bu hızla {0}, sıfırlamadan önce tükenecek</value></data>
+  <data name="Meter_PaceByReset" xml:space="preserve"><value>Bu hızla sıfırlamada yaklaşık %{0:0}</value></data>
+  <data name="Meter_StatusStale" xml:space="preserve"><value>ESKİ</value></data>
+  <data name="Meter_StatusExhausted" xml:space="preserve"><value>TÜKENDİ</value></data>
+  <data name="Meter_StatusCritical" xml:space="preserve"><value>KRİTİK</value></data>
+  <data name="Meter_StatusWatch" xml:space="preserve"><value>DİKKAT</value></data>
+  <data name="Meter_StatusOnTrack" xml:space="preserve"><value>YOLUNDA</value></data>
+  <data name="ProviderCard_MoreLimits" xml:space="preserve"><value>+{0} limit daha</value></data>
+  <data name="ProviderCard_ViewProvider" xml:space="preserve"><value>Sağlayıcıyı görüntüle</value></data>
+  <data name="ProviderCard_ServiceIncident" xml:space="preserve"><value>HİZMET SORUNU</value></data>
+  <data name="Reset_AutomationName" xml:space="preserve"><value>Kota sıfırlama anımsatıcısı</value></data>
+  <data name="Settings_DetectedPlan" xml:space="preserve"><value>{0} algılandı</value></data>
+  <data name="Settings_DetectedPlanNamed" xml:space="preserve"><value>{0} planı algılandı</value></data>
+  <data name="Settings_UsdPerMonth" xml:space="preserve"><value>USD / ay</value></data>
+  <data name="Settings_DetectedPrice" xml:space="preserve"><value>Algılanan fiyat: ayda ${0:0.##}</value></data>
+  <data name="Tray_Open" xml:space="preserve"><value>QuotaBoard'u aç</value></data>
+  <data name="Tray_Refresh" xml:space="preserve"><value>Yenile</value></data>
+  <data name="Tray_Quit" xml:space="preserve"><value>Çık</value></data>
+  <data name="Tray_NoMeters" xml:space="preserve"><value>Henüz kullanılabilir kota ölçeri yok.</value></data>
+  <data name="Tray_Hint" xml:space="preserve"><value>Durum için sol tıklayın · işlemler için sağ tıklayın</value></data>
+  <data name="Tray_TooltipNoMeters" xml:space="preserve"><value>QuotaBoard · henüz ölçer yok</value></data>
+  <data name="UsageWindow_LastDays" xml:space="preserve"><value>Son {0} gün</value></data>
+  <data name="UsageWindow_Summary" xml:space="preserve"><value>{0} token · {1} API tahmini</value></data>
+  <data name="UsageWindow_SelectedPeriod" xml:space="preserve"><value>Seçili dönem</value></data>
+  <data name="UsageWindow_Days" xml:space="preserve"><value>{0} günlük</value></data>
+  <data name="UsageWindow_Breakdown" xml:space="preserve"><value>{0}&#xA;{1} token&#xA;{2} API tahmini</value></data>
+  <data name="UsageWindow_WorktreeSuffix" xml:space="preserve"><value> · çalışma ağacı</value></data>
+  <data name="UsageWindow_ProjectReconciled" xml:space="preserve"><value>Uzlaştırıldı · toplam {0}</value></data>
+  <data name="UsageWindow_ProjectMismatch" xml:space="preserve"><value>Proje toplamı {0} · geçmiş toplamı {1}</value></data>
+  <data name="UsageWindow_Comparison" xml:space="preserve"><value>{0}: token kullanımı önceki döneme göre {1} · maliyet {2}</value></data>
+  <data name="Delta_NoChange" xml:space="preserve"><value>değişmedi</value></data>
+  <data name="Delta_New" xml:space="preserve"><value>yeni</value></data>
+  <data name="Delta_Unavailable" xml:space="preserve"><value>kullanılamıyor</value></data>
+  <data name="Runtime_AccountCodex" xml:space="preserve"><value>Codex CLI hesabı</value></data>
+  <data name="Runtime_AccountClaude" xml:space="preserve"><value>Claude Code hesabı</value></data>
+  <data name="Runtime_AccountOpenCode" xml:space="preserve"><value>OpenCode CLI geçmişi</value></data>
+  <data name="Runtime_AccountDroid" xml:space="preserve"><value>Factory / Droid</value></data>
+  <data name="Runtime_AccountCopilot" xml:space="preserve"><value>GitHub Copilot</value></data>
+  <data name="Runtime_AuthCodex" xml:space="preserve"><value>ChatGPT OAuth</value></data>
+  <data name="Runtime_AuthClaude" xml:space="preserve"><value>Claude Code OAuth</value></data>
+  <data name="Runtime_AuthOpenCode" xml:space="preserve"><value>Yerel kullanım geçmişi</value></data>
+  <data name="Runtime_AuthDroid" xml:space="preserve"><value>Factory CLI oturumu / isteğe bağlı API anahtarı</value></data>
+  <data name="Runtime_AuthCopilot" xml:space="preserve"><value>GitHub cihaz yetkilendirmesi</value></data>
+  <data name="Runtime_AuthOpenCodeMetadata" xml:space="preserve"><value>Yerel geçmiş + sağlayıcı kimlik doğrulama meta verileri</value></data>
+  <data name="Runtime_AuthOpenCodeDatabase" xml:space="preserve"><value>Yerel kullanım veritabanı</value></data>
+  <data name="Runtime_AuthDroidSession" xml:space="preserve"><value>Factory CLI oturumu</value></data>
+  <data name="Runtime_AuthDroidApiKey" xml:space="preserve"><value>İsteğe bağlı API anahtarı</value></data>
+  <data name="Runtime_MeterPrimaryLimit" xml:space="preserve"><value>Birincil limit</value></data>
+  <data name="Runtime_MeterSecondaryLimit" xml:space="preserve"><value>İkincil limit</value></data>
+  <data name="Runtime_MeterIndividualLimit" xml:space="preserve"><value>Bireysel limit</value></data>
+  <data name="Runtime_MeterWeeklyLimit" xml:space="preserve"><value>Haftalık limit</value></data>
+  <data name="Runtime_MeterFiveHourLimit" xml:space="preserve"><value>5 saatlik limit</value></data>
+  <data name="Runtime_MeterMonthlyLimit" xml:space="preserve"><value>Aylık limit</value></data>
+  <data name="Runtime_MeterGoSessionBudget" xml:space="preserve"><value>Go oturum bütçesi</value></data>
+  <data name="Runtime_MeterGoWeeklyBudget" xml:space="preserve"><value>Go haftalık bütçesi</value></data>
+  <data name="Runtime_MeterGoMonthlyBudget" xml:space="preserve"><value>Go aylık bütçesi</value></data>
+  <data name="Runtime_MeterStandardTokens" xml:space="preserve"><value>Standart tokenlar</value></data>
+  <data name="Runtime_MeterPremiumTokens" xml:space="preserve"><value>Premium tokenlar</value></data>
+  <data name="Runtime_MeterExtraUsageBalance" xml:space="preserve"><value>Ek kullanım bakiyesi</value></data>
+  <data name="Runtime_MeterCredits" xml:space="preserve"><value>Krediler</value></data>
+  <data name="Runtime_MeterCodexExtraLimit" xml:space="preserve"><value>Codex ek limiti</value></data>
+  <data name="Runtime_SecondaryMeter" xml:space="preserve"><value>İkincil {0}</value></data>
+  <data name="Runtime_WeeklyLimitFor" xml:space="preserve"><value>{0} haftalık limiti</value></data>
+  <data name="Runtime_FiveHourLimitFor" xml:space="preserve"><value>{0} 5 saatlik limiti</value></data>
+  <data name="Runtime_MonthlyLimitFor" xml:space="preserve"><value>{0} aylık limiti</value></data>
+  <data name="Runtime_LimitFor" xml:space="preserve"><value>{0} limiti</value></data>
+  <data name="Runtime_TokensFor" xml:space="preserve"><value>{0} tokenları</value></data>
+  <data name="Runtime_FailureAuthentication" xml:space="preserve"><value>Kimlik doğrulama başarısız</value></data>
+  <data name="Runtime_FailureAuthorization" xml:space="preserve"><value>Yetkilendirme başarısız</value></data>
+  <data name="Runtime_FailureAccountMismatch" xml:space="preserve"><value>Hesap uyuşmazlığı</value></data>
+  <data name="Runtime_FailureRateLimited" xml:space="preserve"><value>İstek sınırlandı</value></data>
+  <data name="Runtime_FailureNetwork" xml:space="preserve"><value>Ağ hatası</value></data>
+  <data name="Runtime_FailureTimeout" xml:space="preserve"><value>Zaman aşımı</value></data>
+  <data name="Runtime_FailureMalformed" xml:space="preserve"><value>Sağlayıcı yanıtı bozuk</value></data>
+  <data name="Runtime_FailureProviderChanged" xml:space="preserve"><value>Sağlayıcı yanıtı değişti</value></data>
+  <data name="Runtime_FailureCancelled" xml:space="preserve"><value>İptal edildi</value></data>
+  <data name="Runtime_FailureUnsupported" xml:space="preserve"><value>Desteklenmiyor</value></data>
+  <data name="Runtime_FailureUnknown" xml:space="preserve"><value>Bilinmeyen hata</value></data>
+  <data name="Runtime_MeaningSuccess" xml:space="preserve"><value>Limitler okundu ve Genel Bakış'ta gösteriliyor.</value></data>
+  <data name="Runtime_MeaningAuthentication" xml:space="preserve"><value>Bu sağlayıcının CLI'ında veya uygulamasında yeniden oturum açın.</value></data>
+  <data name="Runtime_MeaningAuthorization" xml:space="preserve"><value>Bu hesabın söz konusu limitleri okuma izni yok.</value></data>
+  <data name="Runtime_MeaningAccountMismatch" xml:space="preserve"><value>Yanıt başka bir hesaba aitti, bu yüzden yok sayıldı.</value></data>
+  <data name="Runtime_MeaningRateLimited" xml:space="preserve"><value>Sağlayıcı QuotaBoard'dan yavaşlamasını istedi. Daha sonra yeniden denenecek.</value></data>
+  <data name="Runtime_MeaningNetwork" xml:space="preserve"><value>QuotaBoard sağlayıcıya ulaşamadı.</value></data>
+  <data name="Runtime_MeaningTimeout" xml:space="preserve"><value>Sağlayıcı zamanında yanıt vermedi.</value></data>
+  <data name="Runtime_MeaningMalformed" xml:space="preserve"><value>Yanıt okunamadı, bu yüzden ekranda hiçbir şey değiştirilmedi.</value></data>
+  <data name="Runtime_MeaningProviderChanged" xml:space="preserve"><value>Bu sağlayıcı yanıtını değiştirdi. Okuyabilmek için QuotaBoard'ın güncellenmesi gerekiyor.</value></data>
+  <data name="Runtime_MeaningCancelled" xml:space="preserve"><value>Yenileme, bu denetim bitmeden iptal edildi.</value></data>
+  <data name="Runtime_MeaningUnsupported" xml:space="preserve"><value>Bu sağlayıcı planınız için limit yayınlamıyor.</value></data>
+  <data name="Runtime_MeaningUnknown" xml:space="preserve"><value>Denetim bilinmeyen bir nedenle başarısız oldu. Yeniden yenilemeyi deneyin.</value></data>
+  <data name="Runtime_ApiKeySuffix" xml:space="preserve"><value>(API anahtarı)</value></data>
+  <data name="Runtime_StatusMinor" xml:space="preserve"><value>Küçük çaplı hizmet kesintisi</value></data>
+  <data name="Runtime_StatusMajor" xml:space="preserve"><value>Kısmi sistem kesintisi</value></data>
+  <data name="Runtime_StatusCritical" xml:space="preserve"><value>Büyük sistem kesintisi</value></data>
+  <data name="Runtime_StatusMaintenance" xml:space="preserve"><value>Bakım çalışması</value></data>
+  <data name="Runtime_StatusUnknown" xml:space="preserve"><value>Hizmet kesintisi</value></data>
+  <data name="Alert_UsageTitle" xml:space="preserve"><value>{0} · {1} %{2:0} seviyesine ulaştı</value></data>
+  <data name="Alert_UsageWithReset" xml:space="preserve"><value>%{0:0.#} kullanıldı · {1:g} tarihinde sıfırlanır</value></data>
+  <data name="Alert_Usage" xml:space="preserve"><value>%{0:0.#} kullanıldı</value></data>
+  <data name="Alert_ResetTitle" xml:space="preserve"><value>{0} · {1} yakında sıfırlanacak</value></data>
+  <data name="Alert_ResetMessage" xml:space="preserve"><value>{0} sonra sıfırlanır.</value></data>
+  <data name="Alert_HoursMinutes" xml:space="preserve"><value>{0} sa {1} dk</value></data>
+  <data name="Alert_Minutes" xml:space="preserve"><value>{0} dk</value></data>
+  <data name="Usage_AnalysisEyebrow.Text" xml:space="preserve"><value>KULLANIM ANALİZİ</value></data>
+  <data name="Usage_AnalysisTitle.Text" xml:space="preserve"><value>Dönem karşılaştırması</value></data>
+  <data name="Usage_AnalysisDescription.Text" xml:space="preserve"><value>Seçili aralık ile 7, 30 ve 90 günlük dönemlerin önceki dönem karşılaştırması.</value></data>
+  <data name="Usage_ShowMore" xml:space="preserve"><value>Daha fazla göster ({0} kaldı)</value></data>
+  <data name="Usage_ShowLess" xml:space="preserve"><value>Daha az göster</value></data>
+  <data name="UsageWindow_ModelLine" xml:space="preserve"><value>{0} · {1}</value></data>
+
+  <data name="Data_AuthAmp" xml:space="preserve"><value>Amp CLI / erişim tokenı</value></data>
+  <data name="Data_CoverageAmp" xml:space="preserve"><value>Kesin son iş parçacığı tokenları, abonelik kullanımı ve kredi bakiyeleri</value></data>
+  <data name="Runtime_AccountAmp" xml:space="preserve"><value>Amp hesabı</value></data>
+  <data name="Runtime_AuthAmp" xml:space="preserve"><value>Amp CLI / erişim tokenı</value></data>
+  <data name="Data_AuthCursor" xml:space="preserve"><value>Mevcut Cursor uygulama oturumu</value></data>
+  <data name="Data_CoverageCursor" xml:space="preserve"><value>Cursor web kullanım limitleri ve kullanım olaylarından kesin istek tokenları</value></data>
+  <data name="Runtime_AccountCursor" xml:space="preserve"><value>Cursor hesabı</value></data>
+  <data name="Runtime_AuthCursor" xml:space="preserve"><value>Cursor uygulama oturumu</value></data>
+  <data name="Catalog_Checking" xml:space="preserve"><value>Denetleniyor…</value></data>
+  <data name="Catalog_Loaded" xml:space="preserve"><value>YÜKLENDİ</value></data>
+  <data name="Catalog_Unavailable" xml:space="preserve"><value>KULLANILAMIYOR</value></data>
+  <data name="Catalog_NoCache" xml:space="preserve"><value>Henüz katalog indirilmedi.</value></data>
+  <data name="Catalog_Detail" xml:space="preserve"><value>{0} model fiyatlandı · doğrulama {1} · {2}</value></data>
+  <data name="Catalog_NextDue" xml:space="preserve"><value>08:00 ve 20:00'de yenilenir · sonraki {0}</value></data>
+  <data name="Catalog_NextDueUnknown" xml:space="preserve"><value>08:00 ve 20:00'de yenilenir</value></data>
+  <data name="Catalog_RefreshFailed" xml:space="preserve"><value>Yenileme başarısız.</value></data>
+  <data name="Settings_ModelCatalog.Text" xml:space="preserve"><value>Model kataloğu</value></data>
+  <data name="Settings_ModelCatalogDescription.Text" xml:space="preserve"><value>Token fiyatları models.dev'den gelir. Günde iki kez kendiliğinden yenilenir; hemen istiyorsanız buradan yenileyin.</value></data>
+  <data name="Settings_ModelCatalogRefresh.Content" xml:space="preserve"><value>Şimdi yenile</value></data>
+  <data name="Settings_ModelCatalogSource.Text" xml:space="preserve"><value>models.dev/api.json</value></data>
+</root>

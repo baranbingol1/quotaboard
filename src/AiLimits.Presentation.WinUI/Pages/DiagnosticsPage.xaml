@@ -1,0 +1,64 @@
+﻿<Page
+    x:Class="AiLimits.Presentation.WinUI.Pages.DiagnosticsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="{ThemeResource PageBackgroundBrush}">
+    <ScrollViewer>
+        <Grid Padding="34,28,34,48" RowSpacing="18">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MinWidth="240" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock x:Uid="Diagnostics_Eyebrow" Style="{StaticResource EyebrowTextStyle}" />
+                    <TextBlock x:Uid="Diagnostics_Title" Style="{StaticResource PageTitleTextStyle}" Margin="0,5,0,0" />
+                    <TextBlock x:Uid="Diagnostics_Description"
+                               Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+                <Button Grid.Column="1" x:Uid="Diagnostics_Refresh" Command="{x:Bind ViewModel.RefreshCommand}"
+                        HorizontalAlignment="Right" VerticalAlignment="Bottom" Style="{StaticResource AccentButtonStyle}" />
+            </Grid>
+            <Grid x:Name="StatusGrid" Grid.Row="1" ColumnSpacing="14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MinWidth="150" />
+                    <ColumnDefinition Width="*" MinWidth="150" />
+                    <ColumnDefinition Width="*" MinWidth="150" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource SurfaceBorderStyle}">
+                    <StackPanel>
+                        <TextBlock x:Uid="Diagnostics_PricingCatalog" Style="{StaticResource EyebrowTextStyle}" />
+                        <TextBlock x:Uid="Diagnostics_Loading" FontFamily="{ThemeResource MetricFont}" FontSize="24" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Uid="Diagnostics_CheckingLocalCache" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Style="{StaticResource SurfaceBorderStyle}">
+                    <StackPanel>
+                        <TextBlock x:Uid="Diagnostics_Scanners" Style="{StaticResource EyebrowTextStyle}" />
+                        <TextBlock Text="0 / 0" FontFamily="{ThemeResource MetricFont}" FontSize="24" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Uid="Diagnostics_DiscoveringTelemetry" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Style="{StaticResource SurfaceBorderStyle}">
+                    <StackPanel>
+                        <TextBlock x:Uid="Diagnostics_Database" Style="{StaticResource EyebrowTextStyle}" />
+                        <TextBlock x:Uid="Diagnostics_Opening" FontFamily="{ThemeResource MetricFont}" FontSize="24" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Uid="Diagnostics_InitializingDatabase" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+            <StackPanel Grid.Row="2" Spacing="4">
+                <TextBlock x:Uid="Diagnostics_AttemptsTitle" Style="{StaticResource SectionTitleTextStyle}" />
+                <TextBlock x:Uid="Diagnostics_AttemptsCaption"
+                           Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" />
+            </StackPanel>
+            <Border x:Name="AttemptsHost" Grid.Row="3" Style="{StaticResource SurfaceBorderStyle}" Padding="0" />
+        </Grid>
+    </ScrollViewer>
+</Page>

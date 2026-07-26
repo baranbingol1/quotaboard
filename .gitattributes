@@ -1,0 +1,39 @@
+# Line endings are decided here, not by each clone's core.autocrlf setting.
+# Every text file is stored LF in the repository and checked out with the
+# platform's ending; the exceptions below pin an ending where a tool cares.
+* text=auto
+
+# Agent bootstrap scripts run under bash in a Linux container. A CRLF
+# checkout breaks them on the shebang line with $'\r': command not found.
+.agents/resume text eol=lf
+.agents/setup  text eol=lf
+*.sh           text eol=lf
+
+# Windows PowerShell tolerates LF, but the scripts are Windows-only and
+# CRLF keeps them readable in Notepad and the ISE.
+*.ps1  text eol=crlf
+*.psm1 text eol=crlf
+*.cmd  text eol=crlf
+*.bat  text eol=crlf
+
+# Declared so Git never has to guess from file contents.
+*.cs       text diff=csharp
+*.xaml     text
+*.csproj   text
+*.props    text
+*.targets  text
+*.slnx     text
+*.pubxml   text
+*.resw     text
+*.manifest text
+*.json     text
+*.yml      text
+*.md       text
+*.txt      text
+
+# Binary assets: no ending conversion, no textual diff.
+*.png binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.db  binary

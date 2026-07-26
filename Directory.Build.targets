@@ -1,0 +1,7 @@
+<Project>
+  <!-- Explicitly override Microsoft.Data.Sqlite's older native bundle. Version 3.0.3
+       carries SQLite 3.53.x and removes GHSA-2m69-gcr7-jv3q from the graph. -->
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'AiLimits.Infrastructure'">
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" VersionOverride="3.0.3" />
+  </ItemGroup>
+</Project>

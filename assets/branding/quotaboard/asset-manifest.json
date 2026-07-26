@@ -1,0 +1,72 @@
+﻿{
+  "source": "approved QuotaBoard refinement proof generated in this task",
+  "selection": "approved MONO variant of polished concept 7",
+  "generated_files": [
+    "quotaboard-mono-master-1024.png",
+    "quotaboard-mono-16.png",
+    "quotaboard-mono-20.png",
+    "quotaboard-mono-24.png",
+    "quotaboard-mono-30.png",
+    "quotaboard-mono-32.png",
+    "quotaboard-mono-36.png",
+    "quotaboard-mono-40.png",
+    "quotaboard-mono-48.png",
+    "quotaboard-mono-60.png",
+    "quotaboard-mono-64.png",
+    "quotaboard-mono-72.png",
+    "quotaboard-mono-80.png",
+    "quotaboard-mono-96.png",
+    "quotaboard-mono-128.png",
+    "quotaboard-mono-256.png",
+    "quotaboard-mono-512.png",
+    "quotaboard-mono.ico"
+  ],
+  "png_sizes": [
+    16,
+    20,
+    24,
+    30,
+    32,
+    36,
+    40,
+    48,
+    60,
+    64,
+    72,
+    80,
+    96,
+    128,
+    256,
+    512
+  ],
+  "ico_sizes": [
+    16,
+    20,
+    24,
+    32,
+    40,
+    48,
+    64,
+    96,
+    128,
+    256
+  ],
+  "validation": {
+    "canvas": [
+      1024,
+      1024
+    ],
+    "visible_bbox": [
+      128,
+      145,
+      896,
+      879
+    ],
+    "visible_width": 768,
+    "visible_height": 734,
+    "transparent_corners": true,
+    "color": "#171A1C"
+  }
+}
+
+
