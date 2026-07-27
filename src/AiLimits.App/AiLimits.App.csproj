@@ -31,4 +31,5 @@
     <Content Include="Assets\QuotaBoard-Light.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\QuotaBoard-Tray-Glyph.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <Import Project="PublishLayout.targets" />
 </Project>

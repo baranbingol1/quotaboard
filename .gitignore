@@ -36,6 +36,13 @@ GeneratedFiles/
 .env.*
 !.env.example
 
+# Local AI coding-assistant instructions and skills
+/.agents/
+/.claude/
+/AGENTS.md
+/agents.md
+/CLAUDE.md
+
 # OS metadata
 .DS_Store
 Thumbs.db
