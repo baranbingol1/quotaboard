@@ -11,6 +11,15 @@ shape of the code; the code itself is the specification.
   acceptance criteria, and the locked product decisions.
 - [06 — Implementation status](06-implementation-status.md): what is built, what
   is partial, and what is not started.
+- [07 — Design principles](07-design-principles.md): the product personality,
+  the five ranked principles that resolve design trade-offs, and the
+  theme/spacing governance rules every visual change is judged against.
+- [08 — Design tokens](08-design-tokens.md): the named color slots, chart
+  series rules, type scale, spacing scale, radii, and motion values that all
+  XAML must be expressed in.
+- [09 — Usage page critique](09-usage-critique.md): the first critique pass
+  against the design docs — what was fixed, what was examined and accepted,
+  and the ranked design backlog.
 - [Provider release checklist](provider-release-checklist.md): what must be
   true before a new provider adapter ships.
 
