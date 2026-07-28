@@ -12,8 +12,13 @@ param(
     #      stays clean.
     #   2. Local development: canonical hand-launchable install at
     #      <repoRoot>\app\win-<arch>\.
-    # Explicit -OutputPath always wins.
-    [string]$OutputPath
+    # Explicit -OutputPath always wins, but the target is recursively deleted
+    # before publishing, so test-publish-output-path.ps1 vets it: scratch
+    # locations (repo app\, temp dirs) pass, anything else needs
+    # -AllowExternalOutputPath, and some locations are always refused.
+    [string]$OutputPath,
+
+    [switch]$AllowExternalOutputPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -33,6 +38,12 @@ if (-not $OutputPath) {
 }
 
 $resolvedOutput = [System.IO.Path]::GetFullPath($OutputPath)
+
+# The output directory is recursively deleted below; vet it first.
+& "$PSScriptRoot\test-publish-output-path.ps1" `
+    -ResolvedOutput $resolvedOutput `
+    -RepositoryRoot $repositoryRoot `
+    -AllowExternalOutputPath:$AllowExternalOutputPath
 
 $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
 if (-not $dotnet) {
