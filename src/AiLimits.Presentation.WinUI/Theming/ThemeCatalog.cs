@@ -20,8 +20,8 @@ public static class ThemeCatalog
         new("#1a1b26", "#e1e2e7"),
         new("#1e2030", "#d5d6db"),
         new("#222436", "#c8c9ce"),
-        new("#c8d3f5", "#3760bf"),
-        new("#828bb8", "#8990a3"),
+        new("#c8d3f5", "#3258AF"),
+        new("#828bb8", "#555B6C"),
         new("#737aa2", "#737a8c"),
         new("#9099b2", "#5a607d"),
         new("#545c7e", "#9699a8"),
@@ -29,7 +29,7 @@ public static class ThemeCatalog
         new("#ff966c", "#b15c00"),
         new("#ff757f", "#f52a65"),
         new("#82aaff", "#2e7de9"),
-        new ThemeColor[] { new("#82aaff", "#2e7de9"), new("#c3e88d", "#587539"), new("#ff966c", "#b15c00"), new("#c099ff", "#9854f1"), new("#ff966c", "#b15c00"), new("#ff757f", "#f52a65") });
+        new ThemeColor[] { new("#82aaff", "#2e7de9"), new("#c3e88d", "#587539"), new("#ff966c", "#b15c00"), new("#c099ff", "#9854f1"), new("#73daca", "#118c74"), new("#ff757f", "#f52a65") });
 
     public static readonly ThemePalette Catppuccin = new(
         "catppuccin",
@@ -41,7 +41,7 @@ public static class ThemeCatalog
         new("#181825", "#e6e9ef"),
         new("#11111b", "#dce0e8"),
         new("#cdd6f4", "#4c4f69"),
-        new("#9399b2", "#7c7f93"),
+        new("#9399b2", "#636679"),
         new("#313244", "#ccd0da"),
         new("#45475a", "#bcc0cc"),
         new("#585b70", "#acb0be"),
@@ -81,7 +81,7 @@ public static class ThemeCatalog
         new("#3c3836", "#ebdbb2"),
         new("#504945", "#d5c4a1"),
         new("#ebdbb2", "#3c3836"),
-        new("#928374", "#7c6f64"),
+        new("#928374", "#685D54"),
         new("#665c54", "#bdae93"),
         new("#ebdbb2", "#3c3836"),
         new("#504945", "#d5c4a1"),
@@ -109,7 +109,7 @@ public static class ThemeCatalog
         new("#D08770", "#D08770"),
         new("#BF616A", "#BF616A"),
         new("#88C0D0", "#5E81AC"),
-        new ThemeColor[] { new("#88C0D0", "#5E81AC"), new("#A3BE8C", "#A3BE8C"), new("#8FBCBB", "#8FBCBB"), new("#81A1C1", "#81A1C1"), new("#D08770", "#D08770"), new("#BF616A", "#BF616A") });
+        new ThemeColor[] { new("#88C0D0", "#5E81AC"), new("#A3BE8C", "#A3BE8C"), new("#EBCB8B", "#EBCB8B"), new("#81A1C1", "#81A1C1"), new("#D08770", "#D08770"), new("#BF616A", "#BF616A") });
 
     public static readonly ThemePalette Everforest = new(
         "everforest",
@@ -121,7 +121,7 @@ public static class ThemeCatalog
         new("#333c43", "#efebd4"),
         new("#343f44", "#f4f0d9"),
         new("#d3c6aa", "#5c6a72"),
-        new("#7a8478", "#a6b0a0"),
+        new("#7a8478", "#616C5A"),
         new("#859289", "#939f91"),
         new("#9da9a0", "#829181"),
         new("#7a8478", "#a6b0a0"),
@@ -129,7 +129,7 @@ public static class ThemeCatalog
         new("#e69875", "#f57d26"),
         new("#e67e80", "#f85552"),
         new("#83c092", "#35a77c"),
-        new ThemeColor[] { new("#a7c080", "#8da101"), new("#a7c080", "#8da101"), new("#d699b6", "#df69ba"), new("#7fbbb3", "#3a94c5"), new("#e69875", "#f57d26"), new("#e67e80", "#f85552") });
+        new ThemeColor[] { new("#a7c080", "#8da101"), new("#dbbc7f", "#dfa000"), new("#d699b6", "#df69ba"), new("#7fbbb3", "#3a94c5"), new("#e69875", "#f57d26"), new("#e67e80", "#f85552") });
 
     public static readonly ThemePalette Kanagawa = new(
         "kanagawa",
@@ -169,7 +169,7 @@ public static class ThemeCatalog
         new("#E6B673", "#E6B673"),
         new("#D95757", "#D95757"),
         new("#39BAE6", "#39BAE6"),
-        new ThemeColor[] { new("#59C2FF", "#59C2FF"), new("#7FD962", "#7FD962"), new("#E6B450", "#E6B450"), new("#D2A6FF", "#D2A6FF"), new("#E6B673", "#E6B673"), new("#D95757", "#D95757") });
+        new ThemeColor[] { new("#59C2FF", "#59C2FF"), new("#7FD962", "#7FD962"), new("#E6B450", "#E6B450"), new("#D2A6FF", "#D2A6FF"), new("#95E6CB", "#95E6CB"), new("#D95757", "#D95757") });
 
     public static readonly ThemePalette Onedark = new(
         "one-dark",
@@ -181,7 +181,7 @@ public static class ThemeCatalog
         new("#21252b", "#f0f0f1"),
         new("#353b45", "#eaeaeb"),
         new("#abb2bf", "#383a42"),
-        new("#5c6370", "#a0a1a7"),
+        new("#5c6370", "#6A6B72"),
         new("#393f4a", "#d1d1d2"),
         new("#61afef", "#4078f2"),
         new("#2c313a", "#e0e0e1"),
