@@ -21,6 +21,18 @@
             <Setter Property="BorderBrush" Value="{ThemeResource SurfaceStrokeBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="7" />
+            <!-- ItemTemplate instead of DisplayMemberPath: the default presenter
+                 clips long labels mid-glyph ("Anthropic (Claude (") at this panel
+                 width. Trimming with an ellipsis plus a tooltip keeps the full
+                 name one hover away. -->
+            <Setter Property="ItemTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis"
+                                   ToolTipService.ToolTip="{Binding Label}" />
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
         <Style x:Key="ChartSeriesToggleStyle" TargetType="ToggleButton">
             <Setter Property="MinHeight" Value="28" />
@@ -113,21 +125,25 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <!-- Full-width rows, not two half columns: at this panel width a
+                             split column leaves ~86px per picker, and the Compare face
+                             clipped to "Previc…". Stacking matches the Date range row
+                             above and keeps every option readable. -->
+                        <StackPanel Spacing="14">
                             <StackPanel Spacing="5"><TextBlock Text="Time grain" FontSize="11" Foreground="{ThemeResource TextSecondaryBrush}"/><ComboBox x:Name="TimeGrainPicker" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="OnQueryControlChanged"><ComboBoxItem Content="Auto" Tag="auto"/><ComboBoxItem Content="Day" Tag="day"/><ComboBoxItem Content="Week" Tag="week"/><ComboBoxItem Content="Month" Tag="month"/></ComboBox></StackPanel>
-                            <StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="Compare" FontSize="11" Foreground="{ThemeResource TextSecondaryBrush}"/><ComboBox x:Name="ComparePicker" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="OnQueryControlChanged"><ComboBoxItem Content="Previous" Tag="previous"/><ComboBoxItem Content="Off" Tag="none"/></ComboBox></StackPanel>
-                        </Grid>
+                            <StackPanel Spacing="5"><TextBlock Text="Compare" FontSize="11" Foreground="{ThemeResource TextSecondaryBrush}"/><ComboBox x:Name="ComparePicker" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="OnQueryControlChanged"><ComboBoxItem Content="Previous" Tag="previous"/><ComboBoxItem Content="Off" Tag="none"/></ComboBox></StackPanel>
+                        </StackPanel>
 
                         <Rectangle Height="1" Fill="{ThemeResource SurfaceStrokeBrush}" />
 
                         <StackPanel Spacing="5">
                             <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="PROVIDER" Style="{StaticResource QueryLabelStyle}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" x:Name="ProviderCountText" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="{ThemeResource MetricFont}" FontSize="9" Foreground="{ThemeResource TextQuietBrush}"/></Grid>
-                            <ListView x:Name="ProviderFilter" Style="{StaticResource FacetListStyle}" DisplayMemberPath="Label" SelectionChanged="OnProviderSelectionChanged" />
+                            <ListView x:Name="ProviderFilter" Style="{StaticResource FacetListStyle}" SelectionChanged="OnProviderSelectionChanged" />
                         </StackPanel>
 
                         <StackPanel Spacing="5">
                             <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="HARNESS" Style="{StaticResource QueryLabelStyle}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" x:Name="HarnessCountText" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="{ThemeResource MetricFont}" FontSize="9" Foreground="{ThemeResource TextQuietBrush}"/></Grid>
-                            <ListView x:Name="HarnessFilter" Style="{StaticResource FacetListStyle}" DisplayMemberPath="Label" SelectionChanged="OnHarnessSelectionChanged" />
+                            <ListView x:Name="HarnessFilter" Style="{StaticResource FacetListStyle}" SelectionChanged="OnHarnessSelectionChanged" />
                         </StackPanel>
 
                         <StackPanel Spacing="5">
@@ -137,7 +153,7 @@
                                  window was doing. -->
                             <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="PROJECT / WORKTREE" Style="{StaticResource QueryLabelStyle}" TextWrapping="Wrap" VerticalAlignment="Center" ToolTipService.ToolTip="Each Git worktree is listed as its own project."/><TextBlock Grid.Column="1" x:Name="ProjectCountText" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="{ThemeResource MetricFont}" FontSize="9" Foreground="{ThemeResource TextQuietBrush}"/></Grid>
                             <TextBox x:Name="ProjectSearchBox" PlaceholderText="Find a project" TextChanged="OnProjectSearchChanged" />
-                            <ListView x:Name="ProjectFilter" Style="{StaticResource FacetListStyle}" DisplayMemberPath="Label" SelectionChanged="OnProjectSelectionChanged" />
+                            <ListView x:Name="ProjectFilter" Style="{StaticResource FacetListStyle}" SelectionChanged="OnProjectSelectionChanged" />
                             <!-- Shown only when the window actually contains usage from a
                                  harness that reports no working directory, and it names
                                  just those. Collapsed is the right default: most queries
@@ -151,7 +167,7 @@
                         <StackPanel Spacing="5">
                             <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="MODEL" Style="{StaticResource QueryLabelStyle}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" x:Name="ModelCountText" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="{ThemeResource MetricFont}" FontSize="9" Foreground="{ThemeResource TextQuietBrush}"/></Grid>
                             <TextBox x:Name="ModelSearchBox" PlaceholderText="Find a model" TextChanged="OnModelSearchChanged" />
-                            <ListView x:Name="ModelFilter" Style="{StaticResource FacetListStyle}" DisplayMemberPath="Label" SelectionChanged="OnModelSelectionChanged" />
+                            <ListView x:Name="ModelFilter" Style="{StaticResource FacetListStyle}" SelectionChanged="OnModelSelectionChanged" />
                         </StackPanel>
                     </StackPanel>
                 </ScrollViewer>

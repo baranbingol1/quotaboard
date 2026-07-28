@@ -301,7 +301,7 @@ public sealed partial class UsagePage : Page
 
         MatchingRecordsText.Text = result.MatchingRecordCount == 0
             ? "Nothing matches this query"
-            : $"{result.MatchingRecordCount:N0} rows · {FormatTokens(result.TotalTokens)} tokens";
+            : $"{result.MatchingRecordCount:N0} rows";
         MatchingRecordsDetailText.Text = result.MatchingRecordCount == 0
             ? "Clear a filter or widen the date range."
             : string.Join(" · ", new[]
