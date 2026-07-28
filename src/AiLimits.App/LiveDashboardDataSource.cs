@@ -190,37 +190,61 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                 // screen wait behind it, and a first run over a large history
                 // takes minutes — so the plan limits, which are two seconds of
                 // network, did not appear until the disk work was done.
-                Task scanTask = ScanTelemetryIfDueAsync(accounts, progress, cancellationToken);
-                Task task = RefreshLimitsAsync(accounts, progress, cancellationToken);
-                Task<PricingCatalogSnapshot?> catalogTask = _catalog.RefreshIfStaleAsync(cancellationToken);
+                // The four parallel tasks share a linked token. If any of them
+                // fails, the finally below cancels the siblings and observes
+                // their exceptions before the failure propagates: no work
+                // outlives the refresh (or runs into disposed services during
+                // shutdown) and nothing faults unobserved.
+                using CancellationTokenSource refreshCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                CancellationToken refreshToken = refreshCts.Token;
+                Task scanTask = ScanTelemetryIfDueAsync(accounts, progress, refreshToken);
+                Task limitsTask = RefreshLimitsAsync(accounts, progress, refreshToken);
+                Task<PricingCatalogSnapshot?> catalogTask = _catalog.RefreshIfStaleAsync(refreshToken);
                 Task<IReadOnlyDictionary<string, ProviderServiceStatus>> providerStatusTask =
-                    _providerStatusClient.PollAsync(cancellationToken);
-                await task.ConfigureAwait(false);
-                // Fetching finished first on a cold start. Relabel the bar so it
-                // stops claiming "8 / 8 providers" while the scan still runs,
-                // and put the limits on screen now instead of holding them
-                // hostage to the history scan.
-                if (!scanTask.IsCompleted)
+                    _providerStatusClient.PollAsync(refreshToken);
+                try
                 {
-                    progress?.Report(new RefreshProgress(0, 0, string.Empty, RefreshStage.ScanningHistory));
-                    if (interim is not null)
+                    await limitsTask.ConfigureAwait(false);
+                    // Fetching finished first on a cold start. Relabel the bar so it
+                    // stops claiming "8 / 8 providers" while the scan still runs,
+                    // and put the limits on screen now instead of holding them
+                    // hostage to the history scan.
+                    if (!scanTask.IsCompleted)
                     {
-                        interim.Report(await ProjectAsync(
-                            await _accounts.ListAsync(cancellationToken).ConfigureAwait(false),
-                            await _catalog.GetCurrentAsync(cancellationToken).ConfigureAwait(false),
-                            fromCache: false,
-                            cancellationToken).ConfigureAwait(false));
+                        progress?.Report(new RefreshProgress(0, 0, string.Empty, RefreshStage.ScanningHistory));
+                        if (interim is not null)
+                        {
+                            interim.Report(await ProjectAsync(
+                                await _accounts.ListAsync(refreshToken).ConfigureAwait(false),
+                                await _catalog.GetCurrentAsync(refreshToken).ConfigureAwait(false),
+                                fromCache: false,
+                                refreshToken).ConfigureAwait(false));
+                        }
+                    }
+                    await scanTask.ConfigureAwait(false);
+                    catalog = await catalogTask.ConfigureAwait(false);
+                    IReadOnlyDictionary<string, ProviderServiceStatus> statuses =
+                        await providerStatusTask.ConfigureAwait(false);
+                    foreach (KeyValuePair<string, ProviderServiceStatus> status in statuses)
+                    {
+                        // Operational responses replace incidents too, which clears
+                        // the warning on the next successful status-page poll.
+                        _providerStatuses[status.Key] = status.Value;
                     }
                 }
-                await scanTask.ConfigureAwait(false);
-                catalog = await catalogTask.ConfigureAwait(false);
-                IReadOnlyDictionary<string, ProviderServiceStatus> statuses =
-                    await providerStatusTask.ConfigureAwait(false);
-                foreach (KeyValuePair<string, ProviderServiceStatus> status in statuses)
+                finally
                 {
-                    // Operational responses replace incidents too, which clears
-                    // the warning on the next successful status-page poll.
-                    _providerStatuses[status.Key] = status.Value;
+                    // Stop whatever is still running, then wait for all four and
+                    // swallow here: the failure (if any) is already propagating
+                    // from the try block.
+                    refreshCts.Cancel();
+                    try
+                    {
+                        await Task.WhenAll(limitsTask, scanTask, catalogTask, providerStatusTask).ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                    }
                 }
                 accounts = await _accounts.ListAsync(cancellationToken).ConfigureAwait(false);
                 await RefreshResetCreditsIfDueAsync(accounts, forceRefresh, cancellationToken).ConfigureAwait(false);
@@ -1506,6 +1530,18 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
 
     public void Dispose()
     {
+        // An in-flight LoadAsync holds the load gate for its entire run,
+        // parallel sub-tasks included. Taking the gate first keeps the
+        // HttpClients and semaphores below alive until that work has fully
+        // unwound; the bounded wait only gives up when cancellation itself
+        // is stuck, which disposing anyway cannot make worse.
+        try
+        {
+            _loadGate.Wait(TimeSpan.FromSeconds(10));
+        }
+        catch (ObjectDisposedException)
+        {
+        }
         _quotaAlerts.Dispose();
         _refresh.Dispose();
         _catalog.Dispose();
