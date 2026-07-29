@@ -139,6 +139,15 @@ jobs:
           path: ${{ runner.temp }}\AiLimits\release\win-${{ matrix.arch }}
           if-no-files-found: error
 
+      - name: Prepare clean SignPath output directory
+        if: vars.SIGNPATH_ENABLED == 'true'
+        shell: pwsh
+        env:
+          SIGNED_DIR: ${{ runner.temp }}\AiLimits\release\win-${{ matrix.arch }}-signed
+        run: |
+          Remove-Item -LiteralPath $env:SIGNED_DIR -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $env:SIGNED_DIR | Out-Null
+
       - name: Sign with SignPath
         if: vars.SIGNPATH_ENABLED == 'true'
         uses: signpath/github-action-submit-signing-request@b9d91eadd323de506c0c81cf0c7fe7438f3360fd # v2
@@ -148,7 +157,7 @@ jobs:
           project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
           signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
           github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
-          output-artifact-directory: ${{ runner.temp }}\AiLimits\release\win-${{ matrix.arch }}
+          output-artifact-directory: ${{ runner.temp }}\AiLimits\release\win-${{ matrix.arch }}-signed
 
       - name: Self-signed test signing (fallback)
         if: vars.SIGNPATH_ENABLED != 'true'
@@ -157,12 +166,45 @@ jobs:
           PUBLISH_DIR: ${{ runner.temp }}\AiLimits\release\win-${{ matrix.arch }}
         run: ./scripts/sign-release.ps1 -PublishDir $env:PUBLISH_DIR
 
+      - name: Validate signed output
+        shell: pwsh
+        env:
+          UNSIGNED_DIR: ${{ runner.temp }}\AiLimits\release\win-${{ matrix.arch }}
+          SIGNED_DIR: ${{ runner.temp }}\AiLimits\release\win-${{ matrix.arch }}-signed
+          SIGNPATH_ENABLED: ${{ vars.SIGNPATH_ENABLED }}
+        run: |
+          if ($env:SIGNPATH_ENABLED -eq 'true') {
+              if (-not (Test-Path -LiteralPath $env:SIGNED_DIR -PathType Container)) {
+                  throw "SignPath did not produce $env:SIGNED_DIR"
+              }
+              $relativeInventory = {
+                  param($root)
+                  @(Get-ChildItem -LiteralPath $root -Recurse -File | ForEach-Object {
+                      [System.IO.Path]::GetRelativePath($root, $_.FullName)
+                  } | Sort-Object)
+              }
+              $unsigned = & $relativeInventory $env:UNSIGNED_DIR
+              $signed = & $relativeInventory $env:SIGNED_DIR
+              $difference = @(Compare-Object $unsigned $signed)
+              if ($difference.Count -gt 0) {
+                  $detail = ($difference | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }) -join "`n"
+                  throw "SignPath output inventory differs from unsigned input:`n$detail"
+              }
+              $selected = $env:SIGNED_DIR
+          } else {
+              $selected = $env:UNSIGNED_DIR
+          }
+
+          ./scripts/validate-publish.ps1 -Architecture ${{ matrix.arch }} -OutputPath $selected
+          if ($LASTEXITCODE -ne 0) { throw "Signed publish validation exited $LASTEXITCODE" }
+          ./scripts/verify-signatures.ps1 -RootPath $selected -RequireTrustedSignature ($env:SIGNPATH_ENABLED -eq 'true')
+          if ($LASTEXITCODE -ne 0) { throw "Signature verification exited $LASTEXITCODE" }
+          "PUBLISH_DIR=$selected" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
       # microsoft/sbom-tool ships as a standalone binary rather than a pinned
       # action, so the download is pinned by version and sha256 instead.
       - name: Generate SBOM
         shell: pwsh
-        env:
-          PUBLISH_DIR: ${{ runner.temp }}\AiLimits\release\win-${{ matrix.arch }}
         run: |
           $tool = Join-Path $env:RUNNER_TEMP 'sbom-tool.exe'
           Invoke-WebRequest -Uri 'https://github.com/microsoft/sbom-tool/releases/download/v4.1.5/sbom-tool-win-x64.exe' -OutFile $tool
@@ -181,8 +223,6 @@ jobs:
 
       - name: Package
         shell: pwsh
-        env:
-          PUBLISH_DIR: ${{ runner.temp }}\AiLimits\release\win-${{ matrix.arch }}
         run: |
           $name = "QuotaBoard-${{ steps.version.outputs.version }}-win-${{ matrix.arch }}"
           New-Item -ItemType Directory -Force dist | Out-Null

@@ -46,7 +46,7 @@ if (-not (Test-Path -LiteralPath $resolvedPublishDir)) {
     throw "Publish directory does not exist: $resolvedPublishDir"
 }
 
-$targets = Get-ChildItem -LiteralPath $resolvedPublishDir -File |
+$targets = Get-ChildItem -LiteralPath $resolvedPublishDir -Recurse -File |
     Where-Object { $_.Extension -in '.exe', '.dll' } |
     ForEach-Object { $_.FullName }
 if (-not $targets) {

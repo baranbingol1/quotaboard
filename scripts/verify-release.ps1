@@ -4,9 +4,9 @@ param(
     [Parameter(Mandatory)]
     [string]$DistDir,
 
-    # When true (SignPath signing enabled), QuotaBoard.exe must chain to a
-    # trusted root. When false, a self-signed test signature is accepted as
-    # long as a signature is actually present and the digest verifies.
+    # When true (SignPath signing enabled), every shipped executable/library
+    # must chain to a trusted root. When false, intact self-signed test
+    # signatures are accepted.
     [bool]$RequireTrustedSignature = $false,
 
     # GitHub repository (owner/repo) for `gh attestation verify`. When set,
@@ -22,33 +22,13 @@ Post-release verification.
 
 Runs against assets re-downloaded from the published GitHub release, not the
 files left on the build agent, so upload corruption or tampering is caught.
-For every archive: the .sha256 sidecar must match, the zip must be non-empty
-and contain QuotaBoard.exe, the executable must carry an Authenticode
-signature, and (when -Repository is set) the archive's build-provenance
+For every archive: the .sha256 sidecar must match, the full archive must pass
+publish-layout and architecture validation, every shipped EXE/DLL must carry
+an Authenticode signature, and (when -Repository is set) build-provenance
 attestation must verify. SPDX SBOM assets must exist for every ZIP, parse as
 valid SPDX JSON with a non-empty packages array, and mention QuotaBoard.exe.
 Any mismatch fails the run.
 #>
-
-function Resolve-SignTool {
-    $onPath = Get-Command signtool.exe -ErrorAction SilentlyContinue
-    if ($onPath) {
-        return $onPath.Source
-    }
-
-    $kitsRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
-    $kits = Get-ChildItem $kitsRoot -Directory -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -match '^\d+\.' } |
-        Sort-Object { [version]$_.Name } -Descending
-    foreach ($kit in $kits) {
-        $candidate = Join-Path $kit.FullName 'x64\signtool.exe'
-        if (Test-Path -LiteralPath $candidate) {
-            return $candidate
-        }
-    }
-
-    throw 'signtool.exe was not found. Install the Windows SDK signing tools.'
-}
 
 $resolvedDistDir = [System.IO.Path]::GetFullPath($DistDir)
 if (-not (Test-Path -LiteralPath $resolvedDistDir)) {
@@ -60,7 +40,7 @@ if (-not $zips) {
     throw "No .zip assets found in $resolvedDistDir"
 }
 
-$signTool = Resolve-SignTool
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 foreach ($zip in $zips) {
     $sidecarPath = "$($zip.FullName).sha256"
@@ -74,44 +54,36 @@ foreach ($zip in $zips) {
         throw "SHA256 mismatch for $($zip.Name): sidecar says $expected, download hashes to $actual"
     }
 
-    $archive = [System.IO.Compression.ZipFile]::OpenRead($zip.FullName)
-    $tempExe = $null
-    try {
-        if ($archive.Entries.Count -eq 0) {
-            throw "$($zip.Name) contains no files"
-        }
-        $entryCount = $archive.Entries.Count
-        $exeEntry = $archive.Entries | Where-Object { $_.FullName -eq 'QuotaBoard.exe' } | Select-Object -First 1
-        if (-not $exeEntry) {
-            throw "$($zip.Name) does not contain QuotaBoard.exe"
-        }
-        $tempExe = Join-Path ([System.IO.Path]::GetTempPath()) "QuotaBoard-verify-$([guid]::NewGuid()).exe"
-        [System.IO.Compression.ZipFileExtensions]::ExtractToFile($exeEntry, $tempExe)
+    if ($zip.Name -notmatch '(?i)-win-(x64|arm64)\.zip$') {
+        throw "$($zip.Name): cannot infer architecture; expected a -win-x64.zip or -win-arm64.zip suffix"
     }
-    finally {
-        $archive.Dispose()
-    }
-
+    $architecture = $Matches[1].ToLowerInvariant()
+    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "QuotaBoard-verify-$([guid]::NewGuid())"
     try {
-        $signature = Get-AuthenticodeSignature -FilePath $tempExe
-        if (-not $signature.SignerCertificate) {
-            throw "$($zip.Name): QuotaBoard.exe carries no Authenticode signature"
-        }
-
-        $verifyOutput = & $signTool verify /pa $tempExe 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            $verifyText = ($verifyOutput | Out-String).Trim()
-            $untrustedRoot = $verifyText -match 'terminated in a root certificate which is not trusted'
-            if ($RequireTrustedSignature -or -not $untrustedRoot) {
-                throw "$($zip.Name): signtool verify failed: $verifyText"
+        New-Item -ItemType Directory -Path $tempDir | Out-Null
+        $archive = [System.IO.Compression.ZipFile]::OpenRead($zip.FullName)
+        try {
+            if ($archive.Entries.Count -eq 0) {
+                throw "$($zip.Name) contains no files"
             }
-            Write-Warning "$($zip.Name): QuotaBoard.exe signature verifies but chains to an untrusted test root (expected for self-signed CI builds)."
+            $entryCount = $archive.Entries.Count
+            [System.IO.Compression.ZipFileExtensions]::ExtractToDirectory($archive, $tempDir)
+        }
+        finally {
+            $archive.Dispose()
+        }
+
+        & (Join-Path $scriptDir 'validate-publish.ps1') -Architecture $architecture -OutputPath $tempDir
+        if ($LASTEXITCODE -ne 0) {
+            throw "$($zip.Name): publish validation failed (exit $LASTEXITCODE)"
+        }
+        & (Join-Path $scriptDir 'verify-signatures.ps1') -RootPath $tempDir -RequireTrustedSignature $RequireTrustedSignature
+        if ($LASTEXITCODE -ne 0) {
+            throw "$($zip.Name): signature verification failed (exit $LASTEXITCODE)"
         }
     }
     finally {
-        if ($tempExe) {
-            Remove-Item -LiteralPath $tempExe -Force -ErrorAction SilentlyContinue
-        }
+        Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 
     Write-Host "$($zip.Name): sha256 ok, $entryCount entries, signature ok"
@@ -137,7 +109,7 @@ foreach ($zip in $zips) {
 
 $sboms = Get-ChildItem -LiteralPath $resolvedDistDir -Filter '*.spdx.json' -File
 if (-not $sboms) {
-    throw "No SPDX SBOM assets found in $resolvedDistDir — expected one per release ZIP"
+    throw "No SPDX SBOM assets found in $resolvedDistDir; expected one per release ZIP"
 }
 
 # Build a map of ZIP base names to their SBOM counterparts.
