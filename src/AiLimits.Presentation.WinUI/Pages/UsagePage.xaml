@@ -21,7 +21,11 @@
             <Setter Property="BorderBrush" Value="{ThemeResource SurfaceStrokeBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="7" />
+            <Setter Property="ItemTemplate" Value="{StaticResource FacetItemTemplate}" />
         </Style>
+        <DataTemplate x:Key="FacetItemTemplate">
+            <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{Binding Label}" />
+        </DataTemplate>
         <Style x:Key="ChartSeriesToggleStyle" TargetType="ToggleButton">
             <Setter Property="MinHeight" Value="28" />
             <Setter Property="Padding" Value="10,4" />
@@ -113,21 +117,34 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                            <StackPanel Spacing="5"><TextBlock x:Uid="Usage_TimeGrainLabel" Text="Time grain" FontSize="11" Foreground="{ThemeResource TextSecondaryBrush}"/><ComboBox x:Name="TimeGrainPicker" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="OnQueryControlChanged"><ComboBoxItem x:Uid="Usage_GrainAuto" Content="Auto" Tag="auto"/><ComboBoxItem x:Uid="Usage_GrainDay" Content="Day" Tag="day"/><ComboBoxItem x:Uid="Usage_GrainWeek" Content="Week" Tag="week"/><ComboBoxItem x:Uid="Usage_GrainMonth" Content="Month" Tag="month"/></ComboBox></StackPanel>
-                            <StackPanel Grid.Column="1" Spacing="5"><TextBlock x:Uid="Usage_CompareLabel" Text="Compare" FontSize="11" Foreground="{ThemeResource TextSecondaryBrush}"/><ComboBox x:Name="ComparePicker" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="OnQueryControlChanged"><ComboBoxItem x:Uid="Usage_ComparePrevious" Content="Previous" Tag="previous"/><ComboBoxItem x:Uid="Usage_CompareOff" Content="Off" Tag="none"/></ComboBox></StackPanel>
-                        </Grid>
+                        <StackPanel Spacing="5">
+                            <TextBlock x:Uid="Usage_TimeGrainLabel" Text="Time grain" FontSize="11" Foreground="{ThemeResource TextSecondaryBrush}" />
+                            <ComboBox x:Name="TimeGrainPicker" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="OnQueryControlChanged">
+                                <ComboBoxItem x:Uid="Usage_GrainAuto" Content="Auto" Tag="auto"/>
+                                <ComboBoxItem x:Uid="Usage_GrainDay" Content="Day" Tag="day"/>
+                                <ComboBoxItem x:Uid="Usage_GrainWeek" Content="Week" Tag="week"/>
+                                <ComboBoxItem x:Uid="Usage_GrainMonth" Content="Month" Tag="month"/>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <StackPanel Spacing="5">
+                            <TextBlock x:Uid="Usage_CompareLabel" Text="Compare" FontSize="11" Foreground="{ThemeResource TextSecondaryBrush}" />
+                            <ComboBox x:Name="ComparePicker" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="OnQueryControlChanged">
+                                <ComboBoxItem x:Uid="Usage_ComparePrevious" Content="Previous" Tag="previous"/>
+                                <ComboBoxItem x:Uid="Usage_CompareOff" Content="Off" Tag="none"/>
+                            </ComboBox>
+                        </StackPanel>
 
                         <Rectangle Height="1" Fill="{ThemeResource SurfaceStrokeBrush}" />
 
                         <StackPanel Spacing="5">
                             <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Uid="Usage_ProviderEyebrow" Text="PROVIDER" Style="{StaticResource QueryLabelStyle}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" x:Name="ProviderCountText" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="{ThemeResource MetricFont}" FontSize="9" Foreground="{ThemeResource TextQuietBrush}"/></Grid>
-                            <ListView x:Name="ProviderFilter" Style="{StaticResource FacetListStyle}" DisplayMemberPath="Label" SelectionChanged="OnProviderSelectionChanged" />
+                            <ListView x:Name="ProviderFilter" Style="{StaticResource FacetListStyle}" SelectionChanged="OnProviderSelectionChanged" />
                         </StackPanel>
 
                         <StackPanel Spacing="5">
                             <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Uid="Usage_HarnessEyebrow" Text="HARNESS" Style="{StaticResource QueryLabelStyle}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" x:Name="HarnessCountText" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="{ThemeResource MetricFont}" FontSize="9" Foreground="{ThemeResource TextQuietBrush}"/></Grid>
-                            <ListView x:Name="HarnessFilter" Style="{StaticResource FacetListStyle}" DisplayMemberPath="Label" SelectionChanged="OnHarnessSelectionChanged" />
+                            <ListView x:Name="HarnessFilter" Style="{StaticResource FacetListStyle}" SelectionChanged="OnHarnessSelectionChanged" />
                         </StackPanel>
 
                         <StackPanel Spacing="5">
@@ -137,7 +154,7 @@
                                  window was doing. -->
                             <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Uid="Usage_ProjectEyebrow" x:Name="ProjectEyebrowLabel" Text="PROJECT / WORKTREE" Style="{StaticResource QueryLabelStyle}" TextWrapping="Wrap" VerticalAlignment="Center"/><TextBlock Grid.Column="1" x:Name="ProjectCountText" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="{ThemeResource MetricFont}" FontSize="9" Foreground="{ThemeResource TextQuietBrush}"/></Grid>
                             <TextBox x:Uid="Usage_ProjectSearch" x:Name="ProjectSearchBox" PlaceholderText="Find a project" TextChanged="OnProjectSearchChanged" />
-                            <ListView x:Name="ProjectFilter" Style="{StaticResource FacetListStyle}" DisplayMemberPath="Label" SelectionChanged="OnProjectSelectionChanged" />
+                            <ListView x:Name="ProjectFilter" Style="{StaticResource FacetListStyle}" SelectionChanged="OnProjectSelectionChanged" />
                             <!-- Shown only when the window actually contains usage from a
                                  harness that reports no working directory, and it names
                                  just those. Collapsed is the right default: most queries
@@ -151,7 +168,7 @@
                         <StackPanel Spacing="5">
                             <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Uid="Usage_ModelEyebrow" Text="MODEL" Style="{StaticResource QueryLabelStyle}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" x:Name="ModelCountText" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="{ThemeResource MetricFont}" FontSize="9" Foreground="{ThemeResource TextQuietBrush}"/></Grid>
                             <TextBox x:Uid="Usage_ModelSearch" x:Name="ModelSearchBox" PlaceholderText="Find a model" TextChanged="OnModelSearchChanged" />
-                            <ListView x:Name="ModelFilter" Style="{StaticResource FacetListStyle}" DisplayMemberPath="Label" SelectionChanged="OnModelSelectionChanged" />
+                            <ListView x:Name="ModelFilter" Style="{StaticResource FacetListStyle}" SelectionChanged="OnModelSelectionChanged" />
                         </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
@@ -286,7 +303,9 @@
 
                             <ItemsControl x:Name="ModelMixItems">
                                 <ItemsControl.ItemTemplate><DataTemplate>
-                                    <Grid Padding="0,10" BorderBrush="{ThemeResource SurfaceStrokeBrush}" BorderThickness="0,1,0,0" ColumnSpacing="14" RowSpacing="7">
+                                    <Grid Padding="0,10" BorderBrush="{ThemeResource SurfaceStrokeBrush}" BorderThickness="0,1,0,0" ColumnSpacing="14" RowSpacing="7"
+                                          IsTabStop="True" UseSystemFocusVisuals="True" FocusVisualMargin="-2"
+                                          AutomationProperties.Name="{Binding AutomationName}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" MinWidth="150"/>
                                             <ColumnDefinition Width="Auto"/>

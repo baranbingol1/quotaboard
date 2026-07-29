@@ -283,10 +283,11 @@ public sealed class ClineTokenRefreshTests : IDisposable
         await File.WriteAllTextAsync(LegacyCachePath, """
             {"accessToken":"file-token","refreshToken":"file-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
             """);
-        // The access-token write lands but the expires-at write fails: the
-        // vault now holds a half-written session that LoadAsync rejects, so
-        // deleting the plaintext file here would strand the user.
-        _secrets.FaultFor = key => key is { Scope: "cline", Key: "session.expires-at" }
+        // The staging expires-at write fails after staging access succeeds:
+        // the vault now holds a half-written staging set, but the live keys are
+        // untouched and LoadAsync rejects them, so deleting the plaintext file
+        // here would strand the user.
+        _secrets.FaultFor = key => key is { Scope: "cline", Key: "session.expires-at.staging" }
             ? new System.ComponentModel.Win32Exception(5)
             : null;
         var store = new ClineSessionStore(_secrets, LegacyCachePath);
@@ -300,6 +301,62 @@ public sealed class ClineTokenRefreshTests : IDisposable
         Assert.NotNull(migrated);
         Assert.Equal("file-token", migrated!.AccessToken);
         Assert.False(File.Exists(LegacyCachePath));
+    }
+
+    [Fact]
+    public async Task A_refresh_write_failure_after_access_and_expiry_succeed_keeps_plaintext_and_hides_partial_state()
+    {
+        Directory.CreateDirectory(_cacheDirectory);
+        await File.WriteAllTextAsync(LegacyCachePath, """
+            {"accessToken":"file-token","refreshToken":"file-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
+            """);
+        // The staging refresh-token write fails after staging access and
+        // expiry succeed. The live keys must stay untouched so LoadAsync
+        // cannot return a session with the new access but a stale or missing
+        // refresh.
+        _secrets.FaultFor = key => key is { Scope: "cline", Key: "session.refresh-token.staging" }
+            ? new System.ComponentModel.Win32Exception(5)
+            : null;
+        var store = new ClineSessionStore(_secrets, LegacyCachePath);
+
+        // No partial session leaks, and the plaintext cache is kept for retry.
+        Assert.Null(await store.LoadAsync(default));
+        Assert.True(File.Exists(LegacyCachePath));
+
+        // The vault recovering lets the next load finish the migration.
+        _secrets.FaultFor = null;
+        ClineSession? migrated = await store.LoadAsync(default);
+
+        Assert.NotNull(migrated);
+        Assert.Equal("file-token", migrated!.AccessToken);
+        Assert.Equal("file-refresh", migrated.RefreshToken);
+        Assert.False(File.Exists(LegacyCachePath));
+    }
+
+    [Fact]
+    public async Task A_mid_write_failure_in_non_migration_save_leaves_previous_session_intact()
+    {
+        ClineSessionStore store = Store();
+        // Save a good session first.
+        await store.SaveAsync(
+            new ClineSession("good-access", "good-refresh", Now + TimeSpan.FromHours(1)), default);
+        ClineSession? good = await store.LoadAsync(default);
+        Assert.NotNull(good);
+        Assert.Equal("good-access", good!.AccessToken);
+
+        // Attempt to save a new session, but fault on the staging expiry write.
+        _secrets.FaultFor = key => key is { Scope: "cline", Key: "session.expires-at.staging" }
+            ? new System.ComponentModel.Win32Exception(5)
+            : null;
+        await store.SaveAsync(
+            new ClineSession("bad-access", "bad-refresh", Now + TimeSpan.FromHours(2)), default);
+
+        // The previous good session must still be intact.
+        _secrets.FaultFor = null;
+        ClineSession? loaded = await store.LoadAsync(default);
+        Assert.NotNull(loaded);
+        Assert.Equal("good-access", loaded!.AccessToken);
+        Assert.Equal("good-refresh", loaded.RefreshToken);
     }
 
     [Fact]

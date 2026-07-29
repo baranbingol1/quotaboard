@@ -56,6 +56,30 @@ public sealed class SafeFileEnumerationTests
     }
 
     [Fact]
+    public void IsSafeDirectory_rejects_a_junction_as_the_scan_root()
+    {
+        using var temp = new TemporaryDirectory();
+        var outside = Directory.CreateDirectory(Path.Combine(temp.Path, "outside"));
+        File.WriteAllText(Path.Combine(outside.FullName, "leak.jsonl"), "{}");
+        var root = Directory.CreateDirectory(Path.Combine(temp.Path, "root"));
+        var real = Directory.CreateDirectory(Path.Combine(root.FullName, "real"));
+        File.WriteAllText(Path.Combine(real.FullName, "ok.jsonl"), "{}");
+        // The scan root itself is a junction: without IsSafeDirectory, the
+        // AttributesToSkip guard only filters children, so the root's target
+        // would still be walked.
+        string link = Path.Combine(temp.Path, "link-root");
+        CreateJunction(link, root.FullName);
+
+        Assert.False(SafeFileEnumeration.IsSafeDirectory(link));
+        Assert.True(SafeFileEnumeration.IsSafeDirectory(root.FullName));
+        // Enumerating through the junction root reads the target's files.
+        var leaked = Directory.EnumerateFiles(link, "*.jsonl", SafeFileEnumeration.Recursive).ToArray();
+        Assert.NotEmpty(leaked);
+        // A caller using IsSafeDirectory as its gate would never reach that
+        // enumeration, so no files from the target are seen.
+    }
+
+    [Fact]
     public async Task A_scanner_reads_nothing_through_a_junction()
     {
         using var temp = new TemporaryDirectory();

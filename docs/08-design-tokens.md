@@ -62,6 +62,10 @@ ten palettes. Four rules, all enforceable by inspection of `ThemeCatalog`:
    series 5 was a near-twin of series 3 (now teal `#95E6CB`). Matrix is a
    deliberate monochrome-green ramp and is exempt by theme identity; check
    any new palette against this rule before it ships.*
+   The Usage chart and legend bind to `ChartSeries1Brush`…`ChartSeries6Brush`
+   by legend order, with `ChartSeriesOthersBrush` for the pooled "Others"
+   bucket. `ProviderColors` stays the source of truth for brand identity on
+   product chrome (provider cards, connections, tray, model-mix accent strips).
 2. **Slot 1 is the flagship's data voice.** Series 1 carries the dominant
    category and should be the palette's most legible color against
    `SurfaceBrush` — not its prettiest.

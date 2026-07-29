@@ -7,7 +7,11 @@ param(
     # When true (SignPath signing enabled), QuotaBoard.exe must chain to a
     # trusted root. When false, a self-signed test signature is accepted as
     # long as a signature is actually present and the digest verifies.
-    [bool]$RequireTrustedSignature = $false
+    [bool]$RequireTrustedSignature = $false,
+
+    # GitHub repository (owner/repo) for `gh attestation verify`. When set,
+    # each release ZIP is verified against its build-provenance attestation.
+    [string]$Repository
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,8 +23,11 @@ Post-release verification.
 Runs against assets re-downloaded from the published GitHub release, not the
 files left on the build agent, so upload corruption or tampering is caught.
 For every archive: the .sha256 sidecar must match, the zip must be non-empty
-and contain QuotaBoard.exe, and the executable must carry an Authenticode
-signature. SPDX SBOM assets must parse as JSON. Any mismatch fails the run.
+and contain QuotaBoard.exe, the executable must carry an Authenticode
+signature, and (when -Repository is set) the archive's build-provenance
+attestation must verify. SPDX SBOM assets must exist for every ZIP, parse as
+valid SPDX JSON with a non-empty packages array, and mention QuotaBoard.exe.
+Any mismatch fails the run.
 #>
 
 function Resolve-SignTool {
@@ -108,16 +115,77 @@ foreach ($zip in $zips) {
     }
 
     Write-Host "$($zip.Name): sha256 ok, $entryCount entries, signature ok"
+
+    # Verify the build-provenance attestation that the build job created for
+    # this archive. `gh attestation verify` checks the in-toto statement
+    # against the repository's signing origin; a non-zero exit means the
+    # archive's provenance cannot be verified (missing, tampered, or from a
+    # different repo).
+    if ($Repository) {
+        Write-Host "Verifying attestation for $($zip.Name)..."
+        & gh attestation verify $zip.FullName --repo $Repository 2>&1 | ForEach-Object { Write-Host $_ }
+        if ($LASTEXITCODE -ne 0) {
+            throw "$($zip.Name): attestation verification failed (exit $LASTEXITCODE)"
+        }
+        Write-Host "$($zip.Name): attestation ok"
+    }
 }
 
-foreach ($sbom in Get-ChildItem -LiteralPath $resolvedDistDir -Filter '*.spdx.json' -File) {
+# --- SBOM validation -------------------------------------------------------
+# Every release ZIP must ship a matching SPDX SBOM (same base name, .sbom.spdx.json
+# instead of .zip). Zero SBOMs is a failure: the build is expected to publish them.
+
+$sboms = Get-ChildItem -LiteralPath $resolvedDistDir -Filter '*.spdx.json' -File
+if (-not $sboms) {
+    throw "No SPDX SBOM assets found in $resolvedDistDir — expected one per release ZIP"
+}
+
+# Build a map of ZIP base names to their SBOM counterparts.
+$zipBases = $zips | ForEach-Object {
+    [System.IO.Path]::GetFileNameWithoutExtension($_.Name)
+}
+
+foreach ($zipBase in $zipBases) {
+    $matchingSbom = $sboms | Where-Object {
+        (($_.BaseName -replace '\.sbom$', '') -eq $zipBase)
+    } | Select-Object -First 1
+    if (-not $matchingSbom) {
+        throw "No SBOM matching $zipBase.zip (expected $zipBase.sbom.spdx.json)"
+    }
+}
+
+foreach ($sbom in $sboms) {
+    $raw = Get-Content -LiteralPath $sbom.FullName -Raw
     try {
-        $null = Get-Content -LiteralPath $sbom.FullName -Raw | ConvertFrom-Json -ErrorAction Stop
+        $doc = $raw | ConvertFrom-Json -ErrorAction Stop
     }
     catch {
         throw "$($sbom.Name) is not valid JSON: $_"
     }
-    Write-Host "$($sbom.Name): SBOM parses as JSON"
+
+    if (-not $doc.PSObject.Properties.Name) {
+        throw "$($sbom.Name) is an empty JSON object"
+    }
+
+    # Minimal SPDX shape: must declare an SPDX version and carry a non-empty
+    # packages array. sbom-tool always emits both.
+    if (-not $doc.spdxVersion) {
+        throw "$($sbom.Name) missing required field 'spdxVersion'"
+    }
+    $packages = @($doc.packages)
+    if ($packages.Count -eq 0) {
+        throw "$($sbom.Name) has an empty 'packages' array"
+    }
+
+    # The SBOM must describe the same executable the ZIP ships.
+    $hasExe = $packages | Where-Object {
+        $_.name -eq 'QuotaBoard' -or $_.name -eq 'QuotaBoard.exe'
+    }
+    if (-not $hasExe) {
+        throw "$($sbom.Name) does not list QuotaBoard/QuotaBoard.exe in its packages"
+    }
+
+    Write-Host "$($sbom.Name): SPDX $($doc.spdxVersion), $($packages.Count) packages, QuotaBoard.exe present"
 }
 
 Write-Host "All release assets verified."

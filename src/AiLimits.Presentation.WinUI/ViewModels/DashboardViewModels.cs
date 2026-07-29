@@ -187,7 +187,10 @@ public sealed record UsageModelTrendRowViewModel(
     string Cost,
     string ActivityLabel,
     Brush Accent,
-    IReadOnlyList<UsageSparkBarViewModel> Spark);
+    IReadOnlyList<UsageSparkBarViewModel> Spark)
+{
+    public string AutomationName => $"{Label}, {Tokens}, {ActivityLabel}";
+}
 
 public sealed record UsageSparkBarViewModel(
     double Width,

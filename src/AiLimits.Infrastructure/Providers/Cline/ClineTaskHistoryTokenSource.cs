@@ -39,7 +39,7 @@ public sealed class ClineTaskHistoryTokenSource(IReadOnlyList<string> roots) : I
         {
             IReadOnlyDictionary<string, ClineTaskInfo> tasks = LoadTaskHistory(root);
             string tasksRoot = Path.Combine(root, "tasks");
-            if (Directory.Exists(tasksRoot))
+            if (SafeFileEnumeration.IsSafeDirectory(tasksRoot))
             {
                 foreach (string taskDirectory in Directory.EnumerateDirectories(tasksRoot, "*", SafeFileEnumeration.TopLevel)
                              .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
@@ -60,7 +60,7 @@ public sealed class ClineTaskHistoryTokenSource(IReadOnlyList<string> roots) : I
             }
 
             string sessionsRoot = Path.Combine(root, "sessions");
-            if (Directory.Exists(sessionsRoot))
+            if (SafeFileEnumeration.IsSafeDirectory(sessionsRoot))
             {
                 foreach (string sessionDirectory in Directory.EnumerateDirectories(sessionsRoot, "*", SafeFileEnumeration.TopLevel)
                              .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))

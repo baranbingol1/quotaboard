@@ -29,7 +29,7 @@ public sealed class FactoryLogTokenSource(string factoryHome) : ITokenUsageSourc
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var logDirectory = Path.Combine(factoryHome, "logs");
-        if (!Directory.Exists(logDirectory)) yield break;
+        if (!SafeFileEnumeration.IsSafeDirectory(logDirectory)) yield break;
 
         var sessions = await ReadSessionDirectoriesAsync(cancellationToken).ConfigureAwait(false);
         string[] files;

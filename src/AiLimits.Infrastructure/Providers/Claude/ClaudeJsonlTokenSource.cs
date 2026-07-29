@@ -21,7 +21,7 @@ public sealed class ClaudeJsonlTokenSource(string claudeHome) : ITokenUsageSourc
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var projects = Path.Combine(claudeHome, "projects");
-        if (!Directory.Exists(projects)) yield break;
+        if (!SafeFileEnumeration.IsSafeDirectory(projects)) yield break;
 
         foreach (var file in Directory.EnumerateFiles(projects, "*.jsonl", SafeFileEnumeration.Recursive)
                      .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))

@@ -443,10 +443,10 @@ public sealed partial class UsagePage : Page
         YAxisMidText.Text = FormatTokens(maximum / 2);
 
         Dictionary<string, Brush> seriesBrushes = result.ChartLegend
-            .Select(item => new
+            .Select((item, index) => new
             {
                 item.Key,
-                Brush = ChartSeriesBrush(item.Key, item.Label, item.IsOthers),
+                Brush = ChartSeriesBrush(index, item.IsOthers),
             })
             .ToDictionary(item => item.Key, item => item.Brush, StringComparer.OrdinalIgnoreCase);
 
@@ -551,16 +551,11 @@ public sealed partial class UsagePage : Page
         }
     }
 
-    private Brush ChartSeriesBrush(string key, string label, bool isOthers)
+    private Brush ChartSeriesBrush(int legendIndex, bool isOthers)
     {
-        if (isOthers)
-        {
-            return ThemeService.ResolveThemeResource("ChartSeriesOthersBrush") as Brush
-                ?? new SolidColorBrush(Microsoft.UI.Colors.Gray);
-        }
-        // Chart series are providers/tools, so they carry the same accent as
-        // everywhere else in the app instead of a positional theme color.
-        return new SolidColorBrush(Theming.ThemeDictionaryBuilder.Parse(ProviderColors.Resolve(key, label)));
+        string resourceKey = ChartSeriesBrushResolver.ResolveResourceKey(legendIndex, isOthers);
+        return ThemeService.ResolveThemeResource(resourceKey) as Brush
+            ?? new SolidColorBrush(Microsoft.UI.Colors.Gray);
     }
 
     private void RenderBreakdown(UsageAnalyticsResult result)

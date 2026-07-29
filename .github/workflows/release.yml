@@ -254,6 +254,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+      attestations: read
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
@@ -267,11 +268,13 @@ jobs:
           gh release download $env:TAG --dir dist `
             --pattern '*.zip' --pattern '*.zip.sha256' --pattern '*.spdx.json'
 
-      - name: Verify hashes, signatures, and contents
+      - name: Verify hashes, signatures, attestation, and SBOM
         shell: pwsh
         env:
           SIGNPATH_ENABLED: ${{ vars.SIGNPATH_ENABLED }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: >-
           ./scripts/verify-release.ps1
           -DistDir dist
           -RequireTrustedSignature ($env:SIGNPATH_ENABLED -eq 'true')
+          -Repository $env:GITHUB_REPOSITORY

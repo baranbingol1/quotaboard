@@ -22,6 +22,19 @@ internal sealed record ClineSession(string AccessToken, string? RefreshToken, Da
 /// single blob at 2560 UTF-16 characters, which a bearer and a refresh JWT can
 /// jointly exceed.
 ///
+/// <para>
+/// <b>Atomicity.</b> Because every field is a separate entry, a save that
+/// writes access then expiry then refresh can fail halfway, leaving the live
+/// keys holding a half-written session (new access + stale or missing
+/// refresh). To prevent that, <see cref="TrySaveAsync"/> writes every field
+/// to <i>staging</i> keys first. Only when all staging writes succeed does it
+/// write a commit marker and promote staging into the live keys. If any
+/// staging write fails, the live keys are untouched and the staging keys are
+/// cleaned up. <see cref="LoadAsync"/> only ever reads live keys; if it finds
+/// a commit marker (a promotion was interrupted), it finishes the promotion
+/// before reading.
+/// </para>
+///
 /// Every operation is best-effort: if the secret store is unavailable the
 /// strategy simply refreshes again on the next fetch, exactly as it did when
 /// the cache file was missing.
@@ -33,6 +46,19 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
     private const string RefreshTokenKey = "session.refresh-token";
     private const string ExpiresAtKey = "session.expires-at";
 
+    // Staging keys: written first, promoted to the live keys above only after
+    // every field succeeds. LoadAsync never reads these.
+    private const string StagingAccessTokenKey = "session.access-token.staging";
+    private const string StagingExpiresAtKey = "session.expires-at.staging";
+    private const string StagingRefreshTokenKey = "session.refresh-token.staging";
+    // "1" = the live refresh key should be deleted during promotion;
+    // "0" = the staging refresh value should be copied to the live key.
+    private const string StagingClearRefreshKey = "session.clear-refresh.staging";
+    // Present only between "all staging writes succeeded" and "promotion to
+    // live keys finished." Its presence tells LoadAsync to finish the
+    // promotion before reading.
+    private const string CommitKey = "session.commit";
+
     private bool _legacyMigrationAttempted;
 
     public async Task<ClineSession?> LoadAsync(CancellationToken cancellationToken)
@@ -40,6 +66,14 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
         await MigrateLegacyCacheAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            // A commit marker means a previous save was interrupted between
+            // staging and promotion. Finish the promotion so the live keys are
+            // consistent before we read them.
+            if (await secrets.GetAsync(Scope, CommitKey, cancellationToken).ConfigureAwait(false) is not null)
+            {
+                await RecoverInterruptedPromotionAsync(cancellationToken).ConfigureAwait(false);
+            }
+
             string? accessToken = await secrets.GetAsync(Scope, AccessTokenKey, cancellationToken).ConfigureAwait(false);
             string? expires = await secrets.GetAsync(Scope, ExpiresAtKey, cancellationToken).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(accessToken) || expires is null ||
@@ -68,27 +102,50 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
     /// </summary>
     public async Task<bool> TrySaveAsync(ClineSession session, CancellationToken cancellationToken)
     {
+        // Phase 1: stage every field. If any write fails, clean up whatever
+        // staging was written and leave the live keys untouched.
         try
         {
-            await secrets.SetAsync(Scope, AccessTokenKey, session.AccessToken, cancellationToken).ConfigureAwait(false);
-            await secrets.SetAsync(Scope, ExpiresAtKey,
+            await secrets.SetAsync(Scope, StagingAccessTokenKey, session.AccessToken, cancellationToken).ConfigureAwait(false);
+            await secrets.SetAsync(Scope, StagingExpiresAtKey,
                 session.ExpiresAt.ToString("o", CultureInfo.InvariantCulture), cancellationToken).ConfigureAwait(false);
             if (session.RefreshToken is { } refreshToken)
             {
-                await secrets.SetAsync(Scope, RefreshTokenKey, refreshToken, cancellationToken).ConfigureAwait(false);
+                await secrets.SetAsync(Scope, StagingRefreshTokenKey, refreshToken, cancellationToken).ConfigureAwait(false);
             }
             else
             {
-                await secrets.DeleteAsync(Scope, RefreshTokenKey, cancellationToken).ConfigureAwait(false);
+                // Clear any leftover refresh staging from a prior save so the
+                // promotion step does not re-stage a stale value.
+                await secrets.DeleteAsync(Scope, StagingRefreshTokenKey, cancellationToken).ConfigureAwait(false);
             }
-            return true;
+            await secrets.SetAsync(Scope, StagingClearRefreshKey,
+                session.RefreshToken is null ? "1" : "0", cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (IsRecoverable(ex))
         {
-            // Best effort: without the cache the strategy just refreshes again
-            // next fetch.
+            await CleanupStagingAsync(cancellationToken).ConfigureAwait(false);
             return false;
         }
+
+        // Phase 2: commit, then promote staging into the live keys. If the
+        // process is interrupted, the commit marker tells the next LoadAsync
+        // to finish the promotion.
+        try
+        {
+            await secrets.SetAsync(Scope, CommitKey, "1", cancellationToken).ConfigureAwait(false);
+            await PromoteStagingAsync(cancellationToken).ConfigureAwait(false);
+            await CleanupStagingAsync(cancellationToken).ConfigureAwait(false);
+            await secrets.DeleteAsync(Scope, CommitKey, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (IsRecoverable(ex))
+        {
+            // Promotion was interrupted. The commit marker is still set, so
+            // the next LoadAsync will finish it. Report failure so a caller
+            // holding the plaintext cache keeps it for a retry.
+            return false;
+        }
+        return true;
     }
 
     /// <summary>
@@ -128,6 +185,64 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
             // Older builds wrote through a sibling temp file; a crash between
             // write and rename could have left one holding the same tokens.
             File.Delete(legacyCachePath + ".tmp");
+        }
+        catch (Exception ex) when (IsRecoverable(ex))
+        {
+        }
+    }
+
+    private async Task RecoverInterruptedPromotionAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await PromoteStagingAsync(cancellationToken).ConfigureAwait(false);
+            await CleanupStagingAsync(cancellationToken).ConfigureAwait(false);
+            await secrets.DeleteAsync(Scope, CommitKey, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (IsRecoverable(ex))
+        {
+            // The vault is still unavailable; the next LoadAsync will retry.
+        }
+    }
+
+    private async Task PromoteStagingAsync(CancellationToken cancellationToken)
+    {
+        string? stagingAccess = await secrets.GetAsync(Scope, StagingAccessTokenKey, cancellationToken).ConfigureAwait(false);
+        string? stagingExpires = await secrets.GetAsync(Scope, StagingExpiresAtKey, cancellationToken).ConfigureAwait(false);
+        string? stagingRefresh = await secrets.GetAsync(Scope, StagingRefreshTokenKey, cancellationToken).ConfigureAwait(false);
+        string? clearFlag = await secrets.GetAsync(Scope, StagingClearRefreshKey, cancellationToken).ConfigureAwait(false);
+
+        if (stagingAccess is not null)
+        {
+            await secrets.SetAsync(Scope, AccessTokenKey, stagingAccess, cancellationToken).ConfigureAwait(false);
+        }
+        if (stagingExpires is not null)
+        {
+            await secrets.SetAsync(Scope, ExpiresAtKey, stagingExpires, cancellationToken).ConfigureAwait(false);
+        }
+        if (clearFlag == "1")
+        {
+            await secrets.DeleteAsync(Scope, RefreshTokenKey, cancellationToken).ConfigureAwait(false);
+        }
+        else if (stagingRefresh is not null)
+        {
+            await secrets.SetAsync(Scope, RefreshTokenKey, stagingRefresh, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task CleanupStagingAsync(CancellationToken cancellationToken)
+    {
+        await TryDeleteAsync(StagingAccessTokenKey, cancellationToken).ConfigureAwait(false);
+        await TryDeleteAsync(StagingExpiresAtKey, cancellationToken).ConfigureAwait(false);
+        await TryDeleteAsync(StagingRefreshTokenKey, cancellationToken).ConfigureAwait(false);
+        await TryDeleteAsync(StagingClearRefreshKey, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task TryDeleteAsync(string key, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await secrets.DeleteAsync(Scope, key, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (IsRecoverable(ex))
         {
