@@ -74,5 +74,56 @@ public sealed class SqliteRetentionTests
         }
     }
 
+    [Fact]
+    public async Task PruneKeepsEachAccountsNewestAttemptEvenWhenItIsPastTheCutoff()
+    {
+        // A persistent failure must not age into a generic "Cached" label: the
+        // newest attempt row per account survives regardless of age.
+        var directory = Path.Combine(Path.GetTempPath(), "AiLimits.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "state.db");
+        var now = new DateTimeOffset(2026, 7, 22, 12, 0, 0, TimeSpan.Zero);
+
+        try
+        {
+            var database = new SqliteDatabase(path);
+            await database.InitializeAsync();
+
+            await using (var connection = new SqliteConnection($"Data Source={path}"))
+            {
+                await connection.OpenAsync();
+                await using var seed = connection.CreateCommand();
+                seed.CommandText = $$"""
+                    -- Every attempt for 'a' is past the cutoff; the newest still survives.
+                    INSERT INTO fetch_attempts VALUES('a-oldest', 'claude', 'a', 's', '{{Iso(now.AddDays(-45))}}', 1, 5, 'net');
+                    INSERT INTO fetch_attempts VALUES('a-newest', 'claude', 'a', 's', '{{Iso(now.AddDays(-40))}}', 1, 5, 'net');
+                    -- 'b' has a fresh attempt; its old ones prune as before.
+                    INSERT INTO fetch_attempts VALUES('b-old', 'claude', 'b', 's', '{{Iso(now.AddDays(-40))}}', 1, 5, 'net');
+                    INSERT INTO fetch_attempts VALUES('b-new', 'claude', 'b', 's', '{{Iso(now.AddDays(-1))}}', 1, 0, 'ok');
+                    """;
+                await seed.ExecuteNonQueryAsync();
+            }
+
+            await new SqliteRetention(database).PruneAsync(now);
+
+            await using var verify = new SqliteConnection($"Data Source={path}");
+            await verify.OpenAsync();
+            await using var command = verify.CreateCommand();
+            command.CommandText = "SELECT id FROM fetch_attempts ORDER BY id;";
+            await using var reader = await command.ExecuteReaderAsync();
+            var survivors = new List<string>();
+            while (await reader.ReadAsync())
+            {
+                survivors.Add(reader.GetString(0));
+            }
+            Assert.Equal(["a-newest", "b-new"], survivors);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static string Iso(DateTimeOffset value) => value.ToString("O");
 }

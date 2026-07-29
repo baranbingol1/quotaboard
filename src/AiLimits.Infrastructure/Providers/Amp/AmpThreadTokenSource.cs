@@ -54,6 +54,8 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource
                 ["threads", "list", "--include-archived", "--limit", PageSize.ToString(CultureInfo.InvariantCulture), "--offset", offset.ToString(CultureInfo.InvariantCulture), "--json"],
                 TimeSpan.FromSeconds(20),
                 cancellationToken).ConfigureAwait(false);
+            if (listResult.OutputTruncated)
+                throw new InvalidOperationException("Amp thread listing exceeded the capture limit and was truncated.");
             if (listResult.ExitCode != 0 || !AmpThreadParser.TryParseThreadList(listResult.StandardOutput, out IReadOnlyList<AmpThreadSummary> page))
                 throw new InvalidOperationException("Amp thread listing failed.");
             if (page.Count == 0) break;
@@ -78,6 +80,8 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource
                 ["threads", "export", thread.Id],
                 TimeSpan.FromSeconds(30),
                 cancellationToken).ConfigureAwait(false);
+            if (exportResult.OutputTruncated)
+                throw new InvalidOperationException("Amp thread export exceeded the capture limit and was truncated.");
             if (exportResult.ExitCode != 0
                 || !AmpThreadParser.TryParseUsage(thread.Id, exportResult.StandardOutput, cutoff, out IReadOnlyList<AmpThreadUsage> usage))
                 throw new InvalidOperationException("Amp thread export failed.");

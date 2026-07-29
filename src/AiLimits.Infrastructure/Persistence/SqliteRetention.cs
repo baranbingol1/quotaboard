@@ -35,7 +35,19 @@ public sealed class SqliteRetention(SqliteDatabase database)
                     DELETE FROM snapshots
                     WHERE observed_at < $snapshotCutoff
                       AND id NOT IN (SELECT MAX(id) FROM snapshots GROUP BY provider_id, account_id);
-                    DELETE FROM fetch_attempts WHERE started_at < $attemptCutoff;
+                    -- Each account's newest attempt is always kept: it carries the
+                    -- latest known outcome, and aging it out would let a persistent
+                    -- failure fade into a generic "Cached" label.
+                    DELETE FROM fetch_attempts
+                    WHERE started_at < $attemptCutoff
+                      AND rowid NOT IN (
+                          SELECT rowid FROM (
+                              SELECT rowid, ROW_NUMBER() OVER (
+                                  PARTITION BY provider_id, account_id
+                                  ORDER BY started_at DESC, rowid DESC) AS rn
+                              FROM fetch_attempts
+                          ) WHERE rn = 1
+                      );
                     DELETE FROM scanner_fingerprints WHERE observed_at < $fingerprintCutoff;
                     DELETE FROM alert_state WHERE notified_at < $alertCutoff;
                     """;

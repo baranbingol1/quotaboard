@@ -234,46 +234,113 @@
   <data name="Settings_BlurEmailsDescription.Text" xml:space="preserve"><value>Mask account emails everywhere so screenshots are safe to share</value></data>
   <data name="Settings_BlurEmailsToggle.OffContent" xml:space="preserve"><value>Off</value></data>
   <data name="Settings_BlurEmailsToggle.OnContent" xml:space="preserve"><value>On</value></data>
-  <data name="Usage_Eyebrow.Text" xml:space="preserve"><value>LOCAL USAGE LEDGER</value></data>
-  <data name="Usage_Title.Text" xml:space="preserve"><value>Usage, attributed to the account that authorized it.</value></data>
-  <data name="Usage_Description.Text" xml:space="preserve"><value>Harness is the CLI that recorded the request. Provider is the account or route that supplied access.</value></data>
-  <data name="Usage_WindowLabel.Text" xml:space="preserve"><value>HISTORY WINDOW</value></data>
+  <data name="Usage_Eyebrow.Text" xml:space="preserve"><value>USAGE</value></data>
+  <data name="Usage_OnDevicePill.Text" xml:space="preserve"><value>ON-DEVICE</value></data>
+  <data name="Usage_Title.Text" xml:space="preserve"><value>Filter and break down your usage.</value></data>
+  <data name="Usage_QuerySummary.Text" xml:space="preserve"><value>Last 30 days · all activity</value></data>
+  <data name="Usage_ResetQuery.Content" xml:space="preserve"><value>Reset query</value></data>
+  <data name="Usage_RefreshData.Content" xml:space="preserve"><value>Refresh data</value></data>
+  <data name="Usage_QueryEyebrow.Text" xml:space="preserve"><value>QUERY</value></data>
+  <data name="Usage_QueryTitle.Text" xml:space="preserve"><value>Filter the ledger</value></data>
+  <data name="Usage_ActiveFilters.Text" xml:space="preserve"><value>0 active</value></data>
+  <data name="Usage_DateRangeLabel.Text" xml:space="preserve"><value>Date range</value></data>
   <data name="Usage_Window7.Content" xml:space="preserve"><value>Last 7 days</value></data>
   <data name="Usage_Window30.Content" xml:space="preserve"><value>Last 30 days</value></data>
   <data name="Usage_Window90.Content" xml:space="preserve"><value>Last 90 days</value></data>
-  <data name="Usage_Window365.Content" xml:space="preserve"><value>Last 365 days</value></data>
-  <data name="Usage_WindowCustom.Content" xml:space="preserve"><value>Custom…</value></data>
-  <data name="Usage_ApplyWindow.Content" xml:space="preserve"><value>Apply window</value></data>
-  <data name="Usage_TrendTitle.Text" xml:space="preserve"><value>Tokens and API-equivalent cost</value></data>
-  <data name="Usage_TokensLegend.Text" xml:space="preserve"><value>Tokens</value></data>
-  <data name="Usage_CostLegend.Text" xml:space="preserve"><value>API cost</value></data>
-  <data name="Usage_HeatmapWindow.Text" xml:space="preserve"><value>LAST 12 WEEKS</value></data>
-  <data name="Usage_HeatmapTitle.Text" xml:space="preserve"><value>Activity heatmap</value></data>
-  <data name="Usage_HeatmapDescription.Text" xml:space="preserve"><value>Every day of recorded local usage. Darker means more tokens; hover a cell for the exact day.</value></data>
-  <data name="Usage_ProviderBreakdown.Text" xml:space="preserve"><value>AUTH PROVIDER BREAKDOWN</value></data>
-  <data name="Usage_ProviderBreakdownDescription.Text" xml:space="preserve"><value>API estimate means the equivalent public API price for the observed token lanes. It is not a subscription bill.</value></data>
-  <data name="Usage_AuthProviderColumn.Text" xml:space="preserve"><value>AUTH PROVIDER</value></data>
-  <data name="Usage_TokensColumn.Text" xml:space="preserve"><value>TOKENS</value></data>
-  <data name="Usage_ApiEstimateColumn.Text" xml:space="preserve"><value>API ESTIMATE</value></data>
-  <data name="Usage_PricingCoverageColumn.Text" xml:space="preserve"><value>PRICING COVERAGE</value></data>
-  <data name="Usage_SourcesColumn.Text" xml:space="preserve"><value>SOURCES</value></data>
-  <data name="Usage_TokenShare.Text" xml:space="preserve"><value>TOKEN SHARE</value></data>
-  <data name="Usage_ProjectBreakdown.Text" xml:space="preserve"><value>BY PROJECT / WORKTREE</value></data>
-  <data name="Usage_SortTokens.Content" xml:space="preserve"><value>Sort: tokens</value></data>
-  <data name="Usage_SortCost.Content" xml:space="preserve"><value>Sort: cost</value></data>
-  <data name="Usage_SortProject.Content" xml:space="preserve"><value>Sort: project</value></data>
-  <data name="Usage_ProjectColumn.Text" xml:space="preserve"><value>PROJECT</value></data>
-  <data name="Usage_WorktreePathColumn.Text" xml:space="preserve"><value>WORKTREE PATH</value></data>
-  <data name="Usage_RepositoryColumn.Text" xml:space="preserve"><value>SHARED REPOSITORY</value></data>
-  <data name="Usage_ProjectTokensColumn.Text" xml:space="preserve"><value>TOKENS</value></data>
-  <data name="Usage_ProjectCostColumn.Text" xml:space="preserve"><value>API ESTIMATE</value></data>
-  <data name="Usage_ModelLedger.Text" xml:space="preserve"><value>MODEL LEDGER</value></data>
-  <data name="Usage_ModelLedgerDescription.Text" xml:space="preserve"><value>Every model keeps its recording source, authorizing provider, tokens, and catalog pricing state.</value></data>
-  <data name="Usage_SourceColumn.Text" xml:space="preserve"><value>SOURCE</value></data>
-  <data name="Usage_ModelColumn.Text" xml:space="preserve"><value>MODEL</value></data>
-  <data name="Usage_ModelAuthProviderColumn.Text" xml:space="preserve"><value>AUTH PROVIDER</value></data>
-  <data name="Usage_ModelTokensColumn.Text" xml:space="preserve"><value>TOKENS</value></data>
-  <data name="Usage_ModelApiEstimateColumn.Text" xml:space="preserve"><value>API ESTIMATE</value></data>
+  <data name="Usage_Window365.Content" xml:space="preserve"><value>Last year</value></data>
+  <data name="Usage_WindowCustom.Content" xml:space="preserve"><value>Custom range…</value></data>
+  <data name="Usage_FromDate.Header" xml:space="preserve"><value>From</value></data>
+  <data name="Usage_ThroughDate.Header" xml:space="preserve"><value>Through</value></data>
+  <data name="Usage_ApplyDates.Content" xml:space="preserve"><value>Apply dates</value></data>
+  <data name="Usage_TimeGrainLabel.Text" xml:space="preserve"><value>Time grain</value></data>
+  <data name="Usage_GrainAuto.Content" xml:space="preserve"><value>Auto</value></data>
+  <data name="Usage_GrainDay.Content" xml:space="preserve"><value>Day</value></data>
+  <data name="Usage_GrainWeek.Content" xml:space="preserve"><value>Week</value></data>
+  <data name="Usage_GrainMonth.Content" xml:space="preserve"><value>Month</value></data>
+  <data name="Usage_CompareLabel.Text" xml:space="preserve"><value>Compare</value></data>
+  <data name="Usage_ComparePrevious.Content" xml:space="preserve"><value>Previous</value></data>
+  <data name="Usage_CompareOff.Content" xml:space="preserve"><value>Off</value></data>
+  <data name="Usage_ProviderEyebrow.Text" xml:space="preserve"><value>PROVIDER</value></data>
+  <data name="Usage_HarnessEyebrow.Text" xml:space="preserve"><value>HARNESS</value></data>
+  <data name="Usage_ProjectEyebrow.Text" xml:space="preserve"><value>PROJECT / WORKTREE</value></data>
+  <data name="Usage_ProjectSearch.PlaceholderText" xml:space="preserve"><value>Find a project</value></data>
+  <data name="Usage_ModelEyebrow.Text" xml:space="preserve"><value>MODEL</value></data>
+  <data name="Usage_ModelSearch.PlaceholderText" xml:space="preserve"><value>Find a model</value></data>
+  <data name="Usage_ChartEyebrow.Text" xml:space="preserve"><value>TOKENS OVER TIME</value></data>
+  <data name="Usage_WindowInitial.Text" xml:space="preserve"><value>LAST 30 DAYS</value></data>
+  <data name="Usage_SeriesBy.Text" xml:space="preserve"><value>SERIES BY</value></data>
+  <data name="Usage_SeriesProvider.Content" xml:space="preserve"><value>Provider</value></data>
+  <data name="Usage_SeriesHarness.Content" xml:space="preserve"><value>Harness</value></data>
+  <data name="Usage_SeriesModel.Content" xml:space="preserve"><value>Model</value></data>
+  <data name="Usage_ChartEmpty.Text" xml:space="preserve"><value>No usage matches this query. Clear a filter or widen the date range.</value></data>
+  <data name="Usage_TokensAxis.Text" xml:space="preserve"><value>TOKENS</value></data>
+  <data name="Usage_MatchingEyebrow.Text" xml:space="preserve"><value>MATCHING DATA</value></data>
+  <data name="Usage_ModelMixEyebrow.Text" xml:space="preserve"><value>MODEL MIX</value></data>
+  <data name="Usage_ModelMixEmpty.Text" xml:space="preserve"><value>No models match this query.</value></data>
+  <data name="Usage_BreakdownEyebrow.Text" xml:space="preserve"><value>TOKEN BREAKDOWN</value></data>
+  <data name="Usage_ColLabel.Text" xml:space="preserve"><value>Label</value></data>
+  <data name="Usage_ColTokens.Text" xml:space="preserve"><value>Tokens</value></data>
+  <data name="Usage_ColIn.Text" xml:space="preserve"><value>In</value></data>
+  <data name="Usage_ColOut.Text" xml:space="preserve"><value>Out</value></data>
+  <data name="Usage_ColCacheR.Text" xml:space="preserve"><value>Cache R</value></data>
+  <data name="Usage_ColCacheW.Text" xml:space="preserve"><value>Cache W</value></data>
+  <data name="Usage_ColReason.Text" xml:space="preserve"><value>Reason</value></data>
+  <data name="Usage_ColApi.Text" xml:space="preserve"><value>API $</value></data>
+  <data name="Usage_ApiEquivalentEyebrow.Text" xml:space="preserve"><value>API EQUIVALENT</value></data>
+  <data name="Usage_PricingCoverage.Text" xml:space="preserve"><value>Public API-price estimate</value></data>
+  <data name="Usage_BreakdownBy.Text" xml:space="preserve"><value>BREAK DOWN BY</value></data>
+  <data name="Usage_BreakdownProvider.Content" xml:space="preserve"><value>Provider</value></data>
+  <data name="Usage_BreakdownHarness.Content" xml:space="preserve"><value>Harness</value></data>
+  <data name="Usage_BreakdownProject.Content" xml:space="preserve"><value>Project / worktree</value></data>
+  <data name="Usage_BreakdownModel.Content" xml:space="preserve"><value>Model</value></data>
+  <data name="Usage_ProjectEyebrowTip" xml:space="preserve"><value>Each Git worktree is listed as its own project.</value></data>
+  <data name="Usage_HoverTokens" xml:space="preserve"><value>{0} tokens</value></data>
+  <data name="Usage_PricingCoverageDetail" xml:space="preserve"><value>Public API-price estimate · {0:0.#}% of matching tokens priced</value></data>
+  <data name="Usage_PricingCoverageNone" xml:space="preserve"><value>No exact public API price is available for this query</value></data>
+  <data name="Usage_FilterAllData" xml:space="preserve"><value>ALL DATA</value></data>
+  <data name="Usage_FilterActiveCount" xml:space="preserve"><value>{0} ACTIVE</value></data>
+  <data name="Usage_QueryAllActivity" xml:space="preserve"><value>all activity</value></data>
+  <data name="Usage_QueryFiltersOne" xml:space="preserve"><value>{0} filter</value></data>
+  <data name="Usage_QueryFiltersMany" xml:space="preserve"><value>{0} filters</value></data>
+  <data name="Usage_MatchingNone" xml:space="preserve"><value>Nothing matches this query</value></data>
+  <data name="Usage_MatchingNoneDetail" xml:space="preserve"><value>Clear a filter or widen the date range.</value></data>
+  <data name="Usage_MatchingRows" xml:space="preserve"><value>{0:N0} rows</value></data>
+  <data name="Usage_PluralProvider" xml:space="preserve"><value>{0} provider</value></data>
+  <data name="Usage_PluralProviders" xml:space="preserve"><value>{0} providers</value></data>
+  <data name="Usage_PluralHarness" xml:space="preserve"><value>{0} harness</value></data>
+  <data name="Usage_PluralHarnesses" xml:space="preserve"><value>{0} harnesses</value></data>
+  <data name="Usage_PluralModel" xml:space="preserve"><value>{0} model</value></data>
+  <data name="Usage_PluralModels" xml:space="preserve"><value>{0} models</value></data>
+  <data name="Usage_PluralProject" xml:space="preserve"><value>{0} project</value></data>
+  <data name="Usage_PluralProjects" xml:space="preserve"><value>{0} projects</value></data>
+  <data name="Usage_ActiveBuckets" xml:space="preserve"><value>{0} active {1}</value></data>
+  <data name="Usage_GrainDayNoun" xml:space="preserve"><value>day</value></data>
+  <data name="Usage_GrainDaysNoun" xml:space="preserve"><value>days</value></data>
+  <data name="Usage_GrainWeekNoun" xml:space="preserve"><value>week</value></data>
+  <data name="Usage_GrainWeeksNoun" xml:space="preserve"><value>weeks</value></data>
+  <data name="Usage_GrainMonthNoun" xml:space="preserve"><value>month</value></data>
+  <data name="Usage_GrainMonthsNoun" xml:space="preserve"><value>months</value></data>
+  <data name="Usage_ModelActivity" xml:space="preserve"><value>used on {0} of {1} {2}</value></data>
+  <data name="Usage_ModelActivityWindow" xml:space="preserve"><value>used on {0} of {1} {2} · {3}</value></data>
+  <data name="Usage_ModelMixSubtitleOne" xml:space="preserve"><value>{0} model in this query, newest activity on the right.</value></data>
+  <data name="Usage_ModelMixSubtitleMany" xml:space="preserve"><value>{0} models in this query, newest activity on the right.</value></data>
+  <data name="Usage_SparkTooltip" xml:space="preserve"><value>{0} · {1} tokens</value></data>
+  <data name="Usage_SparkAutomation" xml:space="preserve"><value>{0}, {1}: {2} tokens</value></data>
+  <data name="Usage_BarTooltip" xml:space="preserve"><value>{0}
+{1} tokens</value></data>
+  <data name="Usage_BarAutomation" xml:space="preserve"><value>{0}, {1} tokens</value></data>
+  <data name="Usage_ProjectSourceNote" xml:space="preserve"><value>No working directory is reported for {0}, so that usage lands under {1}.</value></data>
+  <data name="Usage_JoinAnd" xml:space="preserve"><value> and </value></data>
+  <data name="Usage_BreakdownByProvider" xml:space="preserve"><value>by provider</value></data>
+  <data name="Usage_BreakdownByHarness" xml:space="preserve"><value>by harness</value></data>
+  <data name="Usage_BreakdownByProject" xml:space="preserve"><value>by project</value></data>
+  <data name="Usage_BreakdownByModel" xml:space="preserve"><value>by model</value></data>
+  <data name="Usage_FacetSelected" xml:space="preserve"><value>{0} SELECTED</value></data>
+  <data name="Usage_FacetAvailable" xml:space="preserve"><value>{0} AVAILABLE</value></data>
+  <data name="Usage_ComparisonOff" xml:space="preserve"><value>Comparison off</value></data>
+  <data name="Usage_ComparisonNew" xml:space="preserve"><value>New vs previous period</value></data>
+  <data name="Usage_ComparisonNoBaseline" xml:space="preserve"><value>No previous-period baseline</value></data>
+  <data name="Usage_ComparisonChange" xml:space="preserve"><value>{0:+0.#;-0.#;0}% vs previous period</value></data>
   <data name="Common_Unknown" xml:space="preserve"><value>Unknown</value></data>
   <data name="Countdown_Now" xml:space="preserve"><value>now</value></data>
   <data name="Countdown_Minutes" xml:space="preserve"><value>in {0}m</value></data>
@@ -360,6 +427,7 @@
   <data name="Data_CachedAge" xml:space="preserve"><value>Cached · {0}</value></data>
   <data name="Data_RateLimitedAge" xml:space="preserve"><value>Rate-limited · {0}</value></data>
   <data name="Data_OfflineAge" xml:space="preserve"><value>Offline · {0}</value></data>
+  <data name="Data_RetryingAge" xml:space="preserve"><value>Retrying · {0}</value></data>
   <data name="Data_UnsupportedAge" xml:space="preserve"><value>Unsupported response · {0}</value></data>
   <data name="Card_StatusLive" xml:space="preserve"><value>LIVE</value></data>
   <data name="Card_StatusStale" xml:space="preserve"><value>STALE</value></data>
@@ -371,6 +439,7 @@
   <data name="Data_SignInRequired" xml:space="preserve"><value>Sign-in required</value></data>
   <data name="Data_RateLimited" xml:space="preserve"><value>Rate-limited</value></data>
   <data name="Data_Offline" xml:space="preserve"><value>Offline</value></data>
+  <data name="Data_Retrying" xml:space="preserve"><value>Retrying</value></data>
   <data name="Data_Unsupported" xml:space="preserve"><value>Unsupported response</value></data>
   <data name="Data_FetchFailed" xml:space="preserve"><value>Fetch failed</value></data>
   <data name="Data_ConnectedNoQuota" xml:space="preserve"><value>Connected · no quota data</value></data>
@@ -471,6 +540,7 @@
   <data name="Runtime_FailureProviderChanged" xml:space="preserve"><value>Provider response changed</value></data>
   <data name="Runtime_FailureCancelled" xml:space="preserve"><value>Cancelled</value></data>
   <data name="Runtime_FailureUnsupported" xml:space="preserve"><value>Not supported</value></data>
+  <data name="Runtime_FailureTemporarilyUnavailable" xml:space="preserve"><value>Temporarily unavailable</value></data>
   <data name="Runtime_FailureUnknown" xml:space="preserve"><value>Unknown failure</value></data>
   <data name="Runtime_MeaningSuccess" xml:space="preserve"><value>Limits were read and are shown on Overview.</value></data>
   <data name="Runtime_MeaningAuthentication" xml:space="preserve"><value>Sign in again in this provider's CLI or app.</value></data>
@@ -483,6 +553,7 @@
   <data name="Runtime_MeaningProviderChanged" xml:space="preserve"><value>This provider changed its response. QuotaBoard needs an update to read it.</value></data>
   <data name="Runtime_MeaningCancelled" xml:space="preserve"><value>The refresh was cancelled before this check finished.</value></data>
   <data name="Runtime_MeaningUnsupported" xml:space="preserve"><value>This provider does not publish limits for your plan.</value></data>
+  <data name="Runtime_MeaningTemporarilyUnavailable" xml:space="preserve"><value>The source is temporarily unavailable. QuotaBoard keeps retrying automatically.</value></data>
   <data name="Runtime_MeaningUnknown" xml:space="preserve"><value>The check failed for an unknown reason. Try refreshing again.</value></data>
   <data name="Runtime_ApiKeySuffix" xml:space="preserve"><value>(API key)</value></data>
   <data name="Runtime_StatusMinor" xml:space="preserve"><value>Minor service outage</value></data>
@@ -497,9 +568,6 @@
   <data name="Alert_ResetMessage" xml:space="preserve"><value>Reset in {0}.</value></data>
   <data name="Alert_HoursMinutes" xml:space="preserve"><value>{0}h {1}m</value></data>
   <data name="Alert_Minutes" xml:space="preserve"><value>{0}m</value></data>
-  <data name="Usage_AnalysisEyebrow.Text" xml:space="preserve"><value>USAGE ANALYSIS</value></data>
-  <data name="Usage_AnalysisTitle.Text" xml:space="preserve"><value>Period-over-period change</value></data>
-  <data name="Usage_AnalysisDescription.Text" xml:space="preserve"><value>Selected window plus fixed 7-, 30-, and 90-day comparisons.</value></data>
   <data name="Usage_ShowMore" xml:space="preserve"><value>Show more ({0} remaining)</value></data>
   <data name="Usage_ShowLess" xml:space="preserve"><value>Show less</value></data>
   <data name="UsageWindow_ModelLine" xml:space="preserve"><value>{0} · {1}</value></data>

@@ -129,6 +129,10 @@ internal sealed class AmpCliStrategy(IProcessRunner runner, IClock clock) : ILim
         try
         {
             ProcessResult result = await runner.RunAsync(executable, ["usage"], TimeSpan.FromSeconds(15), cancellationToken).ConfigureAwait(false);
+            if (result.OutputTruncated || result.ErrorTruncated)
+            {
+                return FetchResult.Failure(FetchFailureKind.MalformedResponse, "Amp usage output exceeded the capture limit and was truncated.", FallbackPolicy.TryNextStrategy, Id, Stopwatch.GetElapsedTime(started));
+            }
             string output = string.IsNullOrWhiteSpace(result.StandardOutput) ? result.StandardError : result.StandardOutput;
             return result.ExitCode == 0 && AmpParser.TryParse(output, out AmpUsage? usage)
                 ? FetchResult.Success(AmpParser.Snapshot(account.Key, usage, clock.UtcNow, Id, "cli"), Id, Stopwatch.GetElapsedTime(started))

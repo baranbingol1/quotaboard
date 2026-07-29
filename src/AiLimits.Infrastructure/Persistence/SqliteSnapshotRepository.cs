@@ -215,6 +215,58 @@ public sealed class SqliteSnapshotRepository(SqliteDatabase database) : ISnapsho
         }
     }
 
+    /// <summary>
+    /// Latest fetch-attempt outcome per account, so cards can say "Sign-in
+    /// required" instead of an ever-aging "Cached" when credentials disappear
+    /// (e.g. a CLI logout or an update that relocates its auth store).
+    ///
+    /// Keyed by account, not provider: a provider that supports several
+    /// accounts would otherwise have one account's failure labelled onto
+    /// every card it owns — a single signed-out Codex login made every
+    /// other Codex account read "Sign-in required".
+    ///
+    /// This is a true per-account latest; the previous global
+    /// ORDER BY started_at DESC LIMIT 100 silently dropped any account whose
+    /// attempts fell out of the window and defaulted it to healthy.
+    /// ROW_NUMBER with a rowid tiebreak keeps "latest" deterministic when two
+    /// attempts share a timestamp: the one recorded last wins.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<AccountKey, FetchFailureKind>> ReadLatestFailureKindsAsync(CancellationToken cancellationToken)
+    {
+        Dictionary<AccountKey, FetchFailureKind> kinds = new Dictionary<AccountKey, FetchFailureKind>();
+        SqliteConnection connection = await database.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            SqliteCommand command = connection.CreateCommand();
+            await using (command.ConfigureAwait(false))
+            {
+                command.CommandText = """
+                    SELECT provider_id, account_id, failure_kind
+                    FROM (
+                        SELECT provider_id, account_id, failure_kind,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY provider_id, account_id
+                                   ORDER BY started_at DESC, rowid DESC) AS rn
+                        FROM fetch_attempts
+                    )
+                    WHERE rn = 1;
+                    """;
+                SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                await using (reader.ConfigureAwait(false))
+                {
+                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        if (AccountKey.TryParse($"{reader.GetString(0)}:{reader.GetString(1)}", out AccountKey? account))
+                        {
+                            kinds[account.Value] = (FetchFailureKind)reader.GetInt32(2);
+                        }
+                    }
+                }
+            }
+        }
+        return kinds;
+    }
+
     private static async Task<ProviderSnapshot> ReadSnapshotAsync(SqliteConnection connection, AccountKey account, SnapshotHeader header, CancellationToken cancellationToken)
     {
         List<UsageMeter> meters = new List<UsageMeter>();

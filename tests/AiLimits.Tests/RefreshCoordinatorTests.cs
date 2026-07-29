@@ -143,6 +143,69 @@ public sealed class RefreshCoordinatorTests
     }
 
     [Fact]
+    public async Task NotConfiguredAndUnsupportedSkipsAreNotPersistedAsAttempts()
+    {
+        // A skip is not a fetch attempt: persisting one wrote a fresh row whose
+        // recency hid the account's last real outcome in latest-attempt queries.
+        var account = new ProviderAccount(new AccountKey(new ProviderId("fake"), "one"),
+            "one", null, "fixture", 4, true);
+        var accounts = new MemoryAccounts(account);
+        var snapshots = new MemorySnapshots();
+        var coordinator = new RefreshCoordinator(
+            [new FakeAdapter(
+                new SkippedStrategy("not-configured", StrategyAvailability.NotConfigured),
+                new SkippedStrategy("unsupported", StrategyAvailability.Unsupported))],
+            accounts, snapshots, new SnapshotMerger(), new FixedClock(), NullLogger<RefreshCoordinator>.Instance);
+
+        var publication = await coordinator.RefreshAsync(new RefreshRequest(account.Key, 4));
+
+        Assert.Equal(RefreshPublicationStatus.FailedWithoutData, publication.Status);
+        Assert.Empty(publication.Attempts);
+        Assert.Empty(snapshots.Attempts);
+    }
+
+    [Fact]
+    public async Task TemporarilyUnavailableAvailabilityIsPersistedWithItsOwnFailureKind()
+    {
+        var account = new ProviderAccount(new AccountKey(new ProviderId("fake"), "one"),
+            "one", null, "fixture", 4, true);
+        var accounts = new MemoryAccounts(account);
+        var snapshots = new MemorySnapshots();
+        var coordinator = new RefreshCoordinator(
+            [new FakeAdapter(new SkippedStrategy("locked-db", StrategyAvailability.TemporarilyUnavailable))],
+            accounts, snapshots, new SnapshotMerger(), new FixedClock(), NullLogger<RefreshCoordinator>.Instance);
+
+        var publication = await coordinator.RefreshAsync(new RefreshRequest(account.Key, 4));
+
+        Assert.Equal(RefreshPublicationStatus.FailedWithoutData, publication.Status);
+        var attempt = Assert.Single(publication.Attempts);
+        Assert.Equal("locked-db", attempt.StrategyId);
+        Assert.Equal(FetchFailureKind.TemporarilyUnavailable, attempt.FailureKind);
+        Assert.Equal(FetchFailureKind.TemporarilyUnavailable, Assert.Single(snapshots.Attempts).FailureKind);
+    }
+
+    [Fact]
+    public async Task ALaterAvailabilitySkipDoesNotMaskAnEarlierRealFailure()
+    {
+        var account = new ProviderAccount(new AccountKey(new ProviderId("fake"), "one"),
+            "one", null, "fixture", 4, true);
+        var accounts = new MemoryAccounts(account);
+        var snapshots = new MemorySnapshots();
+        var coordinator = new RefreshCoordinator(
+            [new FakeAdapter(
+                new FailingStrategy(FetchFailureKind.Network) { Order = 1 },
+                new SkippedStrategy("not-configured", StrategyAvailability.NotConfigured) { Order = 2 })],
+            accounts, snapshots, new SnapshotMerger(), new FixedClock(), NullLogger<RefreshCoordinator>.Instance);
+
+        var publication = await coordinator.RefreshAsync(new RefreshRequest(account.Key, 4));
+
+        Assert.Equal(RefreshPublicationStatus.FailedWithoutData, publication.Status);
+        var attempt = Assert.Single(publication.Attempts);
+        Assert.Equal(FetchFailureKind.Network, attempt.FailureKind);
+        Assert.Equal(FetchFailureKind.Network, Assert.Single(snapshots.Attempts).FailureKind);
+    }
+
+    [Fact]
     public async Task FixtureMeterPersistsEndToEndWithoutPresentationKnowledge()
     {
         using var temporary = new TemporaryDirectory();
@@ -223,6 +286,26 @@ public sealed class RefreshCoordinatorTests
             throw new InvalidOperationException("should never be called");
     }
 
+    private sealed class SkippedStrategy(string id, StrategyAvailability availability) : ILimitFetchStrategy
+    {
+        public string Id => id;
+        public int Order { get; init; } = 1;
+        public Task<StrategyAvailabilityResult> CheckAvailabilityAsync(ProviderAccount providerAccount, CancellationToken cancellationToken) =>
+            Task.FromResult(new StrategyAvailabilityResult(availability, "not runnable right now"));
+        public Task<FetchResult> FetchAsync(ProviderAccount providerAccount, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("skipped strategies must never be fetched");
+    }
+
+    private sealed class FailingStrategy(FetchFailureKind kind) : ILimitFetchStrategy
+    {
+        public string Id => "failing";
+        public int Order { get; init; } = 1;
+        public Task<StrategyAvailabilityResult> CheckAvailabilityAsync(ProviderAccount providerAccount, CancellationToken cancellationToken) =>
+            Task.FromResult(StrategyAvailabilityResult.Ready());
+        public Task<FetchResult> FetchAsync(ProviderAccount providerAccount, CancellationToken cancellationToken) =>
+            Task.FromResult(FetchResult.Failure(kind, "boom", FallbackPolicy.TryNextStrategy, Id, TimeSpan.Zero));
+    }
+
     private sealed class StrategyCreationThrowingAdapter : IProviderAdapter
     {
         public ProviderDescriptor Descriptor { get; } = new(new ProviderId("fake"), "Fake", "#000000",
@@ -248,11 +331,12 @@ public sealed class RefreshCoordinatorTests
     private sealed class MemorySnapshots : ISnapshotRepository
     {
         private ProviderSnapshot? _snapshot;
+        public List<FetchAttempt> Attempts { get; } = [];
         public Task<ProviderSnapshot?> GetLatestAsync(AccountKey account, CancellationToken cancellationToken) => Task.FromResult(_snapshot);
         public Task SaveAsync(ProviderSnapshot snapshot, long generation, CancellationToken cancellationToken) { _snapshot = snapshot; return Task.CompletedTask; }
         public Task<IReadOnlyList<ProviderSnapshot>> GetHistoryAsync(AccountKey account, DateTimeOffset from, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<ProviderSnapshot>>(_snapshot is null ? [] : [_snapshot]);
-        public Task RecordAttemptAsync(FetchAttempt attempt, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task RecordAttemptAsync(FetchAttempt attempt, CancellationToken cancellationToken) { Attempts.Add(attempt); return Task.CompletedTask; }
     }
 
     private sealed class TemporaryDirectory : IDisposable

@@ -21,18 +21,6 @@
             <Setter Property="BorderBrush" Value="{ThemeResource SurfaceStrokeBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="7" />
-            <!-- ItemTemplate instead of DisplayMemberPath: the default presenter
-                 clips long labels mid-glyph ("Anthropic (Claude (") at this panel
-                 width. Trimming with an ellipsis plus a tooltip keeps the full
-                 name one hover away. -->
-            <Setter Property="ItemTemplate">
-                <Setter.Value>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis"
-                                   ToolTipService.ToolTip="{Binding Label}" />
-                    </DataTemplate>
-                </Setter.Value>
-            </Setter>
         </Style>
         <Style x:Key="ChartSeriesToggleStyle" TargetType="ToggleButton">
             <Setter Property="MinHeight" Value="28" />
@@ -62,16 +50,16 @@
             <controls:AdaptiveHeaderPanel MinContentWidth="320" Spacing="20">
                 <StackPanel MaxWidth="760" VerticalAlignment="Bottom">
                     <StackPanel Orientation="Horizontal" Spacing="10">
-                        <TextBlock Text="USAGE" Style="{StaticResource EyebrowTextStyle}" VerticalAlignment="Center" />
-                        <Border Background="{ThemeResource PillPositiveBackgroundBrush}" CornerRadius="12" Padding="9,3"><TextBlock Text="ON-DEVICE" FontFamily="{ThemeResource MetricFont}" FontSize="9" Foreground="{ThemeResource PillPositiveForegroundBrush}" /></Border>
+                        <TextBlock x:Uid="Usage_Eyebrow" Text="USAGE" Style="{StaticResource EyebrowTextStyle}" VerticalAlignment="Center" />
+                        <Border Background="{ThemeResource PillPositiveBackgroundBrush}" CornerRadius="12" Padding="9,3"><TextBlock x:Uid="Usage_OnDevicePill" Text="ON-DEVICE" FontFamily="{ThemeResource MetricFont}" FontSize="9" Foreground="{ThemeResource PillPositiveForegroundBrush}" /></Border>
                     </StackPanel>
-                    <TextBlock Text="Filter and break down your usage." FontSize="30" FontWeight="SemiBold" Margin="0,5,0,0" TextWrapping="Wrap" />
-                    <TextBlock x:Name="QuerySummaryText" Text="Last 30 days · all activity" Foreground="{ThemeResource TextSecondaryBrush}" Margin="0,5,0,0" TextWrapping="Wrap" />
+                    <TextBlock x:Uid="Usage_Title" Text="Filter and break down your usage." FontSize="30" FontWeight="SemiBold" Margin="0,5,0,0" TextWrapping="Wrap" />
+                    <TextBlock x:Uid="Usage_QuerySummary" x:Name="QuerySummaryText" Text="Last 30 days · all activity" Foreground="{ThemeResource TextSecondaryBrush}" Margin="0,5,0,0" TextWrapping="Wrap" />
                 </StackPanel>
                 <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom" Spacing="7">
                     <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                        <Button x:Name="ResetQueryButton" Content="Reset query" Click="OnResetQuery" />
-                        <Button Content="Refresh data" Command="{x:Bind ViewModel.RefreshCommand}" Style="{StaticResource AccentButtonStyle}" />
+                        <Button x:Uid="Usage_ResetQuery" x:Name="ResetQueryButton" Content="Reset query" Click="OnResetQuery" />
+                        <Button x:Uid="Usage_RefreshData" Content="Refresh data" Command="{x:Bind ViewModel.RefreshCommand}" Style="{StaticResource AccentButtonStyle}" />
                     </StackPanel>
                     <!-- Same live progress strip as Overview: a refresh takes
                          long enough that a disabled gray button reads as a
@@ -107,43 +95,39 @@
                         <Grid ColumnSpacing="8">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <StackPanel>
-                                <TextBlock Text="QUERY" Style="{StaticResource QueryLabelStyle}"/>
-                                <TextBlock Text="Filter the ledger" FontSize="19" FontWeight="SemiBold" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock x:Uid="Usage_QueryEyebrow" Text="QUERY" Style="{StaticResource QueryLabelStyle}"/>
+                                <TextBlock x:Uid="Usage_QueryTitle" Text="Filter the ledger" FontSize="19" FontWeight="SemiBold" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
                             </StackPanel>
-                            <TextBlock Grid.Column="1" x:Name="ActiveFilterCountText" Text="0 active" HorizontalAlignment="Right" VerticalAlignment="Bottom" FontFamily="{ThemeResource MetricFont}" FontSize="10" Foreground="{ThemeResource FocusBrush}"/>
+                            <TextBlock Grid.Column="1" x:Uid="Usage_ActiveFilters" x:Name="ActiveFilterCountText" Text="0 active" HorizontalAlignment="Right" VerticalAlignment="Bottom" FontFamily="{ThemeResource MetricFont}" FontSize="10" Foreground="{ThemeResource TextPrimaryBrush}"/>
                         </Grid>
 
                         <StackPanel Spacing="5">
-                            <TextBlock Text="Date range" FontSize="11" Foreground="{ThemeResource TextSecondaryBrush}" />
+                            <TextBlock x:Uid="Usage_DateRangeLabel" Text="Date range" FontSize="11" Foreground="{ThemeResource TextSecondaryBrush}" />
                             <ComboBox x:Name="DateRangePicker" SelectedIndex="1" HorizontalAlignment="Stretch" SelectionChanged="OnDateRangeChanged">
-                                <ComboBoxItem Content="Last 7 days" Tag="7"/><ComboBoxItem Content="Last 30 days" Tag="30"/><ComboBoxItem Content="Last 90 days" Tag="90"/><ComboBoxItem Content="Last year" Tag="365"/><ComboBoxItem Content="Custom range…" Tag="custom"/>
+                                <ComboBoxItem x:Uid="Usage_Window7" Content="Last 7 days" Tag="7"/><ComboBoxItem x:Uid="Usage_Window30" Content="Last 30 days" Tag="30"/><ComboBoxItem x:Uid="Usage_Window90" Content="Last 90 days" Tag="90"/><ComboBoxItem x:Uid="Usage_Window365" Content="Last year" Tag="365"/><ComboBoxItem x:Uid="Usage_WindowCustom" Content="Custom range…" Tag="custom"/>
                             </ComboBox>
                             <StackPanel x:Name="CustomRangePanel" Visibility="Collapsed" Spacing="6" Margin="0,4,0,0">
-                                <DatePicker x:Name="FromDatePicker" Header="From" />
-                                <DatePicker x:Name="ThroughDatePicker" Header="Through" />
-                                <Button Content="Apply dates" Click="OnApplyCustomRange" HorizontalAlignment="Stretch" />
+                                <DatePicker x:Uid="Usage_FromDate" x:Name="FromDatePicker" Header="From" />
+                                <DatePicker x:Uid="Usage_ThroughDate" x:Name="ThroughDatePicker" Header="Through" />
+                                <Button x:Uid="Usage_ApplyDates" Content="Apply dates" Click="OnApplyCustomRange" HorizontalAlignment="Stretch" />
                             </StackPanel>
                         </StackPanel>
 
-                        <!-- Full-width rows, not two half columns: at this panel width a
-                             split column leaves ~86px per picker, and the Compare face
-                             clipped to "Previc…". Stacking matches the Date range row
-                             above and keeps every option readable. -->
-                        <StackPanel Spacing="14">
-                            <StackPanel Spacing="5"><TextBlock Text="Time grain" FontSize="11" Foreground="{ThemeResource TextSecondaryBrush}"/><ComboBox x:Name="TimeGrainPicker" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="OnQueryControlChanged"><ComboBoxItem Content="Auto" Tag="auto"/><ComboBoxItem Content="Day" Tag="day"/><ComboBoxItem Content="Week" Tag="week"/><ComboBoxItem Content="Month" Tag="month"/></ComboBox></StackPanel>
-                            <StackPanel Spacing="5"><TextBlock Text="Compare" FontSize="11" Foreground="{ThemeResource TextSecondaryBrush}"/><ComboBox x:Name="ComparePicker" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="OnQueryControlChanged"><ComboBoxItem Content="Previous" Tag="previous"/><ComboBoxItem Content="Off" Tag="none"/></ComboBox></StackPanel>
-                        </StackPanel>
+                        <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="5"><TextBlock x:Uid="Usage_TimeGrainLabel" Text="Time grain" FontSize="11" Foreground="{ThemeResource TextSecondaryBrush}"/><ComboBox x:Name="TimeGrainPicker" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="OnQueryControlChanged"><ComboBoxItem x:Uid="Usage_GrainAuto" Content="Auto" Tag="auto"/><ComboBoxItem x:Uid="Usage_GrainDay" Content="Day" Tag="day"/><ComboBoxItem x:Uid="Usage_GrainWeek" Content="Week" Tag="week"/><ComboBoxItem x:Uid="Usage_GrainMonth" Content="Month" Tag="month"/></ComboBox></StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="5"><TextBlock x:Uid="Usage_CompareLabel" Text="Compare" FontSize="11" Foreground="{ThemeResource TextSecondaryBrush}"/><ComboBox x:Name="ComparePicker" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="OnQueryControlChanged"><ComboBoxItem x:Uid="Usage_ComparePrevious" Content="Previous" Tag="previous"/><ComboBoxItem x:Uid="Usage_CompareOff" Content="Off" Tag="none"/></ComboBox></StackPanel>
+                        </Grid>
 
                         <Rectangle Height="1" Fill="{ThemeResource SurfaceStrokeBrush}" />
 
                         <StackPanel Spacing="5">
-                            <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="PROVIDER" Style="{StaticResource QueryLabelStyle}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" x:Name="ProviderCountText" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="{ThemeResource MetricFont}" FontSize="9" Foreground="{ThemeResource TextQuietBrush}"/></Grid>
-                            <ListView x:Name="ProviderFilter" Style="{StaticResource FacetListStyle}" SelectionChanged="OnProviderSelectionChanged" />
+                            <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Uid="Usage_ProviderEyebrow" Text="PROVIDER" Style="{StaticResource QueryLabelStyle}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" x:Name="ProviderCountText" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="{ThemeResource MetricFont}" FontSize="9" Foreground="{ThemeResource TextQuietBrush}"/></Grid>
+                            <ListView x:Name="ProviderFilter" Style="{StaticResource FacetListStyle}" DisplayMemberPath="Label" SelectionChanged="OnProviderSelectionChanged" />
                         </StackPanel>
 
                         <StackPanel Spacing="5">
-                            <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="HARNESS" Style="{StaticResource QueryLabelStyle}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" x:Name="HarnessCountText" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="{ThemeResource MetricFont}" FontSize="9" Foreground="{ThemeResource TextQuietBrush}"/></Grid>
-                            <ListView x:Name="HarnessFilter" Style="{StaticResource FacetListStyle}" SelectionChanged="OnHarnessSelectionChanged" />
+                            <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Uid="Usage_HarnessEyebrow" Text="HARNESS" Style="{StaticResource QueryLabelStyle}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" x:Name="HarnessCountText" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="{ThemeResource MetricFont}" FontSize="9" Foreground="{ThemeResource TextQuietBrush}"/></Grid>
+                            <ListView x:Name="HarnessFilter" Style="{StaticResource FacetListStyle}" DisplayMemberPath="Label" SelectionChanged="OnHarnessSelectionChanged" />
                         </StackPanel>
 
                         <StackPanel Spacing="5">
@@ -151,9 +135,9 @@
                                  facet headings and shares its row with the count, so at this
                                  panel width it always read as "PROJECT / WORK…" whatever the
                                  window was doing. -->
-                            <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="PROJECT / WORKTREE" Style="{StaticResource QueryLabelStyle}" TextWrapping="Wrap" VerticalAlignment="Center" ToolTipService.ToolTip="Each Git worktree is listed as its own project."/><TextBlock Grid.Column="1" x:Name="ProjectCountText" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="{ThemeResource MetricFont}" FontSize="9" Foreground="{ThemeResource TextQuietBrush}"/></Grid>
-                            <TextBox x:Name="ProjectSearchBox" PlaceholderText="Find a project" TextChanged="OnProjectSearchChanged" />
-                            <ListView x:Name="ProjectFilter" Style="{StaticResource FacetListStyle}" SelectionChanged="OnProjectSelectionChanged" />
+                            <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Uid="Usage_ProjectEyebrow" x:Name="ProjectEyebrowLabel" Text="PROJECT / WORKTREE" Style="{StaticResource QueryLabelStyle}" TextWrapping="Wrap" VerticalAlignment="Center"/><TextBlock Grid.Column="1" x:Name="ProjectCountText" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="{ThemeResource MetricFont}" FontSize="9" Foreground="{ThemeResource TextQuietBrush}"/></Grid>
+                            <TextBox x:Uid="Usage_ProjectSearch" x:Name="ProjectSearchBox" PlaceholderText="Find a project" TextChanged="OnProjectSearchChanged" />
+                            <ListView x:Name="ProjectFilter" Style="{StaticResource FacetListStyle}" DisplayMemberPath="Label" SelectionChanged="OnProjectSelectionChanged" />
                             <!-- Shown only when the window actually contains usage from a
                                  harness that reports no working directory, and it names
                                  just those. Collapsed is the right default: most queries
@@ -165,9 +149,9 @@
                         </StackPanel>
 
                         <StackPanel Spacing="5">
-                            <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="MODEL" Style="{StaticResource QueryLabelStyle}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" x:Name="ModelCountText" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="{ThemeResource MetricFont}" FontSize="9" Foreground="{ThemeResource TextQuietBrush}"/></Grid>
-                            <TextBox x:Name="ModelSearchBox" PlaceholderText="Find a model" TextChanged="OnModelSearchChanged" />
-                            <ListView x:Name="ModelFilter" Style="{StaticResource FacetListStyle}" SelectionChanged="OnModelSelectionChanged" />
+                            <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Uid="Usage_ModelEyebrow" Text="MODEL" Style="{StaticResource QueryLabelStyle}" VerticalAlignment="Center"/><TextBlock Grid.Column="1" x:Name="ModelCountText" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="{ThemeResource MetricFont}" FontSize="9" Foreground="{ThemeResource TextQuietBrush}"/></Grid>
+                            <TextBox x:Uid="Usage_ModelSearch" x:Name="ModelSearchBox" PlaceholderText="Find a model" TextChanged="OnModelSearchChanged" />
+                            <ListView x:Name="ModelFilter" Style="{StaticResource FacetListStyle}" DisplayMemberPath="Label" SelectionChanged="OnModelSelectionChanged" />
                         </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
@@ -179,12 +163,12 @@
                         <StackPanel>
                             <controls:AdaptiveHeaderPanel MinContentWidth="200" Spacing="14">
                                 <StackPanel VerticalAlignment="Top">
-                                    <TextBlock Text="TOKENS OVER TIME" Style="{StaticResource QueryLabelStyle}"/>
+                                    <TextBlock x:Uid="Usage_ChartEyebrow" Text="TOKENS OVER TIME" Style="{StaticResource QueryLabelStyle}"/>
                                     <TextBlock x:Name="TotalTokensText" Text="—" FontFamily="{ThemeResource MetricFont}" FontSize="31" FontWeight="SemiBold" Margin="0,4,0,0"/>
                                 </StackPanel>
                                 <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top">
-                                    <TextBlock x:Name="WindowLabelText" Text="LAST 30 DAYS" Style="{StaticResource QueryLabelStyle}" HorizontalAlignment="Right"/>
-                                    <TextBlock x:Name="ComparisonText" Text="—" Foreground="{ThemeResource FocusBrush}" FontFamily="{ThemeResource MetricFont}" FontSize="12" HorizontalAlignment="Right" Margin="0,5,0,0" TextWrapping="Wrap" TextAlignment="Right"/>
+                                    <TextBlock x:Uid="Usage_WindowInitial" x:Name="WindowLabelText" Text="LAST 30 DAYS" Style="{StaticResource QueryLabelStyle}" HorizontalAlignment="Right"/>
+                                    <TextBlock x:Name="ComparisonText" Text="—" Foreground="{ThemeResource TextPrimaryBrush}" FontFamily="{ThemeResource MetricFont}" FontSize="12" HorizontalAlignment="Right" Margin="0,5,0,0" TextWrapping="Wrap" TextAlignment="Right"/>
                                 </StackPanel>
                             </controls:AdaptiveHeaderPanel>
                             <StackPanel Spacing="8" Margin="0,14,0,0">
@@ -192,10 +176,10 @@
                                      caption do not fit the centre column on a narrow window, and a
                                      StackPanel would push the last one off the edge. -->
                                 <controls:WrapRowPanel>
-                                    <TextBlock Text="SERIES BY" Style="{StaticResource QueryLabelStyle}" VerticalAlignment="Center" Margin="0,0,11,6"/>
-                                    <ToggleButton x:Name="ChartSeriesProviderButton" Content="Provider" IsChecked="True" Style="{StaticResource ChartSeriesToggleStyle}" Margin="0,0,8,6" VerticalAlignment="Center" Click="OnChartSeriesProviderClicked"/>
-                                    <ToggleButton x:Name="ChartSeriesHarnessButton" Content="Harness" Style="{StaticResource ChartSeriesToggleStyle}" Margin="0,0,8,6" VerticalAlignment="Center" Click="OnChartSeriesHarnessClicked"/>
-                                    <ToggleButton x:Name="ChartSeriesModelButton" Content="Model" Style="{StaticResource ChartSeriesToggleStyle}" Margin="0,0,8,6" VerticalAlignment="Center" Click="OnChartSeriesModelClicked"/>
+                                    <TextBlock x:Uid="Usage_SeriesBy" Text="SERIES BY" Style="{StaticResource QueryLabelStyle}" VerticalAlignment="Center" Margin="0,0,11,6"/>
+                                    <ToggleButton x:Uid="Usage_SeriesProvider" x:Name="ChartSeriesProviderButton" Content="Provider" IsChecked="True" Style="{StaticResource ChartSeriesToggleStyle}" Margin="0,0,8,6" VerticalAlignment="Center" Click="OnChartSeriesProviderClicked"/>
+                                    <ToggleButton x:Uid="Usage_SeriesHarness" x:Name="ChartSeriesHarnessButton" Content="Harness" Style="{StaticResource ChartSeriesToggleStyle}" Margin="0,0,8,6" VerticalAlignment="Center" Click="OnChartSeriesHarnessClicked"/>
+                                    <ToggleButton x:Uid="Usage_SeriesModel" x:Name="ChartSeriesModelButton" Content="Model" Style="{StaticResource ChartSeriesToggleStyle}" Margin="0,0,8,6" VerticalAlignment="Center" Click="OnChartSeriesModelClicked"/>
                                 </controls:WrapRowPanel>
                                 <ItemsControl x:Name="ChartLegendItems">
                                     <ItemsControl.ItemsPanel>
@@ -210,7 +194,7 @@
                                     </DataTemplate></ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </StackPanel>
-                            <TextBlock x:Name="EmptyStateText" Text="No usage matches this query. Clear a filter or widen the date range." Visibility="Collapsed" Foreground="{ThemeResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,64,0,64" TextWrapping="Wrap" />
+                            <TextBlock x:Uid="Usage_ChartEmpty" x:Name="EmptyStateText" Text="No usage matches this query. Clear a filter or widen the date range." Visibility="Collapsed" Foreground="{ThemeResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,64,0,64" TextWrapping="Wrap" />
                             <Grid x:Name="ChartPlotHost" Height="248" Margin="0,18,0,0">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="74"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions><RowDefinition Height="210"/><RowDefinition Height="38"/></Grid.RowDefinitions>
@@ -220,7 +204,7 @@
                                     <TextBlock x:Name="YAxisMidText" FontFamily="{ThemeResource MetricFont}" FontSize="11" Foreground="{ThemeResource TextSecondaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                                     <TextBlock x:Name="YAxisZeroText" Text="0" FontFamily="{ThemeResource MetricFont}" FontSize="11" Foreground="{ThemeResource TextSecondaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
                                 </Grid>
-                                <TextBlock Grid.Row="1" Grid.Column="0" Text="TOKENS" Style="{StaticResource QueryLabelStyle}" FontSize="9" HorizontalAlignment="Right" Margin="0,9,10,0"/>
+                                <TextBlock Grid.Row="1" Grid.Column="0" x:Uid="Usage_TokensAxis" Text="TOKENS" Style="{StaticResource QueryLabelStyle}" FontSize="9" HorizontalAlignment="Right" Margin="0,9,10,0"/>
 
                                 <Grid Grid.Row="0" Grid.Column="1" IsHitTestVisible="False">
                                     <Rectangle Height="1" Fill="{ThemeResource SurfaceStrokeBrush}" VerticalAlignment="Top"/>
@@ -229,13 +213,19 @@
                                 </Grid>
 
                                 <ScrollViewer x:Name="ChartScrollViewer" Grid.RowSpan="2" Grid.Column="1" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" VerticalScrollMode="Disabled" SizeChanged="OnChartViewportSizeChanged">
-                                    <ItemsControl x:Name="ChartItems">
+                                    <!-- The chart is one Tab stop ("Once"); Left/Right then move
+                                         between bars via XY focus. Each bar is focusable, named
+                                         for screen readers, and shows the hover card on focus. -->
+                                    <ItemsControl x:Name="ChartItems" TabNavigation="Once" XYFocusKeyboardNavigation="Enabled">
                                         <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="3"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate><DataTemplate>
                                             <!-- A bar is hover-only. Background must stay Transparent
                                                  rather than unset, or the cell is not hit-testable and
                                                  the hover card never appears between segments. -->
                                             <Grid Width="{Binding ItemWidth}" Height="248" Background="Transparent"
+                                                  IsTabStop="True" UseSystemFocusVisuals="True" FocusVisualMargin="-2"
+                                                  AutomationProperties.Name="{Binding AutomationName}"
+                                                  GotFocus="OnChartBarGotFocus" LostFocus="OnChartBarLostFocus"
                                                   ToolTipService.ToolTip="{Binding Tooltip}"
                                                   PointerEntered="OnChartBarPointerMoved" PointerMoved="OnChartBarPointerMoved" PointerExited="OnChartBarPointerExited">
                                                 <Grid.RowDefinitions><RowDefinition Height="210"/><RowDefinition Height="38"/></Grid.RowDefinitions>
@@ -273,7 +263,7 @@
 
                     <Border Style="{StaticResource QueryPanelStyle}" Padding="20,16">
                         <StackPanel Spacing="3">
-                            <TextBlock Text="MATCHING DATA" Style="{StaticResource QueryLabelStyle}"/>
+                            <TextBlock x:Uid="Usage_MatchingEyebrow" Text="MATCHING DATA" Style="{StaticResource QueryLabelStyle}"/>
                             <TextBlock x:Name="MatchingRecordsText" Text="—" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"/>
                             <TextBlock x:Name="MatchingRecordsDetailText" Text="—" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
                         </StackPanel>
@@ -286,13 +276,13 @@
                         <StackPanel Spacing="12">
                             <controls:AdaptiveHeaderPanel MinContentWidth="240" Spacing="14">
                                 <StackPanel Spacing="2" VerticalAlignment="Bottom">
-                                    <TextBlock Text="MODEL MIX" Style="{StaticResource QueryLabelStyle}"/>
+                                    <TextBlock x:Uid="Usage_ModelMixEyebrow" Text="MODEL MIX" Style="{StaticResource QueryLabelStyle}"/>
                                     <TextBlock x:Name="ModelMixSubtitleText" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
                                 </StackPanel>
                                 <TextBlock x:Name="ModelMixWindowText" Style="{StaticResource QueryLabelStyle}" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
                             </controls:AdaptiveHeaderPanel>
 
-                            <TextBlock x:Name="ModelMixEmptyText" Text="No models match this query." Visibility="Collapsed" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" Margin="0,8,0,8"/>
+                            <TextBlock x:Uid="Usage_ModelMixEmpty" x:Name="ModelMixEmptyText" Text="No models match this query." Visibility="Collapsed" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" Margin="0,8,0,8"/>
 
                             <ItemsControl x:Name="ModelMixItems">
                                 <ItemsControl.ItemTemplate><DataTemplate>
@@ -311,13 +301,14 @@
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Tokens}" FontFamily="{ThemeResource MetricFont}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                             <TextBlock Text="{Binding ShareLabel}" FontFamily="{ThemeResource MetricFont}" FontSize="12" Foreground="{ThemeResource TextQuietBrush}" VerticalAlignment="Center" MinWidth="44" TextAlignment="Right"/>
-                                            <TextBlock Text="{Binding Cost}" FontFamily="{ThemeResource MetricFont}" FontSize="13" Foreground="{ThemeResource FocusBrush}" VerticalAlignment="Center" MinWidth="64" TextAlignment="Right"/>
+                                            <TextBlock Text="{Binding Cost}" FontFamily="{ThemeResource MetricFont}" FontSize="13" Foreground="{ThemeResource TextPrimaryBrush}" VerticalAlignment="Center" MinWidth="64" TextAlignment="Right"/>
                                         </StackPanel>
 
                                         <ItemsControl Grid.Row="1" ItemsSource="{Binding Spark}" Height="30" VerticalAlignment="Bottom">
                                             <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                                             <ItemsControl.ItemTemplate><DataTemplate>
-                                                <Grid Width="{Binding Width}" Height="30" ToolTipService.ToolTip="{Binding Tooltip}">
+                                                <Grid Width="{Binding Width}" Height="30" ToolTipService.ToolTip="{Binding Tooltip}"
+                                                      AutomationProperties.Name="{Binding AutomationName}">
                                                     <Border Height="{Binding Height}" Background="{Binding Brush}" Opacity="{Binding Opacity}" CornerRadius="1" VerticalAlignment="Bottom"/>
                                                 </Grid>
                                             </DataTemplate></ItemsControl.ItemTemplate>
@@ -337,7 +328,7 @@
 
                     <Border Style="{StaticResource QueryPanelStyle}" Padding="18,14">
                         <StackPanel Spacing="10">
-                            <TextBlock Text="TOKEN BREAKDOWN" Style="{StaticResource QueryLabelStyle}"/>
+                            <TextBlock x:Uid="Usage_BreakdownEyebrow" Text="TOKEN BREAKDOWN" Style="{StaticResource QueryLabelStyle}"/>
                             <ScrollViewer HorizontalScrollBarVisibility="Auto" HorizontalScrollMode="Auto" VerticalScrollMode="Disabled">
                                 <StackPanel MinWidth="700">
                                     <Grid Padding="0,0,0,6" BorderBrush="{ThemeResource SurfaceStrokeBrush}" BorderThickness="0,0,0,1" ColumnSpacing="10">
@@ -348,14 +339,14 @@
                                             <ColumnDefinition Width="84"/><ColumnDefinition Width="80"/>
                                             <ColumnDefinition Width="88"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Label" Style="{StaticResource QueryLabelStyle}" FontSize="10" HorizontalAlignment="Left"/>
-                                        <TextBlock Grid.Column="1" Text="Tokens" Style="{StaticResource SplitHeaderStyle}"/>
-                                        <TextBlock Grid.Column="2" Text="In" Style="{StaticResource SplitHeaderStyle}"/>
-                                        <TextBlock Grid.Column="3" Text="Out" Style="{StaticResource SplitHeaderStyle}"/>
-                                        <TextBlock Grid.Column="4" Text="Cache R" Style="{StaticResource SplitHeaderStyle}"/>
-                                        <TextBlock Grid.Column="5" Text="Cache W" Style="{StaticResource SplitHeaderStyle}"/>
-                                        <TextBlock Grid.Column="6" Text="Reason" Style="{StaticResource SplitHeaderStyle}"/>
-                                        <TextBlock Grid.Column="7" Text="API $" Style="{StaticResource SplitHeaderStyle}"/>
+                                        <TextBlock x:Uid="Usage_ColLabel" Text="Label" Style="{StaticResource QueryLabelStyle}" FontSize="10" HorizontalAlignment="Left"/>
+                                        <TextBlock Grid.Column="1" x:Uid="Usage_ColTokens" Text="Tokens" Style="{StaticResource SplitHeaderStyle}"/>
+                                        <TextBlock Grid.Column="2" x:Uid="Usage_ColIn" Text="In" Style="{StaticResource SplitHeaderStyle}"/>
+                                        <TextBlock Grid.Column="3" x:Uid="Usage_ColOut" Text="Out" Style="{StaticResource SplitHeaderStyle}"/>
+                                        <TextBlock Grid.Column="4" x:Uid="Usage_ColCacheR" Text="Cache R" Style="{StaticResource SplitHeaderStyle}"/>
+                                        <TextBlock Grid.Column="5" x:Uid="Usage_ColCacheW" Text="Cache W" Style="{StaticResource SplitHeaderStyle}"/>
+                                        <TextBlock Grid.Column="6" x:Uid="Usage_ColReason" Text="Reason" Style="{StaticResource SplitHeaderStyle}"/>
+                                        <TextBlock Grid.Column="7" x:Uid="Usage_ColApi" Text="API $" Style="{StaticResource SplitHeaderStyle}"/>
                                     </Grid>
                                     <ItemsControl x:Name="TokenSplitTable">
                                         <ItemsControl.ItemTemplate><DataTemplate>
@@ -374,7 +365,7 @@
                                                 <TextBlock Grid.Column="4" Text="{Binding CacheReadTokens}" Style="{StaticResource SplitNumberStyle}"/>
                                                 <TextBlock Grid.Column="5" Text="{Binding CacheWriteTokens}" Style="{StaticResource SplitNumberStyle}"/>
                                                 <TextBlock Grid.Column="6" Text="{Binding ReasoningTokens}" Style="{StaticResource SplitNumberStyle}"/>
-                                                <TextBlock Grid.Column="7" Text="{Binding ApiEquivalent}" Style="{StaticResource SplitNumberStyle}" Foreground="{ThemeResource FocusBrush}"/>
+                                                <TextBlock Grid.Column="7" Text="{Binding ApiEquivalent}" Style="{StaticResource SplitNumberStyle}" Foreground="{ThemeResource TextPrimaryBrush}"/>
                                             </Grid>
                                         </DataTemplate></ItemsControl.ItemTemplate>
                                     </ItemsControl>
@@ -388,14 +379,14 @@
             <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
                 <StackPanel Spacing="14">
                     <Border Style="{StaticResource QueryPanelStyle}"><StackPanel Spacing="8">
-                        <TextBlock Text="API EQUIVALENT" Style="{StaticResource QueryLabelStyle}"/>
-                        <TextBlock x:Name="ApiEquivalentText" Text="—" FontFamily="{ThemeResource MetricFont}" FontSize="27" FontWeight="SemiBold" Foreground="{ThemeResource FocusBrush}"/>
-                        <TextBlock x:Name="PricingCoverageText" Text="Public API-price estimate" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
+                        <TextBlock x:Uid="Usage_ApiEquivalentEyebrow" Text="API EQUIVALENT" Style="{StaticResource QueryLabelStyle}"/>
+                        <TextBlock x:Name="ApiEquivalentText" Text="—" FontFamily="{ThemeResource MetricFont}" FontSize="27" FontWeight="SemiBold" Foreground="{ThemeResource TextPrimaryBrush}"/>
+                        <TextBlock x:Uid="Usage_PricingCoverage" x:Name="PricingCoverageText" Text="Public API-price estimate" Foreground="{ThemeResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
                     </StackPanel></Border>
 
                     <Border Style="{StaticResource QueryPanelStyle}"><StackPanel Spacing="8">
-                        <TextBlock Text="BREAK DOWN BY" Style="{StaticResource QueryLabelStyle}"/>
-                        <ComboBox x:Name="BreakdownPicker" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="OnBreakdownChanged"><ComboBoxItem Content="Provider" Tag="provider"/><ComboBoxItem Content="Harness" Tag="tool"/><ComboBoxItem Content="Project / worktree" Tag="project"/><ComboBoxItem Content="Model" Tag="model"/></ComboBox>
+                        <TextBlock x:Uid="Usage_BreakdownBy" Text="BREAK DOWN BY" Style="{StaticResource QueryLabelStyle}"/>
+                        <ComboBox x:Name="BreakdownPicker" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="OnBreakdownChanged"><ComboBoxItem x:Uid="Usage_BreakdownProvider" Content="Provider" Tag="provider"/><ComboBoxItem x:Uid="Usage_BreakdownHarness" Content="Harness" Tag="tool"/><ComboBoxItem x:Uid="Usage_BreakdownProject" Content="Project / worktree" Tag="project"/><ComboBoxItem x:Uid="Usage_BreakdownModel" Content="Model" Tag="model"/></ComboBox>
                         <ItemsControl x:Name="BreakdownItems">
                             <ItemsControl.ItemTemplate><DataTemplate>
                                 <!-- No separator rule between rows: each row already ends in a

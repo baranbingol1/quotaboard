@@ -38,7 +38,7 @@ Diagnostics shows which source answered for each provider, how long it took, and
 2. Extract it anywhere and run `QuotaBoard.exe`. There is no installer, and no administrator rights are required.
 3. Select **Refresh**. QuotaBoard detects supported tools already signed in for the current Windows user.
 
-Until these builds are code-signed, Windows SmartScreen may require **More info → Run anyway**. Each archive ships with a `.sha256` file you can check with `Get-FileHash`.
+Releases are code-signed when repository signing is enabled; other builds carry an untrusted CI test signature, so Windows SmartScreen may still require **More info → Run anyway**. Each archive ships with a `.sha256` file you can check with `Get-FileHash`, and releases publish build-provenance attestations verifiable with `gh attestation verify`.
 
 Requires Windows 10 21H2 (build 19045) or newer. The runtime is self-contained, so there is no .NET to install.
 

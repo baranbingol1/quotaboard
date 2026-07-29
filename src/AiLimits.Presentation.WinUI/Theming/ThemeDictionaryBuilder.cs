@@ -83,7 +83,7 @@ public static class ThemeDictionaryBuilder
             ["SurfaceStrokeActiveBrush"] = Brush(borderActive),
             ["TextPrimaryBrush"] = Brush(text),
             ["TextSecondaryBrush"] = Brush(textMuted),
-            ["TextQuietBrush"] = Brush(Blend(textMuted, background, 0.35)),
+            ["TextQuietBrush"] = Brush(Blend(textMuted, background, 0.15)),
             ["HealthyBrush"] = Brush(success),
             ["WarningBrush"] = Brush(warning),
             ["CriticalBrush"] = Brush(error),

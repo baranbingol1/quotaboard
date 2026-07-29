@@ -12,9 +12,9 @@
             <SolidColorBrush x:Key="SurfaceSecondaryBrush" Color="#FFC8C9CE" />
             <SolidColorBrush x:Key="SurfaceStrokeBrush" Color="#FF737A8C" />
             <SolidColorBrush x:Key="SurfaceStrokeActiveBrush" Color="#FF5A607D" />
-            <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FF3760BF" />
-            <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF8990A3" />
-            <SolidColorBrush x:Key="TextQuietBrush" Color="#FFA8ADBB" />
+            <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FF3258AF" />
+            <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF555B6C" />
+            <SolidColorBrush x:Key="TextQuietBrush" Color="#FF6A6F7E" />
             <SolidColorBrush x:Key="HealthyBrush" Color="#FF587539" />
             <SolidColorBrush x:Key="WarningBrush" Color="#FFB15C00" />
             <SolidColorBrush x:Key="CriticalBrush" Color="#FFF52A65" />
@@ -27,12 +27,12 @@
             <SolidColorBrush x:Key="PillWarningBackgroundBrush" Color="#FFCFC0B4" />
             <SolidColorBrush x:Key="PillWarningForegroundBrush" Color="#FFB15C00" />
             <SolidColorBrush x:Key="PillNeutralBackgroundBrush" Color="#FFC8C9CE" />
-            <SolidColorBrush x:Key="PillNeutralForegroundBrush" Color="#FF8990A3" />
+            <SolidColorBrush x:Key="PillNeutralForegroundBrush" Color="#FF555B6C" />
             <LinearGradientBrush x:Key="ChartBarBrush" StartPoint="0,0" EndPoint="0,1">
                 <GradientStop Color="#FF2E7DE9" Offset="0" />
                 <GradientStop Color="#FF7FAAE8" Offset="1" />
             </LinearGradientBrush>
-            <SolidColorBrush x:Key="ChartSeriesOthersBrush" Color="#FF9BA0B1" />
+            <SolidColorBrush x:Key="ChartSeriesOthersBrush" Color="#FF717685" />
             <SolidColorBrush x:Key="ChartSeries1Brush" Color="#FF2E7DE9" />
             <SolidColorBrush x:Key="ChartSeries2Brush" Color="#FF587539" />
             <SolidColorBrush x:Key="ChartSeries3Brush" Color="#FFB15C00" />
@@ -53,7 +53,7 @@
             <SolidColorBrush x:Key="SurfaceStrokeActiveBrush" Color="#FF9099B2" />
             <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFC8D3F5" />
             <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF828BB8" />
-            <SolidColorBrush x:Key="TextQuietBrush" Color="#FF5E6485" />
+            <SolidColorBrush x:Key="TextQuietBrush" Color="#FF727AA2" />
             <SolidColorBrush x:Key="HealthyBrush" Color="#FFC3E88D" />
             <SolidColorBrush x:Key="WarningBrush" Color="#FFFF966C" />
             <SolidColorBrush x:Key="CriticalBrush" Color="#FFFF757F" />

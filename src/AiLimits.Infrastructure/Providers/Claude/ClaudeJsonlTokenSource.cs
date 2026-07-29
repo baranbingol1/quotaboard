@@ -23,7 +23,7 @@ public sealed class ClaudeJsonlTokenSource(string claudeHome) : ITokenUsageSourc
         var projects = Path.Combine(claudeHome, "projects");
         if (!Directory.Exists(projects)) yield break;
 
-        foreach (var file in Directory.EnumerateFiles(projects, "*.jsonl", SearchOption.AllDirectories)
+        foreach (var file in Directory.EnumerateFiles(projects, "*.jsonl", SafeFileEnumeration.Recursive)
                      .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
         {
             // FileShare.ReadWrite is essential: files actively written by

@@ -80,8 +80,8 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
 
     private readonly QuotaAlertMonitor _quotaAlerts;
 
-    private readonly Dictionary<string, ProviderServiceStatus> _providerStatuses =
-        new Dictionary<string, ProviderServiceStatus>(StringComparer.OrdinalIgnoreCase);
+    // TTL-capped: a dead statuspage feed cannot leave a banner up forever.
+    private readonly ProviderStatusCache _providerStatuses;
 
     private readonly IReadOnlyList<IProviderAdapter> _adapters;
 
@@ -143,6 +143,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         _snapshots = new SqliteSnapshotRepository(_database);
         _usage = new SqliteUsageAggregateRepository(_database);
         _providerStatusClient = new ProviderStatusClient(_httpClient);
+        _providerStatuses = new ProviderStatusCache(_clock);
         _quotaAlerts = new QuotaAlertMonitor(_database);
         ProcessRunner processRunner = new ProcessRunner();
         OpenCodePathDiscovery pathDiscovery = new OpenCodePathDiscovery(processRunner);
@@ -225,12 +226,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                     catalog = await catalogTask.ConfigureAwait(false);
                     IReadOnlyDictionary<string, ProviderServiceStatus> statuses =
                         await providerStatusTask.ConfigureAwait(false);
-                    foreach (KeyValuePair<string, ProviderServiceStatus> status in statuses)
-                    {
-                        // Operational responses replace incidents too, which clears
-                        // the warning on the next successful status-page poll.
-                        _providerStatuses[status.Key] = status.Value;
-                    }
+                    _providerStatuses.Merge(statuses);
                 }
                 finally
                 {
@@ -503,7 +499,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         decimal quotedCost = priced.Where((PricedModelRow item) => item.CostUsd.HasValue).Sum((PricedModelRow item) => item.CostUsd.GetValueOrDefault());
         bool hasPricedUsage = priced.Any((PricedModelRow item) => item.CostUsd.HasValue);
         decimal reportedCost = rows.Where((DailyUsageAggregate row) => row.ReportedServiceCostUsd.HasValue).Sum((DailyUsageAggregate row) => row.ReportedServiceCostUsd.GetValueOrDefault());
-        IReadOnlyDictionary<AccountKey, FetchFailureKind> latestFailures = await ReadLatestFailureKindsAsync(cancellationToken).ConfigureAwait(false);
+        IReadOnlyDictionary<AccountKey, FetchFailureKind> latestFailures = await _snapshots.ReadLatestFailureKindsAsync(cancellationToken).ConfigureAwait(false);
         IReadOnlyList<ProviderCardViewModel> providerCards = BuildProviderCards(accounts, latest, rows, now, latestFailures);
         ResetHorizonItemViewModel[] resets = (from item in providerCards.SelectMany((ProviderCardViewModel provider) => from meter in provider.AllMeters
                 where meter.ResetsAt.HasValue && meter.ResetsAt > now
@@ -1043,7 +1039,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                     .Select(ToMeterViewModel)
                     .ToArray() ?? Array.Empty<MeterViewModel>();
                 BalanceMetric balanceMetric = value?.Balances.FirstOrDefault();
-                _providerStatuses.TryGetValue(adapter.Descriptor.Id.Value, out ProviderServiceStatus? serviceStatus);
+                ProviderServiceStatus? serviceStatus = _providerStatuses.Get(adapter.Descriptor.Id.Value);
                 string incidentSummary = serviceStatus is { IsOperational: false }
                     ? RuntimeText.ProviderStatus(serviceStatus.Indicator, serviceStatus.Description)
                     : string.Empty;
@@ -1083,9 +1079,12 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             foreach (ProviderAccount account in array2)
             {
                 latest.TryGetValue(account.Key, out ProviderSnapshot? value);
-                (string statusLabel, CardStatusKind statusKind) = HealthStatus(account, value, now, latestFailures.GetValueOrDefault(account.Key));
+                FetchFailureKind latestFailure = latestFailures.GetValueOrDefault(account.Key);
+                (string statusLabel, CardStatusKind statusKind) = HealthStatus(account, value, now, latestFailure);
                 string health = descriptor.Id.Value == "opencode" ? L("Data_LocalHistoryDetected") : descriptor.Id.Value == "droid" && account.IsConnected ? L("Data_FactorySessionDetected") : statusLabel;
-                if (descriptor.Id.Value is "opencode" or "droid" && account.IsConnected)
+                // The local-history sources report Live on detection alone, but a
+                // failed latest attempt must still drop them out of Live.
+                if (descriptor.Id.Value is "opencode" or "droid" && account.IsConnected && latestFailure == FetchFailureKind.None)
                 {
                     statusKind = CardStatusKind.Live;
                 }
@@ -1218,79 +1217,32 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
 
     private static (string Label, CardStatusKind Kind) HealthStatus(ProviderAccount account, ProviderSnapshot? snapshot, DateTimeOffset now, FetchFailureKind latestFailure = FetchFailureKind.None)
     {
-        if (snapshot is not null)
+        TimeSpan? age = snapshot is null ? null : now - snapshot.ObservedAt;
+        return AccountHealthPolicy.Decide(account.IsConnected, age, latestFailure) switch
         {
-            TimeSpan age = now - snapshot.ObservedAt;
-            if (age < TimeSpan.FromMinutes(2))
-            {
-                return (F("Data_FreshVia", RuntimeText.AuthSource(account.Key.Provider.Value, account.AuthSource)), CardStatusKind.Live);
-            }
-            if (RequiresSignIn(latestFailure))
-            {
-                return (F("Data_SignInRequiredAge", Age(age)), CardStatusKind.SignInRequired);
-            }
-            // Last-good data stays visible; the label says why it stopped moving.
-            return latestFailure switch
-            {
-                FetchFailureKind.RateLimited => (F("Data_RateLimitedAge", Age(age)), CardStatusKind.RateLimited),
-                FetchFailureKind.Network or FetchFailureKind.Timeout => (F("Data_OfflineAge", Age(age)), CardStatusKind.Offline),
-                FetchFailureKind.MalformedResponse or FetchFailureKind.ProviderChanged or FetchFailureKind.OversizedResponse => (F("Data_UnsupportedAge", Age(age)), CardStatusKind.Error),
-                _ => (F("Data_CachedAge", Age(age)), CardStatusKind.Stale)
-            };
-        }
-        if (!account.IsConnected)
-        {
-            return (L("Data_NotConnected"), CardStatusKind.Offline);
-        }
-        if (RequiresSignIn(latestFailure))
-        {
-            return (L("Data_SignInRequired"), CardStatusKind.SignInRequired);
-        }
-        // No snapshot yet *and* the last fetch failed is the first-fetch case:
-        // there is no cached age to show, but reporting it as "no quota data"
-        // made the card indistinguishable from a provider that simply never
-        // reports quota — and the Overview drops NoQuota cards, so a provider
-        // whose very first response failed to parse disappeared without a word.
-        return latestFailure switch
-        {
-            FetchFailureKind.RateLimited => (L("Data_RateLimited"), CardStatusKind.RateLimited),
-            FetchFailureKind.Network or FetchFailureKind.Timeout => (L("Data_Offline"), CardStatusKind.Offline),
-            FetchFailureKind.MalformedResponse or FetchFailureKind.ProviderChanged
-                or FetchFailureKind.OversizedResponse => (L("Data_Unsupported"), CardStatusKind.Error),
-            FetchFailureKind.Unknown => (L("Data_FetchFailed"), CardStatusKind.Error),
-            _ => (L("Data_ConnectedNoQuota"), CardStatusKind.NoQuota)
+            AccountHealth.Live => (F("Data_FreshVia", RuntimeText.AuthSource(account.Key.Provider.Value, account.AuthSource)), CardStatusKind.Live),
+            AccountHealth.SignInRequired => age is { } signInAge
+                ? (F("Data_SignInRequiredAge", Age(signInAge)), CardStatusKind.SignInRequired)
+                : (L("Data_SignInRequired"), CardStatusKind.SignInRequired),
+            AccountHealth.RateLimited => age is { } limitedAge
+                ? (F("Data_RateLimitedAge", Age(limitedAge)), CardStatusKind.RateLimited)
+                : (L("Data_RateLimited"), CardStatusKind.RateLimited),
+            AccountHealth.Offline => age is { } offlineAge
+                ? (F("Data_OfflineAge", Age(offlineAge)), CardStatusKind.Offline)
+                : (L("Data_Offline"), CardStatusKind.Offline),
+            AccountHealth.UnsupportedResponse => age is { } unsupportedAge
+                ? (F("Data_UnsupportedAge", Age(unsupportedAge)), CardStatusKind.Error)
+                : (L("Data_Unsupported"), CardStatusKind.Error),
+            AccountHealth.Retrying => age is { } retryAge
+                ? (F("Data_RetryingAge", Age(retryAge)), CardStatusKind.Stale)
+                : (L("Data_Retrying"), CardStatusKind.Stale),
+            AccountHealth.FetchFailed => (L("Data_FetchFailed"), CardStatusKind.Error),
+            AccountHealth.NotConnected => (L("Data_NotConnected"), CardStatusKind.Offline),
+            // Cached always carries an age; NoQuota only occurs with no snapshot.
+            _ => age is { } cachedAge
+                ? (F("Data_CachedAge", Age(cachedAge)), CardStatusKind.Stale)
+                : (L("Data_ConnectedNoQuota"), CardStatusKind.NoQuota)
         };
-    }
-
-    // Latest fetch outcome per provider, so cards can say "Sign-in required"
-    // instead of an ever-aging "Cached" when credentials disappear (e.g. a CLI
-    // logout or an update that relocates its auth store).
-    private async Task<IReadOnlyDictionary<AccountKey, FetchFailureKind>> ReadLatestFailureKindsAsync(CancellationToken cancellationToken)
-    {
-        // Keyed by account, not provider: a provider that supports several
-        // accounts would otherwise have one account's failure labelled onto
-        // every card it owns — a single signed-out Codex login made every
-        // other Codex account read "Sign-in required".
-        Dictionary<AccountKey, FetchFailureKind> kinds = [];
-        await using (SqliteConnection connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false))
-        {
-            await using SqliteCommand command = connection.CreateCommand();
-            command.CommandText = "SELECT provider_id, account_id, failure_kind FROM (\n    SELECT provider_id, account_id, failure_kind, started_at FROM fetch_attempts ORDER BY started_at DESC LIMIT 100\n) ORDER BY started_at ASC;";
-            await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            {
-                if (AccountKey.TryParse($"{reader.GetString(0)}:{reader.GetString(1)}", out AccountKey? account))
-                {
-                    kinds[account.Value] = (FetchFailureKind)reader.GetInt32(2);
-                }
-            }
-        }
-        return kinds;
-    }
-
-    private static bool RequiresSignIn(FetchFailureKind kind)
-    {
-        return kind is FetchFailureKind.Authentication or FetchFailureKind.Authorization or FetchFailureKind.Unsupported;
     }
 
     private async Task<IReadOnlyList<FetchAttemptViewModel>> ReadRecentAttemptsAsync(CancellationToken cancellationToken)

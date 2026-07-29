@@ -57,7 +57,16 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
         }
     }
 
-    public async Task SaveAsync(ClineSession session, CancellationToken cancellationToken)
+    public Task SaveAsync(ClineSession session, CancellationToken cancellationToken) =>
+        TrySaveAsync(session, cancellationToken);
+
+    /// <summary>
+    /// Same write path as <see cref="SaveAsync"/>, but reports recoverable
+    /// failures to the caller instead of swallowing them, so a caller holding
+    /// the only other copy of the session (the legacy plaintext cache) can
+    /// keep it for a later retry rather than losing the tokens outright.
+    /// </summary>
+    public async Task<bool> TrySaveAsync(ClineSession session, CancellationToken cancellationToken)
     {
         try
         {
@@ -72,11 +81,13 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
             {
                 await secrets.DeleteAsync(Scope, RefreshTokenKey, cancellationToken).ConfigureAwait(false);
             }
+            return true;
         }
         catch (Exception ex) when (IsRecoverable(ex))
         {
             // Best effort: without the cache the strategy just refreshes again
             // next fetch.
+            return false;
         }
     }
 
@@ -98,9 +109,20 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
             {
                 return;
             }
-            if (ReadLegacyFile(legacyCachePath) is { } session)
+            if (ReadLegacyFile(legacyCachePath) is not { } session)
             {
-                await SaveAsync(session, cancellationToken).ConfigureAwait(false);
+                // Unparseable: there is nothing to migrate, so there is no
+                // safe point at which deleting the file loses usable tokens.
+                // Keep it rather than destroy data we could not read.
+                return;
+            }
+            if (!await TrySaveAsync(session, cancellationToken).ConfigureAwait(false))
+            {
+                // The vault is unavailable right now; keep the plaintext copy
+                // and retry on the next load instead of deleting the only
+                // remaining copy of the tokens.
+                _legacyMigrationAttempted = false;
+                return;
             }
             File.Delete(legacyCachePath);
             // Older builds wrote through a sibling temp file; a crash between

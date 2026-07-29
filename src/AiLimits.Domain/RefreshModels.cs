@@ -16,7 +16,11 @@ public enum FetchFailureKind
     Unsupported,
     Unknown,
     // Appended after Unknown so persisted numeric values keep their meaning.
-    OversizedResponse
+    OversizedResponse,
+    // A strategy that could not run right now (e.g. a locked local database)
+    // but is expected to recover on its own; rendered as retrying, never as
+    // sign-in.
+    TemporarilyUnavailable
 }
 
 public enum FallbackPolicy

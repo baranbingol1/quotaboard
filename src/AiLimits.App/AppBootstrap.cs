@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using AiLimits.Application.Abstractions;
 using AiLimits.Application.Refresh;
+using AiLimits.Infrastructure.Providers.Common;
 using AiLimits.Presentation.WinUI;
 using AiLimits.Presentation.WinUI.Localization;
 using AiLimits.Presentation.WinUI.ViewModels;
@@ -174,29 +175,12 @@ public partial class App : Microsoft.UI.Xaml.Application
                 Directory.Move(legacy, current);
                 return;
             }
-            CopyMissing(legacy, current);
+            DirectoryCopy.CopyMissing(legacy, current);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Legacy data directory migration failed; the app rebuilds aggregates from local histories.");
             // Fresh start: the app rebuilds aggregates from local histories.
-        }
-    }
-
-    private static void CopyMissing(string source, string destination)
-    {
-        Directory.CreateDirectory(destination);
-        foreach (string file in Directory.GetFiles(source))
-        {
-            string target = Path.Combine(destination, Path.GetFileName(file));
-            if (!File.Exists(target))
-            {
-                try { File.Copy(file, target, overwrite: false); } catch { }
-            }
-        }
-        foreach (string directory in Directory.GetDirectories(source))
-        {
-            try { CopyMissing(directory, Path.Combine(destination, Path.GetFileName(directory))); } catch { }
         }
     }
 }

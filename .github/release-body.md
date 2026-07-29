@@ -10,8 +10,11 @@ telemetry.
 2. Extract it anywhere and run `QuotaBoard.exe`. There is no installer and no
    administrator rights are needed; nothing is written outside the folder you
    extracted to and `%LOCALAPPDATA%\QuotaBoard`.
-3. Windows SmartScreen will warn that the publisher is unknown, because these
-   builds are not code-signed yet: **More info → Run anyway**.
+3. These builds are code-signed when repository signing is enabled; otherwise
+   they carry an untrusted CI test signature, so Windows SmartScreen may still
+   warn that the publisher is unknown: **More info → Run anyway**. Each
+   release also ships an SPDX SBOM and a build-provenance attestation, which
+   you can check with `gh attestation verify`.
 
 Verify a download against its `.sha256` file:
 

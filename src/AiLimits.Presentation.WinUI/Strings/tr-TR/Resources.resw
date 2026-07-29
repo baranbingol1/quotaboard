@@ -234,46 +234,113 @@
   <data name="Settings_BlurEmailsDescription.Text" xml:space="preserve"><value>Ekran görüntüleri güvenle paylaşılabilsin diye hesap e-postalarını maskeler</value></data>
   <data name="Settings_BlurEmailsToggle.OffContent" xml:space="preserve"><value>Kapalı</value></data>
   <data name="Settings_BlurEmailsToggle.OnContent" xml:space="preserve"><value>Açık</value></data>
-  <data name="Usage_Eyebrow.Text" xml:space="preserve"><value>YEREL KULLANIM DEFTERİ</value></data>
-  <data name="Usage_Title.Text" xml:space="preserve"><value>Kullanım, yetkilendiren hesaba göre ilişkilendirilir.</value></data>
-  <data name="Usage_Description.Text" xml:space="preserve"><value>Arac, isteği kaydeden CLI'dır. Sağlayıcı erişimi sunan hesap veya rotadır.</value></data>
-  <data name="Usage_WindowLabel.Text" xml:space="preserve"><value>GEÇMİŞ ARALIĞI</value></data>
+  <data name="Usage_Eyebrow.Text" xml:space="preserve"><value>KULLANIM</value></data>
+  <data name="Usage_OnDevicePill.Text" xml:space="preserve"><value>CİHAZDA</value></data>
+  <data name="Usage_Title.Text" xml:space="preserve"><value>Kullanımınızı filtreleyin ve detaylandırın.</value></data>
+  <data name="Usage_QuerySummary.Text" xml:space="preserve"><value>Son 30 gün · tüm etkinlik</value></data>
+  <data name="Usage_ResetQuery.Content" xml:space="preserve"><value>Sorguyu sıfırla</value></data>
+  <data name="Usage_RefreshData.Content" xml:space="preserve"><value>Verileri yenile</value></data>
+  <data name="Usage_QueryEyebrow.Text" xml:space="preserve"><value>SORGU</value></data>
+  <data name="Usage_QueryTitle.Text" xml:space="preserve"><value>Defteri filtrele</value></data>
+  <data name="Usage_ActiveFilters.Text" xml:space="preserve"><value>0 etkin</value></data>
+  <data name="Usage_DateRangeLabel.Text" xml:space="preserve"><value>Tarih aralığı</value></data>
   <data name="Usage_Window7.Content" xml:space="preserve"><value>Son 7 gün</value></data>
   <data name="Usage_Window30.Content" xml:space="preserve"><value>Son 30 gün</value></data>
   <data name="Usage_Window90.Content" xml:space="preserve"><value>Son 90 gün</value></data>
-  <data name="Usage_Window365.Content" xml:space="preserve"><value>Son 365 gün</value></data>
-  <data name="Usage_WindowCustom.Content" xml:space="preserve"><value>Özel…</value></data>
-  <data name="Usage_ApplyWindow.Content" xml:space="preserve"><value>Aralığı uygula</value></data>
-  <data name="Usage_TrendTitle.Text" xml:space="preserve"><value>Token kullanımı ve API eşdeğeri maliyet</value></data>
-  <data name="Usage_TokensLegend.Text" xml:space="preserve"><value>Tokenlar</value></data>
-  <data name="Usage_CostLegend.Text" xml:space="preserve"><value>API maliyeti</value></data>
-  <data name="Usage_HeatmapWindow.Text" xml:space="preserve"><value>SON 12 HAFTA</value></data>
-  <data name="Usage_HeatmapTitle.Text" xml:space="preserve"><value>Etkinlik ısı haritası</value></data>
-  <data name="Usage_HeatmapDescription.Text" xml:space="preserve"><value>Kaydedilmiş yerel kullanımın her günü. Koyu renk daha fazla token kullanımı demektir; tam günü görmek için hücrenin üzerine gelin.</value></data>
-  <data name="Usage_ProviderBreakdown.Text" xml:space="preserve"><value>YETKİLENDİRME SAĞLAYICISI DAĞILIMI</value></data>
-  <data name="Usage_ProviderBreakdownDescription.Text" xml:space="preserve"><value>API tahmini, gözlenen token kullanımının genel API fiyatı eşdeğeridir. Abonelik faturası değildir.</value></data>
-  <data name="Usage_AuthProviderColumn.Text" xml:space="preserve"><value>YETKİLENDİRME SAĞLAYICISI</value></data>
-  <data name="Usage_TokensColumn.Text" xml:space="preserve"><value>TOKEN</value></data>
-  <data name="Usage_ApiEstimateColumn.Text" xml:space="preserve"><value>API TAHMİNİ</value></data>
-  <data name="Usage_PricingCoverageColumn.Text" xml:space="preserve"><value>FİYAT KAPSAMI</value></data>
-  <data name="Usage_SourcesColumn.Text" xml:space="preserve"><value>KAYNAKLAR</value></data>
-  <data name="Usage_TokenShare.Text" xml:space="preserve"><value>TOKEN PAYI</value></data>
-  <data name="Usage_ProjectBreakdown.Text" xml:space="preserve"><value>PROJE / WORKTREE BAZINDA</value></data>
-  <data name="Usage_SortTokens.Content" xml:space="preserve"><value>Sırala: token</value></data>
-  <data name="Usage_SortCost.Content" xml:space="preserve"><value>Sırala: maliyet</value></data>
-  <data name="Usage_SortProject.Content" xml:space="preserve"><value>Sırala: proje</value></data>
-  <data name="Usage_ProjectColumn.Text" xml:space="preserve"><value>PROJE</value></data>
-  <data name="Usage_WorktreePathColumn.Text" xml:space="preserve"><value>ÇALIŞMA AĞACI YOLU</value></data>
-  <data name="Usage_RepositoryColumn.Text" xml:space="preserve"><value>PAYLAŞILAN DEPO</value></data>
-  <data name="Usage_ProjectTokensColumn.Text" xml:space="preserve"><value>TOKEN</value></data>
-  <data name="Usage_ProjectCostColumn.Text" xml:space="preserve"><value>API TAHMİNİ</value></data>
-  <data name="Usage_ModelLedger.Text" xml:space="preserve"><value>MODEL DEFTERİ</value></data>
-  <data name="Usage_ModelLedgerDescription.Text" xml:space="preserve"><value>Her model için kayıt kaynağı, yetkilendiren sağlayıcı, token kullanımı ve katalog fiyatlandırma durumu gösterilir.</value></data>
-  <data name="Usage_SourceColumn.Text" xml:space="preserve"><value>KAYNAK</value></data>
-  <data name="Usage_ModelColumn.Text" xml:space="preserve"><value>MODEL</value></data>
-  <data name="Usage_ModelAuthProviderColumn.Text" xml:space="preserve"><value>YETKİLENDİRME SAĞLAYICISI</value></data>
-  <data name="Usage_ModelTokensColumn.Text" xml:space="preserve"><value>TOKEN</value></data>
-  <data name="Usage_ModelApiEstimateColumn.Text" xml:space="preserve"><value>API TAHMİNİ</value></data>
+  <data name="Usage_Window365.Content" xml:space="preserve"><value>Son yıl</value></data>
+  <data name="Usage_WindowCustom.Content" xml:space="preserve"><value>Özel aralık…</value></data>
+  <data name="Usage_FromDate.Header" xml:space="preserve"><value>Başlangıç</value></data>
+  <data name="Usage_ThroughDate.Header" xml:space="preserve"><value>Bitiş</value></data>
+  <data name="Usage_ApplyDates.Content" xml:space="preserve"><value>Tarihleri uygula</value></data>
+  <data name="Usage_TimeGrainLabel.Text" xml:space="preserve"><value>Zaman dilimi</value></data>
+  <data name="Usage_GrainAuto.Content" xml:space="preserve"><value>Otomatik</value></data>
+  <data name="Usage_GrainDay.Content" xml:space="preserve"><value>Gün</value></data>
+  <data name="Usage_GrainWeek.Content" xml:space="preserve"><value>Hafta</value></data>
+  <data name="Usage_GrainMonth.Content" xml:space="preserve"><value>Ay</value></data>
+  <data name="Usage_CompareLabel.Text" xml:space="preserve"><value>Karşılaştır</value></data>
+  <data name="Usage_ComparePrevious.Content" xml:space="preserve"><value>Önceki</value></data>
+  <data name="Usage_CompareOff.Content" xml:space="preserve"><value>Kapalı</value></data>
+  <data name="Usage_ProviderEyebrow.Text" xml:space="preserve"><value>SAĞLAYICI</value></data>
+  <data name="Usage_HarnessEyebrow.Text" xml:space="preserve"><value>ARAÇ</value></data>
+  <data name="Usage_ProjectEyebrow.Text" xml:space="preserve"><value>PROJE / ÇALIŞMA AĞACI</value></data>
+  <data name="Usage_ProjectSearch.PlaceholderText" xml:space="preserve"><value>Proje bul</value></data>
+  <data name="Usage_ModelEyebrow.Text" xml:space="preserve"><value>MODEL</value></data>
+  <data name="Usage_ModelSearch.PlaceholderText" xml:space="preserve"><value>Model bul</value></data>
+  <data name="Usage_ChartEyebrow.Text" xml:space="preserve"><value>ZAMAN İÇİNDE TOKEN KULLANIMI</value></data>
+  <data name="Usage_WindowInitial.Text" xml:space="preserve"><value>SON 30 GÜN</value></data>
+  <data name="Usage_SeriesBy.Text" xml:space="preserve"><value>SERİLER</value></data>
+  <data name="Usage_SeriesProvider.Content" xml:space="preserve"><value>Sağlayıcı</value></data>
+  <data name="Usage_SeriesHarness.Content" xml:space="preserve"><value>Araç</value></data>
+  <data name="Usage_SeriesModel.Content" xml:space="preserve"><value>Model</value></data>
+  <data name="Usage_ChartEmpty.Text" xml:space="preserve"><value>Bu sorguyla eşleşen kullanım yok. Bir filtreyi temizleyin veya tarih aralığını genişletin.</value></data>
+  <data name="Usage_TokensAxis.Text" xml:space="preserve"><value>TOKEN</value></data>
+  <data name="Usage_MatchingEyebrow.Text" xml:space="preserve"><value>EŞLEŞEN VERİ</value></data>
+  <data name="Usage_ModelMixEyebrow.Text" xml:space="preserve"><value>MODEL KARIŞIMI</value></data>
+  <data name="Usage_ModelMixEmpty.Text" xml:space="preserve"><value>Bu sorguyla eşleşen model yok.</value></data>
+  <data name="Usage_BreakdownEyebrow.Text" xml:space="preserve"><value>TOKEN DAĞILIMI</value></data>
+  <data name="Usage_ColLabel.Text" xml:space="preserve"><value>Etiket</value></data>
+  <data name="Usage_ColTokens.Text" xml:space="preserve"><value>Token</value></data>
+  <data name="Usage_ColIn.Text" xml:space="preserve"><value>Girdi</value></data>
+  <data name="Usage_ColOut.Text" xml:space="preserve"><value>Çıktı</value></data>
+  <data name="Usage_ColCacheR.Text" xml:space="preserve"><value>Önb. Oku</value></data>
+  <data name="Usage_ColCacheW.Text" xml:space="preserve"><value>Önb. Yaz</value></data>
+  <data name="Usage_ColReason.Text" xml:space="preserve"><value>Akıl yürütme</value></data>
+  <data name="Usage_ColApi.Text" xml:space="preserve"><value>API $</value></data>
+  <data name="Usage_ApiEquivalentEyebrow.Text" xml:space="preserve"><value>API EŞDEĞERİ</value></data>
+  <data name="Usage_PricingCoverage.Text" xml:space="preserve"><value>Genel API fiyat tahmini</value></data>
+  <data name="Usage_BreakdownBy.Text" xml:space="preserve"><value>DAĞILIM ÖLÇÜTÜ</value></data>
+  <data name="Usage_BreakdownProvider.Content" xml:space="preserve"><value>Sağlayıcı</value></data>
+  <data name="Usage_BreakdownHarness.Content" xml:space="preserve"><value>Araç</value></data>
+  <data name="Usage_BreakdownProject.Content" xml:space="preserve"><value>Proje / çalışma ağacı</value></data>
+  <data name="Usage_BreakdownModel.Content" xml:space="preserve"><value>Model</value></data>
+  <data name="Usage_ProjectEyebrowTip" xml:space="preserve"><value>Her Git çalışma ağacı kendi projesi olarak listelenir.</value></data>
+  <data name="Usage_HoverTokens" xml:space="preserve"><value>{0} token</value></data>
+  <data name="Usage_PricingCoverageDetail" xml:space="preserve"><value>Genel API fiyat tahmini · eşleşen tokenların %{0:0.#} kadarı fiyatlandırıldı</value></data>
+  <data name="Usage_PricingCoverageNone" xml:space="preserve"><value>Bu sorgu için tam genel API fiyatı yok</value></data>
+  <data name="Usage_FilterAllData" xml:space="preserve"><value>TÜM VERİLER</value></data>
+  <data name="Usage_FilterActiveCount" xml:space="preserve"><value>{0} ETKİN</value></data>
+  <data name="Usage_QueryAllActivity" xml:space="preserve"><value>tüm etkinlik</value></data>
+  <data name="Usage_QueryFiltersOne" xml:space="preserve"><value>{0} filtre</value></data>
+  <data name="Usage_QueryFiltersMany" xml:space="preserve"><value>{0} filtre</value></data>
+  <data name="Usage_MatchingNone" xml:space="preserve"><value>Bu sorguyla eşleşen sonuç yok</value></data>
+  <data name="Usage_MatchingNoneDetail" xml:space="preserve"><value>Bir filtreyi temizleyin veya tarih aralığını genişletin.</value></data>
+  <data name="Usage_MatchingRows" xml:space="preserve"><value>{0:N0} satır</value></data>
+  <data name="Usage_PluralProvider" xml:space="preserve"><value>{0} sağlayıcı</value></data>
+  <data name="Usage_PluralProviders" xml:space="preserve"><value>{0} sağlayıcı</value></data>
+  <data name="Usage_PluralHarness" xml:space="preserve"><value>{0} araç</value></data>
+  <data name="Usage_PluralHarnesses" xml:space="preserve"><value>{0} araç</value></data>
+  <data name="Usage_PluralModel" xml:space="preserve"><value>{0} model</value></data>
+  <data name="Usage_PluralModels" xml:space="preserve"><value>{0} model</value></data>
+  <data name="Usage_PluralProject" xml:space="preserve"><value>{0} proje</value></data>
+  <data name="Usage_PluralProjects" xml:space="preserve"><value>{0} proje</value></data>
+  <data name="Usage_ActiveBuckets" xml:space="preserve"><value>{0} etkin {1}</value></data>
+  <data name="Usage_GrainDayNoun" xml:space="preserve"><value>gün</value></data>
+  <data name="Usage_GrainDaysNoun" xml:space="preserve"><value>gün</value></data>
+  <data name="Usage_GrainWeekNoun" xml:space="preserve"><value>hafta</value></data>
+  <data name="Usage_GrainWeeksNoun" xml:space="preserve"><value>hafta</value></data>
+  <data name="Usage_GrainMonthNoun" xml:space="preserve"><value>ay</value></data>
+  <data name="Usage_GrainMonthsNoun" xml:space="preserve"><value>ay</value></data>
+  <data name="Usage_ModelActivity" xml:space="preserve"><value>{1} {2} içinden {0} tanesinde kullanıldı</value></data>
+  <data name="Usage_ModelActivityWindow" xml:space="preserve"><value>{1} {2} içinden {0} tanesinde kullanıldı · {3}</value></data>
+  <data name="Usage_ModelMixSubtitleOne" xml:space="preserve"><value>Bu sorguda {0} model var; en yeni etkinlik sağda.</value></data>
+  <data name="Usage_ModelMixSubtitleMany" xml:space="preserve"><value>Bu sorguda {0} model var; en yeni etkinlik sağda.</value></data>
+  <data name="Usage_SparkTooltip" xml:space="preserve"><value>{0} · {1} token</value></data>
+  <data name="Usage_SparkAutomation" xml:space="preserve"><value>{0}, {1}: {2} token</value></data>
+  <data name="Usage_BarTooltip" xml:space="preserve"><value>{0}
+{1} token</value></data>
+  <data name="Usage_BarAutomation" xml:space="preserve"><value>{0}, {1} token</value></data>
+  <data name="Usage_ProjectSourceNote" xml:space="preserve"><value>{0} için çalışma dizini bildirilmiyor; bu kullanım {1} altına düşer.</value></data>
+  <data name="Usage_JoinAnd" xml:space="preserve"><value> ve </value></data>
+  <data name="Usage_BreakdownByProvider" xml:space="preserve"><value>sağlayıcıya göre</value></data>
+  <data name="Usage_BreakdownByHarness" xml:space="preserve"><value>araca göre</value></data>
+  <data name="Usage_BreakdownByProject" xml:space="preserve"><value>projeye göre</value></data>
+  <data name="Usage_BreakdownByModel" xml:space="preserve"><value>modele göre</value></data>
+  <data name="Usage_FacetSelected" xml:space="preserve"><value>{0} SEÇİLDİ</value></data>
+  <data name="Usage_FacetAvailable" xml:space="preserve"><value>{0} MEVCUT</value></data>
+  <data name="Usage_ComparisonOff" xml:space="preserve"><value>Karşılaştırma kapalı</value></data>
+  <data name="Usage_ComparisonNew" xml:space="preserve"><value>Önceki döneme göre yeni</value></data>
+  <data name="Usage_ComparisonNoBaseline" xml:space="preserve"><value>Önceki dönem temeli yok</value></data>
+  <data name="Usage_ComparisonChange" xml:space="preserve"><value>Önceki döneme göre %{0:+0.#;-0.#;0}</value></data>
   <data name="Common_Unknown" xml:space="preserve"><value>Bilinmiyor</value></data>
   <data name="Countdown_Now" xml:space="preserve"><value>şimdi</value></data>
   <data name="Countdown_Minutes" xml:space="preserve"><value>{0} dk içinde</value></data>
@@ -360,6 +427,7 @@
   <data name="Data_CachedAge" xml:space="preserve"><value>Önbellekte · {0}</value></data>
   <data name="Data_RateLimitedAge" xml:space="preserve"><value>Hız sınırlı · {0}</value></data>
   <data name="Data_OfflineAge" xml:space="preserve"><value>Çevrimdışı · {0}</value></data>
+  <data name="Data_RetryingAge" xml:space="preserve"><value>Yeniden deneniyor · {0}</value></data>
   <data name="Data_UnsupportedAge" xml:space="preserve"><value>Desteklenmeyen yanıt · {0}</value></data>
   <data name="Card_StatusLive" xml:space="preserve"><value>CANLI</value></data>
   <data name="Card_StatusStale" xml:space="preserve"><value>ESKİ</value></data>
@@ -371,6 +439,7 @@
   <data name="Data_SignInRequired" xml:space="preserve"><value>Oturum açmak gerekiyor</value></data>
   <data name="Data_RateLimited" xml:space="preserve"><value>Hız sınırlandı</value></data>
   <data name="Data_Offline" xml:space="preserve"><value>Çevrimdışı</value></data>
+  <data name="Data_Retrying" xml:space="preserve"><value>Yeniden deneniyor</value></data>
   <data name="Data_Unsupported" xml:space="preserve"><value>Desteklenmeyen yanıt</value></data>
   <data name="Data_FetchFailed" xml:space="preserve"><value>Getirme başarısız</value></data>
   <data name="Data_ConnectedNoQuota" xml:space="preserve"><value>Bağlı · kota verisi yok</value></data>
@@ -471,6 +540,7 @@
   <data name="Runtime_FailureProviderChanged" xml:space="preserve"><value>Sağlayıcı yanıtı değişti</value></data>
   <data name="Runtime_FailureCancelled" xml:space="preserve"><value>İptal edildi</value></data>
   <data name="Runtime_FailureUnsupported" xml:space="preserve"><value>Desteklenmiyor</value></data>
+  <data name="Runtime_FailureTemporarilyUnavailable" xml:space="preserve"><value>Geçici olarak kullanılamıyor</value></data>
   <data name="Runtime_FailureUnknown" xml:space="preserve"><value>Bilinmeyen hata</value></data>
   <data name="Runtime_MeaningSuccess" xml:space="preserve"><value>Limitler okundu ve Genel Bakış'ta gösteriliyor.</value></data>
   <data name="Runtime_MeaningAuthentication" xml:space="preserve"><value>Bu sağlayıcının CLI'ında veya uygulamasında yeniden oturum açın.</value></data>
@@ -483,6 +553,7 @@
   <data name="Runtime_MeaningProviderChanged" xml:space="preserve"><value>Bu sağlayıcı yanıtını değiştirdi. Okuyabilmek için QuotaBoard'ın güncellenmesi gerekiyor.</value></data>
   <data name="Runtime_MeaningCancelled" xml:space="preserve"><value>Yenileme, bu denetim bitmeden iptal edildi.</value></data>
   <data name="Runtime_MeaningUnsupported" xml:space="preserve"><value>Bu sağlayıcı planınız için limit yayınlamıyor.</value></data>
+  <data name="Runtime_MeaningTemporarilyUnavailable" xml:space="preserve"><value>Kaynak geçici olarak kullanılamıyor. QuotaBoard otomatik olarak yeniden deniyor.</value></data>
   <data name="Runtime_MeaningUnknown" xml:space="preserve"><value>Denetim bilinmeyen bir nedenle başarısız oldu. Yeniden yenilemeyi deneyin.</value></data>
   <data name="Runtime_ApiKeySuffix" xml:space="preserve"><value>(API anahtarı)</value></data>
   <data name="Runtime_StatusMinor" xml:space="preserve"><value>Küçük çaplı hizmet kesintisi</value></data>
@@ -497,9 +568,6 @@
   <data name="Alert_ResetMessage" xml:space="preserve"><value>{0} sonra sıfırlanır.</value></data>
   <data name="Alert_HoursMinutes" xml:space="preserve"><value>{0} sa {1} dk</value></data>
   <data name="Alert_Minutes" xml:space="preserve"><value>{0} dk</value></data>
-  <data name="Usage_AnalysisEyebrow.Text" xml:space="preserve"><value>KULLANIM ANALİZİ</value></data>
-  <data name="Usage_AnalysisTitle.Text" xml:space="preserve"><value>Dönem karşılaştırması</value></data>
-  <data name="Usage_AnalysisDescription.Text" xml:space="preserve"><value>Seçili aralık ile 7, 30 ve 90 günlük dönemlerin önceki dönem karşılaştırması.</value></data>
   <data name="Usage_ShowMore" xml:space="preserve"><value>Daha fazla göster ({0} kaldı)</value></data>
   <data name="Usage_ShowLess" xml:space="preserve"><value>Daha az göster</value></data>
   <data name="UsageWindow_ModelLine" xml:space="preserve"><value>{0} · {1}</value></data>

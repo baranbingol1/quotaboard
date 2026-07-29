@@ -231,8 +231,19 @@ public sealed class RefreshCoordinator : IDisposable
                 }
                 if (availability.Availability != StrategyAvailability.Available)
                 {
-                    List<FetchAttempt> list = attempts;
-                    list.Add(await RecordAttemptAsync(account.Key, strategy.Id, TimeSpan.Zero, FetchFailureKind.Unsupported, availability.SafeReason, cancellationToken).ConfigureAwait(false));
+                    // NotConfigured/Unsupported skips are not fetch attempts:
+                    // persisting them added a fresh row whose recency masked a
+                    // real earlier failure in the per-account latest-attempt
+                    // queries (a signed-out CLI would hide its own Network
+                    // error behind a later "not configured" skip). A
+                    // temporarily unavailable strategy DID try to run, so it
+                    // is recorded with its own kind, which the dashboard
+                    // renders as a transient retrying state rather than
+                    // sign-in.
+                    if (availability.Availability == StrategyAvailability.TemporarilyUnavailable)
+                    {
+                        attempts.Add(await RecordAttemptAsync(account.Key, strategy.Id, TimeSpan.Zero, FetchFailureKind.TemporarilyUnavailable, availability.SafeReason, cancellationToken).ConfigureAwait(false));
+                    }
                     continue;
                 }
                 DateTimeOffset startedAt = _clock.UtcNow;

@@ -138,6 +138,7 @@ public sealed record UsageChartBarViewModel(
     string RangeLabel,
     string Tokens,
     string Tooltip,
+    string AutomationName,
     double Height,
     double ItemWidth,
     double BarWidth,
@@ -193,6 +194,7 @@ public sealed record UsageSparkBarViewModel(
     double Height,
     double Opacity,
     string Tooltip,
+    string AutomationName,
     Brush Brush);
 
 public sealed record UsageHistoryDayViewModel(DateOnly Day, long Tokens, decimal? ApiEquivalentCostUsd);

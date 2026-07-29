@@ -38,6 +38,7 @@ public sealed partial class UsagePage : Page
     {
         ViewModel = viewModel;
         InitializeComponent();
+        ToolTipService.SetToolTip(ProjectEyebrowLabel, L("Usage_ProjectEyebrowTip"));
         DateOnly today = DateOnly.FromDateTime(DateTime.Now);
         _through = today;
         _from = today.AddDays(-29);
@@ -49,6 +50,11 @@ public sealed partial class UsagePage : Page
     }
 
     public LiveDashboardViewModel ViewModel { get; }
+
+    private static string L(string key) => LocalizationService.GetString(key);
+
+    private static string F(string key, params object?[] args) =>
+        string.Format(CultureInfo.CurrentCulture, L(key), args);
 
     private void OnLoaded(object sender, RoutedEventArgs args)
     {
@@ -159,23 +165,54 @@ public sealed partial class UsagePage : Page
             return;
         }
 
-        ChartHoverRangeText.Text = bar.RangeLabel;
-        ChartHoverTokensText.Text = $"{bar.Tokens} TOKENS";
-        ChartHoverDetailsText.Text = bar.HoverDetails;
-        ChartHoverCard.Visibility = Visibility.Visible;
+        ShowChartHoverCard(bar);
 
         Windows.Foundation.Point point = args.GetCurrentPoint(ChartPlotHost).Position;
         double cardWidth = Math.Max(170, ChartHoverCard.ActualWidth);
         double cardHeight = Math.Max(46, ChartHoverCard.ActualHeight);
         double left = Math.Clamp(point.X + 14, 0, Math.Max(0, ChartPlotHost.ActualWidth - cardWidth));
         double preferredTop = point.Y >= cardHeight + 12 ? point.Y - cardHeight - 10 : point.Y + 14;
-        double top = Math.Clamp(preferredTop, 0, Math.Max(0, ChartPlotHost.ActualHeight - cardHeight));
-        Canvas.SetLeft(ChartHoverCard, left);
-        Canvas.SetTop(ChartHoverCard, top);
+        PositionChartHoverCard(Math.Clamp(preferredTop, 0, Math.Max(0, ChartPlotHost.ActualHeight - cardHeight)), left);
     }
+
+    private void OnChartBarGotFocus(object sender, RoutedEventArgs args)
+    {
+        if (sender is not FrameworkElement { DataContext: UsageChartBarViewModel bar } host)
+        {
+            return;
+        }
+
+        // Keyboard focus gets the same card a hover would, anchored to the bar
+        // instead of the pointer.
+        ShowChartHoverCard(bar);
+        double cardWidth = Math.Max(170, ChartHoverCard.ActualWidth);
+        double cardHeight = Math.Max(46, ChartHoverCard.ActualHeight);
+        var bounds = host.TransformToVisual(ChartPlotHost).TransformBounds(new Windows.Foundation.Rect(0, 0, host.ActualWidth, host.ActualHeight));
+        double left = Math.Clamp(bounds.X + bounds.Width + 14, 0, Math.Max(0, ChartPlotHost.ActualWidth - cardWidth));
+        double top = Math.Clamp(bounds.Y, 0, Math.Max(0, ChartPlotHost.ActualHeight - cardHeight));
+        PositionChartHoverCard(top, left);
+    }
+
+    private void OnChartBarLostFocus(object sender, RoutedEventArgs args) =>
+        ChartHoverCard.Visibility = Visibility.Collapsed;
 
     private void OnChartBarPointerExited(object sender, PointerRoutedEventArgs args) =>
         ChartHoverCard.Visibility = Visibility.Collapsed;
+
+    private void ShowChartHoverCard(UsageChartBarViewModel bar)
+    {
+        ChartHoverRangeText.Text = bar.RangeLabel;
+        ChartHoverTokensText.Text = F("Usage_HoverTokens", bar.Tokens);
+        ChartHoverDetailsText.Text = bar.HoverDetails;
+        ChartHoverCard.Visibility = Visibility.Visible;
+        ChartHoverCard.Measure(new Windows.Foundation.Size(340, double.PositiveInfinity));
+    }
+
+    private void PositionChartHoverCard(double top, double left)
+    {
+        Canvas.SetLeft(ChartHoverCard, left);
+        Canvas.SetTop(ChartHoverCard, top);
+    }
 
     private void OnBreakdownShowMore(object sender, RoutedEventArgs args)
     {
@@ -278,16 +315,21 @@ public sealed partial class UsagePage : Page
 
         double coverage = result.TotalTokens == 0 ? 0 : 100.0 * result.PricedTokens / result.TotalTokens;
         PricingCoverageText.Text = result.ApiEquivalentCostUsd.HasValue
-            ? $"Public API-price estimate · {coverage:0.#}% of matching tokens priced"
-            : "No exact public API price is available for this query";
+            ? F("Usage_PricingCoverageDetail", coverage)
+            : L("Usage_PricingCoverageNone");
 
         RenderChart(result);
         RenderBreakdown(result);
         RenderModelMix(result);
 
         int activeGroups = ActiveFilterGroupCount();
-        ActiveFilterCountText.Text = activeGroups == 0 ? "ALL DATA" : $"{activeGroups} ACTIVE";
-        QuerySummaryText.Text = $"{RangeLabel(result.From, result.Through)} · {(activeGroups == 0 ? "all activity" : $"{activeGroups} filter{(activeGroups == 1 ? "" : "s")}")} · {BreakdownLabel()}";
+        ActiveFilterCountText.Text = activeGroups == 0
+            ? L("Usage_FilterAllData")
+            : F("Usage_FilterActiveCount", activeGroups);
+        string filterSummary = activeGroups == 0
+            ? L("Usage_QueryAllActivity")
+            : F(activeGroups == 1 ? "Usage_QueryFiltersOne" : "Usage_QueryFiltersMany", activeGroups);
+        QuerySummaryText.Text = $"{RangeLabel(result.From, result.Through)} · {filterSummary} · {BreakdownLabel()}";
     }
 
     /// <summary>
@@ -300,29 +342,29 @@ public sealed partial class UsagePage : Page
         UsageComposition composition = result.Composition;
 
         MatchingRecordsText.Text = result.MatchingRecordCount == 0
-            ? "Nothing matches this query"
-            : $"{result.MatchingRecordCount:N0} rows";
+            ? L("Usage_MatchingNone")
+            : F("Usage_MatchingRows", result.MatchingRecordCount);
         MatchingRecordsDetailText.Text = result.MatchingRecordCount == 0
-            ? "Clear a filter or widen the date range."
+            ? L("Usage_MatchingNoneDetail")
             : string.Join(" · ", new[]
             {
-                Plural(composition.Providers, "provider", "providers"),
-                Plural(composition.Harnesses, "harness", "harnesses"),
-                Plural(composition.Models, "model", "models"),
-                Plural(composition.Projects, "project", "projects"),
-                $"{composition.ActiveBuckets} active {GrainNoun(composition.ActiveBuckets)}"
+                Plural(composition.Providers, "Usage_PluralProvider", "Usage_PluralProviders"),
+                Plural(composition.Harnesses, "Usage_PluralHarness", "Usage_PluralHarnesses"),
+                Plural(composition.Models, "Usage_PluralModel", "Usage_PluralModels"),
+                Plural(composition.Projects, "Usage_PluralProject", "Usage_PluralProjects"),
+                F("Usage_ActiveBuckets", composition.ActiveBuckets, GrainNoun(composition.ActiveBuckets))
             });
     }
 
-    private static string Plural(int count, string singular, string plural) =>
-        $"{count} {(count == 1 ? singular : plural)}";
+    private static string Plural(int count, string singularKey, string pluralKey) =>
+        F(count == 1 ? singularKey : pluralKey, count);
 
     /// <summary>Names the current bucket size, so counts read as "12 active days" rather than a bare number.</summary>
     private string GrainNoun(int count) => ResolveTimeGrain() switch
     {
-        UsageTimeGrain.Month => count == 1 ? "month" : "months",
-        UsageTimeGrain.Week => count == 1 ? "week" : "weeks",
-        _ => count == 1 ? "day" : "days"
+        UsageTimeGrain.Month => L(count == 1 ? "Usage_GrainMonthNoun" : "Usage_GrainMonthsNoun"),
+        UsageTimeGrain.Week => L(count == 1 ? "Usage_GrainWeekNoun" : "Usage_GrainWeeksNoun"),
+        _ => L(count == 1 ? "Usage_GrainDayNoun" : "Usage_GrainDaysNoun")
     };
 
     /// <summary>
@@ -346,17 +388,20 @@ public sealed partial class UsagePage : Page
             UsageSparkBarViewModel[] spark = trend.BucketTokens.Select((tokens, index) =>
             {
                 UsageChartBucket bucket = result.Chart[index];
+                string range = RangeLabel(bucket.From, bucket.Through);
                 return new UsageSparkBarViewModel(
                     barWidth,
                     tokens == 0 ? 1 : Math.Max(2, SparkHeight * tokens / peak),
                     tokens == 0 ? 0.16 : 1.0,
-                    $"{RangeLabel(bucket.From, bucket.Through)} · {FormatTokens(tokens)} tokens",
+                    F("Usage_SparkTooltip", range, FormatTokens(tokens)),
+                    F("Usage_SparkAutomation", trend.Label, range, FormatTokens(tokens)),
                     accent);
             }).ToArray();
 
+            string grain = GrainNoun(result.Chart.Count);
             string activity = trend.FirstUsed.HasValue && trend.LastUsed.HasValue
-                ? $"used on {trend.ActiveBuckets} of {result.Chart.Count} {GrainNoun(result.Chart.Count)} · {RangeLabel(trend.FirstUsed.Value, trend.LastUsed.Value)}"
-                : $"used on {trend.ActiveBuckets} of {result.Chart.Count} {GrainNoun(result.Chart.Count)}";
+                ? F("Usage_ModelActivityWindow", trend.ActiveBuckets, result.Chart.Count, grain, RangeLabel(trend.FirstUsed.Value, trend.LastUsed.Value))
+                : F("Usage_ModelActivity", trend.ActiveBuckets, result.Chart.Count, grain);
 
             return new UsageModelTrendRowViewModel(
                 trend.Key,
@@ -370,8 +415,8 @@ public sealed partial class UsagePage : Page
         }).ToArray();
 
         ModelMixSubtitleText.Text = _allModelMixRows.Length == 0
-            ? "No models match this query."
-            : $"{_allModelMixRows.Length} model{(_allModelMixRows.Length == 1 ? "" : "s")} in this query, newest activity on the right.";
+            ? L("Usage_ModelMixEmpty.Text")
+            : F(_allModelMixRows.Length == 1 ? "Usage_ModelMixSubtitleOne" : "Usage_ModelMixSubtitleMany", _allModelMixRows.Length);
         ModelMixWindowText.Text = RangeLabel(result.From, result.Through).ToUpper(CultureInfo.CurrentCulture);
         ModelMixEmptyText.Visibility = _allModelMixRows.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         RenderModelMixPage();
@@ -446,11 +491,13 @@ public sealed partial class UsagePage : Page
                         $"{segment.Label} · {FormatTokens(segment.Tokens)} · " +
                         $"{(bucket.Tokens == 0 ? 0 : 100.0 * segment.Tokens / bucket.Tokens):0.#}%"));
 
+            string tokens = FormatTokens(bucket.Tokens);
             return new UsageChartBarViewModel(
                 label,
                 range,
-                FormatTokens(bucket.Tokens),
-                $"{range}\n{FormatTokens(bucket.Tokens)} tokens",
+                tokens,
+                F("Usage_BarTooltip", range, tokens),
+                F("Usage_BarAutomation", range, tokens),
                 bucket.Tokens == 0 ? 0 : Math.Max(2, PlotHeight * bucket.Tokens / maximum),
                 geometry.ItemWidth,
                 geometry.BarWidth,
@@ -589,8 +636,10 @@ public sealed partial class UsagePage : Page
             return;
         }
         // Phrased so one name and two read the same way.
-        ProjectSourceNoteText.Text =
-            $"No working directory is reported for {string.Join(" and ", names)}, so that usage lands under Unknown.";
+        ProjectSourceNoteText.Text = F(
+            "Usage_ProjectSourceNote",
+            string.Join(L("Usage_JoinAnd"), names),
+            L("Common_Unknown"));
         ProjectSourceNote.Visibility = Visibility.Visible;
     }
 
@@ -632,10 +681,10 @@ public sealed partial class UsagePage : Page
 
     private string BreakdownLabel() => ResolveBreakdown() switch
     {
-        UsageBreakdownDimension.Harness => "by harness",
-        UsageBreakdownDimension.Project => "by project",
-        UsageBreakdownDimension.Model => "by model",
-        _ => "by provider"
+        UsageBreakdownDimension.Harness => L("Usage_BreakdownByHarness"),
+        UsageBreakdownDimension.Project => L("Usage_BreakdownByProject"),
+        UsageBreakdownDimension.Model => L("Usage_BreakdownByModel"),
+        _ => L("Usage_BreakdownByProvider")
     };
 
     private int ActiveFilterGroupCount() =>
@@ -645,14 +694,14 @@ public sealed partial class UsagePage : Page
         + (_models.Count > 0 ? 1 : 0);
 
     private static string FacetCount(int available, int selected) =>
-        selected > 0 ? $"{selected} SELECTED" : $"{available} AVAILABLE";
+        F(selected > 0 ? "Usage_FacetSelected" : "Usage_FacetAvailable", selected > 0 ? selected : available);
 
     private static string ComparisonLabel(UsageComparison? comparison)
     {
-        if (comparison is null) return "Comparison off";
-        if (comparison.IsNew) return "New vs previous period";
-        if (!comparison.PercentChange.HasValue) return "No previous-period baseline";
-        return $"{comparison.PercentChange.Value:+0.#;-0.#;0}% vs previous period";
+        if (comparison is null) return L("Usage_ComparisonOff");
+        if (comparison.IsNew) return L("Usage_ComparisonNew");
+        if (!comparison.PercentChange.HasValue) return L("Usage_ComparisonNoBaseline");
+        return F("Usage_ComparisonChange", comparison.PercentChange.Value);
     }
 
 

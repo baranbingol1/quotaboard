@@ -9,6 +9,42 @@ public sealed class ProcessRunner : IProcessRunner
     /// <summary>How long a killed process is given to actually die.</summary>
     private static readonly TimeSpan KillGrace = TimeSpan.FromSeconds(2);
 
+    /// <summary>
+    /// Per-stream capture cap. A runaway CLI must not grow the process heap
+    /// without bound; 4 MiB of UTF-16 text is far beyond any real provider
+    /// response while still bounding a looping or compromised binary.
+    /// </summary>
+    internal const int MaxStreamChars = 4 * 1024 * 1024;
+
+    /// <summary>
+    /// Reads the stream to its end, keeping at most <see cref="MaxStreamChars"/>
+    /// characters. Output past the cap is drained and discarded so the child
+    /// never deadlocks on a full pipe, and the result is flagged as truncated.
+    /// </summary>
+    private static async Task<CappedStream> ReadCappedAsync(StreamReader reader, CancellationToken cancellationToken)
+    {
+        char[] buffer = new char[8192];
+        StringBuilder builder = new StringBuilder();
+        bool truncated = false;
+        while (true)
+        {
+            int read = await reader.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken).ConfigureAwait(false);
+            if (read == 0)
+            {
+                break;
+            }
+            int remaining = MaxStreamChars - builder.Length;
+            if (remaining > 0)
+            {
+                builder.Append(buffer, 0, Math.Min(remaining, read));
+            }
+            truncated |= read > remaining;
+        }
+        return new CappedStream(builder.ToString(), truncated);
+    }
+
+    private readonly record struct CappedStream(string Text, bool Truncated);
+
     public async Task<ProcessResult> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken)
     {
         ProcessStartInfo startInfo = new ProcessStartInfo
@@ -37,8 +73,8 @@ public sealed class ProcessRunner : IProcessRunner
         }
         using CancellationTokenSource timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutSource.CancelAfter(timeout);
-        Task<string> outputTask = process.StandardOutput.ReadToEndAsync(timeoutSource.Token);
-        Task<string> errorTask = process.StandardError.ReadToEndAsync(timeoutSource.Token);
+        Task<CappedStream> outputTask = ReadCappedAsync(process.StandardOutput, timeoutSource.Token);
+        Task<CappedStream> errorTask = ReadCappedAsync(process.StandardError, timeoutSource.Token);
         try
         {
             await process.WaitForExitAsync(timeoutSource.Token).ConfigureAwait(false);
@@ -75,7 +111,9 @@ public sealed class ProcessRunner : IProcessRunner
             throw;
         }
         int exitCode = process.ExitCode;
-        return new ProcessResult(exitCode, await outputTask.ConfigureAwait(false), await errorTask.ConfigureAwait(false), Stopwatch.GetElapsedTime(startedAt));
+        CappedStream output = await outputTask.ConfigureAwait(false);
+        CappedStream error = await errorTask.ConfigureAwait(false);
+        return new ProcessResult(exitCode, output.Text, error.Text, Stopwatch.GetElapsedTime(startedAt), output.Truncated, error.Truncated);
     }
 }
 
@@ -84,4 +122,4 @@ public interface IProcessRunner
     Task<ProcessResult> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken);
 }
 
-public sealed record ProcessResult(int ExitCode, string StandardOutput, string StandardError, TimeSpan Duration);
+public sealed record ProcessResult(int ExitCode, string StandardOutput, string StandardError, TimeSpan Duration, bool OutputTruncated = false, bool ErrorTruncated = false);

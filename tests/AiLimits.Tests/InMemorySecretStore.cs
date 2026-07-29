@@ -15,25 +15,44 @@ internal sealed class InMemorySecretStore : ISecretStore
     /// <summary>Set to throw from every operation, mimicking an unavailable vault.</summary>
     public Exception? Fault { get; set; }
 
+    /// <summary>
+    /// Optional per-key fault selector; when it returns an exception for an
+    /// entry, only operations on that entry throw. Mimics a vault that fails
+    /// halfway through a multi-entry write.
+    /// </summary>
+    public Func<(string Scope, string Key), Exception?>? FaultFor { get; set; }
+
     public IReadOnlyCollection<(string Scope, string Key)> Keys => _entries.Keys.ToArray();
 
     public Task SetAsync(string scope, string key, string secret, CancellationToken cancellationToken)
     {
-        if (Fault is { } fault) throw fault;
+        ThrowIfFaulted(scope, key);
         _entries[(scope, key)] = secret;
         return Task.CompletedTask;
     }
 
     public Task<string?> GetAsync(string scope, string key, CancellationToken cancellationToken)
     {
-        if (Fault is { } fault) throw fault;
+        ThrowIfFaulted(scope, key);
         return Task.FromResult(_entries.TryGetValue((scope, key), out string? value) ? value : null);
     }
 
     public Task DeleteAsync(string scope, string key, CancellationToken cancellationToken)
     {
-        if (Fault is { } fault) throw fault;
+        ThrowIfFaulted(scope, key);
         _entries.TryRemove((scope, key), out _);
         return Task.CompletedTask;
+    }
+
+    private void ThrowIfFaulted(string scope, string key)
+    {
+        if (FaultFor?.Invoke((scope, key)) is { } keyedFault)
+        {
+            throw keyedFault;
+        }
+        if (Fault is { } fault)
+        {
+            throw fault;
+        }
     }
 }

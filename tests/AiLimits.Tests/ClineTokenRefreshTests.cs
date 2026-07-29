@@ -252,6 +252,57 @@ public sealed class ClineTokenRefreshTests : IDisposable
     }
 
     [Fact]
+    public async Task A_failed_migration_keeps_the_plaintext_cache_and_retries_on_next_load()
+    {
+        Directory.CreateDirectory(_cacheDirectory);
+        await File.WriteAllTextAsync(LegacyCachePath, """
+            {"accessToken":"file-token","refreshToken":"file-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
+            """);
+        _secrets.Fault = new System.ComponentModel.Win32Exception(5);
+        var store = new ClineSessionStore(_secrets, LegacyCachePath);
+
+        // The vault is down: the session must not be deleted from disk.
+        Assert.Null(await store.LoadAsync(default));
+        Assert.True(File.Exists(LegacyCachePath));
+
+        // The vault recovering lets the very next load finish the migration,
+        // because the failed attempt did not latch.
+        _secrets.Fault = null;
+        ClineSession? migrated = await store.LoadAsync(default);
+
+        Assert.NotNull(migrated);
+        Assert.Equal("file-token", migrated!.AccessToken);
+        Assert.Equal("file-refresh", migrated.RefreshToken);
+        Assert.False(File.Exists(LegacyCachePath));
+    }
+
+    [Fact]
+    public async Task A_partially_written_migration_keeps_the_plaintext_cache()
+    {
+        Directory.CreateDirectory(_cacheDirectory);
+        await File.WriteAllTextAsync(LegacyCachePath, """
+            {"accessToken":"file-token","refreshToken":"file-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
+            """);
+        // The access-token write lands but the expires-at write fails: the
+        // vault now holds a half-written session that LoadAsync rejects, so
+        // deleting the plaintext file here would strand the user.
+        _secrets.FaultFor = key => key is { Scope: "cline", Key: "session.expires-at" }
+            ? new System.ComponentModel.Win32Exception(5)
+            : null;
+        var store = new ClineSessionStore(_secrets, LegacyCachePath);
+
+        Assert.Null(await store.LoadAsync(default));
+        Assert.True(File.Exists(LegacyCachePath));
+
+        _secrets.FaultFor = null;
+        ClineSession? migrated = await store.LoadAsync(default);
+
+        Assert.NotNull(migrated);
+        Assert.Equal("file-token", migrated!.AccessToken);
+        Assert.False(File.Exists(LegacyCachePath));
+    }
+
+    [Fact]
     public async Task An_unavailable_secret_store_degrades_to_no_cache_rather_than_failing()
     {
         _secrets.Fault = new System.ComponentModel.Win32Exception(5);

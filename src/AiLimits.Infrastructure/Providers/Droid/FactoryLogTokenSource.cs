@@ -38,7 +38,7 @@ public sealed class FactoryLogTokenSource(string factoryHome) : ITokenUsageSourc
             files = Directory.EnumerateFiles(
                     logDirectory,
                     "droid-log-single.log*",
-                    SearchOption.TopDirectoryOnly)
+                    SafeFileEnumeration.TopLevel)
                 .OrderBy(SafeLastWriteTimeUtc)
                 .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();

@@ -25,7 +25,7 @@ public sealed class CodexSessionTokenSource(string codexHome) : ITokenUsageSourc
         var roots = new[] { Path.Combine(codexHome, "sessions"), Path.Combine(codexHome, "archived_sessions") };
         var files = roots
             .Where(Directory.Exists)
-            .SelectMany(root => Directory.EnumerateFiles(root, "*.jsonl", SearchOption.AllDirectories))
+            .SelectMany(root => Directory.EnumerateFiles(root, "*.jsonl", SafeFileEnumeration.Recursive))
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
         foreach (var file in files)
         {

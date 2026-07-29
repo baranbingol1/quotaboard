@@ -117,6 +117,7 @@ public static class RuntimeText
         FetchFailureKind.ProviderChanged => L("Runtime_FailureProviderChanged"),
         FetchFailureKind.Cancelled => L("Runtime_FailureCancelled"),
         FetchFailureKind.Unsupported => L("Runtime_FailureUnsupported"),
+        FetchFailureKind.TemporarilyUnavailable => L("Runtime_FailureTemporarilyUnavailable"),
         FetchFailureKind.None => L("Data_Success"),
         _ => L("Runtime_FailureUnknown")
     };
@@ -136,6 +137,7 @@ public static class RuntimeText
         FetchFailureKind.ProviderChanged => L("Runtime_MeaningProviderChanged"),
         FetchFailureKind.Cancelled => L("Runtime_MeaningCancelled"),
         FetchFailureKind.Unsupported => L("Runtime_MeaningUnsupported"),
+        FetchFailureKind.TemporarilyUnavailable => L("Runtime_MeaningTemporarilyUnavailable"),
         FetchFailureKind.None => L("Runtime_MeaningSuccess"),
         _ => L("Runtime_MeaningUnknown")
     };
@@ -147,6 +149,8 @@ public static class RuntimeText
         FetchFailureKind.Authentication or FetchFailureKind.Authorization => CardStatusKind.SignInRequired,
         FetchFailureKind.RateLimited => CardStatusKind.RateLimited,
         FetchFailureKind.Network or FetchFailureKind.Timeout => CardStatusKind.Offline,
+        // Transient, self-recovering: shown as retrying, never as sign-in.
+        FetchFailureKind.TemporarilyUnavailable => CardStatusKind.Stale,
         // Neither broken nor answered: this source simply does not apply here.
         FetchFailureKind.Unsupported or FetchFailureKind.Cancelled => CardStatusKind.NoQuota,
         _ => CardStatusKind.Error

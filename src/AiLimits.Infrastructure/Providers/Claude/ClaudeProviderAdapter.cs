@@ -58,7 +58,7 @@ public sealed class ClaudeProviderAdapter : IProviderAdapter
         try
         {
             ProcessResult result = await _processRunner.RunAsync(_claudeExecutable, new[] { "auth", "status", "--json" }, TimeSpan.FromSeconds(5), cancellationToken).ConfigureAwait(false);
-            if (result.ExitCode != 0)
+            if (result.ExitCode != 0 || result.OutputTruncated)
             {
                 return null;
             }
