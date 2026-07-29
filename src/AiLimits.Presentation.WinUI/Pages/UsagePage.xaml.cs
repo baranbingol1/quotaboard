@@ -59,14 +59,27 @@ public sealed partial class UsagePage : Page
     private void OnLoaded(object sender, RoutedEventArgs args)
     {
         ViewModel.UsageAnalyticsDataChanged += OnUsageAnalyticsDataChanged;
+        ThemeService.Applied += OnThemeApplied;
         RefreshQuery();
     }
 
-    private void OnUnloaded(object sender, RoutedEventArgs args) =>
+    private void OnUnloaded(object sender, RoutedEventArgs args)
+    {
         ViewModel.UsageAnalyticsDataChanged -= OnUsageAnalyticsDataChanged;
+        ThemeService.Applied -= OnThemeApplied;
+    }
 
     private void OnUsageAnalyticsDataChanged(object? sender, EventArgs args) =>
         DispatcherQueue.TryEnqueue(RefreshQuery);
+
+    private void OnThemeApplied(ElementTheme theme) =>
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (_lastResult is not null)
+            {
+                RenderChart(_lastResult);
+            }
+        });
 
     private void OnDateRangeChanged(object sender, SelectionChangedEventArgs args)
     {

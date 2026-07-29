@@ -22,11 +22,18 @@ internal sealed class InMemorySecretStore : ISecretStore
     /// </summary>
     public Func<(string Scope, string Key), Exception?>? FaultFor { get; set; }
 
+    /// <summary>Optional per-key fault selector applied only to writes.</summary>
+    public Func<(string Scope, string Key), Exception?>? SetFaultFor { get; set; }
+
     public IReadOnlyCollection<(string Scope, string Key)> Keys => _entries.Keys.ToArray();
 
     public Task SetAsync(string scope, string key, string secret, CancellationToken cancellationToken)
     {
         ThrowIfFaulted(scope, key);
+        if (SetFaultFor?.Invoke((scope, key)) is { } setFault)
+        {
+            throw setFault;
+        }
         _entries[(scope, key)] = secret;
         return Task.CompletedTask;
     }

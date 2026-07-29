@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 using System.Text.Json;
 using AiLimits.Application.Abstractions;
+using AiLimits.Application.Presentation;
 using AiLimits.Application.Refresh;
 using AiLimits.Application.Snapshots;
 using AiLimits.Domain;
@@ -143,14 +144,14 @@ public sealed class RefreshCoordinatorTests
     }
 
     [Fact]
-    public async Task NotConfiguredAndUnsupportedSkipsAreNotPersistedAsAttempts()
+    public async Task AllUnavailableStrategiesReplaceAStaleSuccessfulAttemptOnce()
     {
-        // A skip is not a fetch attempt: persisting one wrote a fresh row whose
-        // recency hid the account's last real outcome in latest-attempt queries.
         var account = new ProviderAccount(new AccountKey(new ProviderId("fake"), "one"),
             "one", null, "fixture", 4, true);
         var accounts = new MemoryAccounts(account);
         var snapshots = new MemorySnapshots();
+        snapshots.Attempts.Add(new FetchAttempt("previous", account.Key, "working", new FixedClock().UtcNow,
+            TimeSpan.Zero, FetchFailureKind.None, "Success"));
         var coordinator = new RefreshCoordinator(
             [new FakeAdapter(
                 new SkippedStrategy("not-configured", StrategyAvailability.NotConfigured),
@@ -160,8 +161,11 @@ public sealed class RefreshCoordinatorTests
         var publication = await coordinator.RefreshAsync(new RefreshRequest(account.Key, 4));
 
         Assert.Equal(RefreshPublicationStatus.FailedWithoutData, publication.Status);
-        Assert.Empty(publication.Attempts);
-        Assert.Empty(snapshots.Attempts);
+        FetchAttempt unavailable = Assert.Single(publication.Attempts);
+        Assert.Equal(FetchFailureKind.Unsupported, unavailable.FailureKind);
+        Assert.Equal(2, snapshots.Attempts.Count);
+        Assert.Equal(AccountHealth.SignInRequired,
+            AccountHealthPolicy.Decide(isConnected: true, TimeSpan.FromSeconds(30), unavailable.FailureKind));
     }
 
     [Fact]

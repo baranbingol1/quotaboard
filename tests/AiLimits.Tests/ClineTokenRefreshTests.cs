@@ -360,6 +360,31 @@ public sealed class ClineTokenRefreshTests : IDisposable
     }
 
     [Fact]
+    public async Task A_failed_interrupted_promotion_does_not_expose_a_mixed_session()
+    {
+        ClineSessionStore store = Store();
+        await store.SaveAsync(
+            new ClineSession("old-access", "old-refresh", Now + TimeSpan.FromHours(1)), default);
+
+        // Fail the live refresh-token promotion after the new access token and
+        // expiry have already been promoted. The commit marker and staging
+        // values remain so LoadAsync can retry atomically later.
+        _secrets.SetFaultFor = key => key is { Scope: "cline", Key: "session.refresh-token" }
+            ? new System.ComponentModel.Win32Exception(5)
+            : null;
+        await store.SaveAsync(
+            new ClineSession("new-access", "new-refresh", Now + TimeSpan.FromHours(2)), default);
+
+        Assert.Null(await store.LoadAsync(default));
+
+        _secrets.SetFaultFor = null;
+        ClineSession? recovered = await store.LoadAsync(default);
+        Assert.NotNull(recovered);
+        Assert.Equal("new-access", recovered!.AccessToken);
+        Assert.Equal("new-refresh", recovered.RefreshToken);
+    }
+
+    [Fact]
     public async Task An_unavailable_secret_store_degrades_to_no_cache_rather_than_failing()
     {
         _secrets.Fault = new System.ComponentModel.Win32Exception(5);

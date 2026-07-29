@@ -199,6 +199,8 @@ public sealed class RefreshCoordinator : IDisposable
         {
             List<FetchAttempt> attempts = new List<FetchAttempt>();
             TimeSpan? retryAfterHint = null;
+            string? unavailableStrategyId = null;
+            string? unavailableReason = null;
             IReadOnlyList<ILimitFetchStrategy> strategies;
             try
             {
@@ -231,18 +233,17 @@ public sealed class RefreshCoordinator : IDisposable
                 }
                 if (availability.Availability != StrategyAvailability.Available)
                 {
-                    // NotConfigured/Unsupported skips are not fetch attempts:
-                    // persisting them added a fresh row whose recency masked a
-                    // real earlier failure in the per-account latest-attempt
-                    // queries (a signed-out CLI would hide its own Network
-                    // error behind a later "not configured" skip). A
-                    // temporarily unavailable strategy DID try to run, so it
-                    // is recorded with its own kind, which the dashboard
-                    // renders as a transient retrying state rather than
-                    // sign-in.
                     if (availability.Availability == StrategyAvailability.TemporarilyUnavailable)
                     {
                         attempts.Add(await RecordAttemptAsync(account.Key, strategy.Id, TimeSpan.Zero, FetchFailureKind.TemporarilyUnavailable, availability.SafeReason, cancellationToken).ConfigureAwait(false));
+                    }
+                    else
+                    {
+                        // Keep one representative skip. It is persisted only
+                        // if every strategy is unavailable, so a later skip can
+                        // never mask an earlier real attempt.
+                        unavailableStrategyId ??= strategy.Id;
+                        unavailableReason ??= availability.SafeReason;
                     }
                     continue;
                 }
@@ -279,6 +280,12 @@ public sealed class RefreshCoordinator : IDisposable
                     continue;
                 }
                 break;
+            }
+            if (attempts.Count == 0 && unavailableStrategyId is not null)
+            {
+                attempts.Add(await RecordAttemptAsync(account.Key, unavailableStrategyId, TimeSpan.Zero,
+                    FetchFailureKind.Unsupported, unavailableReason ?? "No provider strategy is configured for this account.",
+                    cancellationToken).ConfigureAwait(false));
             }
             ProviderSnapshot cached = await _snapshots.GetLatestAsync(request.Account, cancellationToken).ConfigureAwait(false);
             return new RefreshPublication((cached is null) ? RefreshPublicationStatus.FailedWithoutData : RefreshPublicationStatus.FailedWithCachedData, cached, attempts, generation, (cached is null) ? "All provider strategies failed." : "Showing last known data; refresh failed.", retryAfterHint);

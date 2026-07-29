@@ -146,11 +146,10 @@ $zipBases = $zips | ForEach-Object {
 }
 
 foreach ($zipBase in $zipBases) {
-    $matchingSbom = $sboms | Where-Object {
-        (($_.BaseName -replace '\.sbom$', '') -eq $zipBase)
-    } | Select-Object -First 1
+    $expectedSbom = "$zipBase.sbom.spdx.json"
+    $matchingSbom = $sboms | Where-Object { $_.Name -eq $expectedSbom } | Select-Object -First 1
     if (-not $matchingSbom) {
-        throw "No SBOM matching $zipBase.zip (expected $zipBase.sbom.spdx.json)"
+        throw "No SBOM matching $zipBase.zip (expected $expectedSbom)"
     }
 }
 

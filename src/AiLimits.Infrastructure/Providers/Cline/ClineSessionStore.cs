@@ -71,7 +71,10 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
             // consistent before we read them.
             if (await secrets.GetAsync(Scope, CommitKey, cancellationToken).ConfigureAwait(false) is not null)
             {
-                await RecoverInterruptedPromotionAsync(cancellationToken).ConfigureAwait(false);
+                if (!await TryRecoverInterruptedPromotionAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    return null;
+                }
             }
 
             string? accessToken = await secrets.GetAsync(Scope, AccessTokenKey, cancellationToken).ConfigureAwait(false);
@@ -191,17 +194,19 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
         }
     }
 
-    private async Task RecoverInterruptedPromotionAsync(CancellationToken cancellationToken)
+    private async Task<bool> TryRecoverInterruptedPromotionAsync(CancellationToken cancellationToken)
     {
         try
         {
             await PromoteStagingAsync(cancellationToken).ConfigureAwait(false);
             await CleanupStagingAsync(cancellationToken).ConfigureAwait(false);
             await secrets.DeleteAsync(Scope, CommitKey, cancellationToken).ConfigureAwait(false);
+            return true;
         }
         catch (Exception ex) when (IsRecoverable(ex))
         {
             // The vault is still unavailable; the next LoadAsync will retry.
+            return false;
         }
     }
 

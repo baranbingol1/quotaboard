@@ -56,6 +56,26 @@ public sealed class SafeFileEnumerationTests
     }
 
     [Fact]
+    public void Recursive_enumeration_includes_hidden_files_and_directories()
+    {
+        using var temp = new TemporaryDirectory();
+        var root = Directory.CreateDirectory(Path.Combine(temp.Path, "root"));
+        string hiddenFile = Path.Combine(root.FullName, "hidden.jsonl");
+        File.WriteAllText(hiddenFile, "{}");
+        File.SetAttributes(hiddenFile, File.GetAttributes(hiddenFile) | FileAttributes.Hidden);
+        var hiddenDirectory = Directory.CreateDirectory(Path.Combine(root.FullName, "hidden-directory"));
+        hiddenDirectory.Attributes |= FileAttributes.Hidden;
+        string nestedFile = Path.Combine(hiddenDirectory.FullName, "nested.jsonl");
+        File.WriteAllText(nestedFile, "{}");
+
+        string[] files = Directory.EnumerateFiles(
+            root.FullName, "*.jsonl", SafeFileEnumeration.Recursive).ToArray();
+
+        Assert.Contains(hiddenFile, files);
+        Assert.Contains(nestedFile, files);
+    }
+
+    [Fact]
     public void IsSafeDirectory_rejects_a_junction_as_the_scan_root()
     {
         using var temp = new TemporaryDirectory();

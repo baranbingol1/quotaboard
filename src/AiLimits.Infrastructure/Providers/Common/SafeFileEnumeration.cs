@@ -16,13 +16,13 @@ public static class SafeFileEnumeration
     public static EnumerationOptions Recursive { get; } = new()
     {
         RecurseSubdirectories = true,
-        AttributesToSkip = FileAttributes.Hidden | FileAttributes.System | FileAttributes.ReparsePoint
+        AttributesToSkip = FileAttributes.ReparsePoint
     };
 
     public static EnumerationOptions TopLevel { get; } = new()
     {
         RecurseSubdirectories = false,
-        AttributesToSkip = FileAttributes.Hidden | FileAttributes.System | FileAttributes.ReparsePoint
+        AttributesToSkip = FileAttributes.ReparsePoint
     };
 
     public static bool IsReparsePoint(string path) =>
