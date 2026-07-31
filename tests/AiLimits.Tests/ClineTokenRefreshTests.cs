@@ -113,6 +113,75 @@ public sealed class ClineTokenRefreshTests : IDisposable
     }
 
     [Fact]
+    public async Task Concurrent_fetches_share_the_first_refreshed_session()
+    {
+        var handler = new ConcurrentRefreshHandler();
+        ClineSessionStore store = Store();
+        string lockName = $"Local\\QuotaBoard.Tests.ClineRefresh.{Guid.NewGuid():N}";
+        ClineCredential Credential() => new(
+            "stale-token",
+            "Cline CLI account",
+            ExpiresAt: Now - TimeSpan.FromHours(1),
+            RefreshToken: "stored-refresh",
+            IsWorkOsSession: true);
+        var first = new ClinePassLimitStrategy(
+            new HttpClient(handler), new FixedClock(), Credential, store,
+            new ClineNamedRefreshLock(lockName, TimeSpan.FromSeconds(5)));
+        var second = new ClinePassLimitStrategy(
+            new HttpClient(handler), new FixedClock(), Credential, store,
+            new ClineNamedRefreshLock(lockName, TimeSpan.FromSeconds(5)));
+
+        Task<FetchResult> firstFetch = first.FetchAsync(Account(), default);
+        await handler.FirstRefreshEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Task<FetchResult> secondFetch = second.FetchAsync(Account(), default);
+        try
+        {
+            await Task.Delay(100);
+            Assert.Equal(1, handler.RefreshCount);
+        }
+        finally
+        {
+            handler.ReleaseFirstRefresh.TrySetResult();
+        }
+        FetchResult[] results = await Task.WhenAll(firstFetch, secondFetch);
+
+        Assert.All(results, result => Assert.True(result.IsSuccess, result.SafeMessage));
+        Assert.Equal(1, handler.RefreshCount);
+        Assert.Equal(2, handler.UsageCount);
+    }
+
+    [Fact]
+    public async Task Named_lock_timeout_runs_the_fetch_unlocked()
+    {
+        string name = $"Local\\QuotaBoard.Tests.ClineRefresh.{Guid.NewGuid():N}";
+        using var acquired = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        Task holder = Task.Run(() =>
+        {
+            using var mutex = new Mutex(initiallyOwned: false, name);
+            mutex.WaitOne();
+            acquired.Set();
+            release.Wait();
+            mutex.ReleaseMutex();
+        });
+        acquired.Wait();
+
+        try
+        {
+            var refreshLock = new ClineNamedRefreshLock(name, TimeSpan.Zero);
+
+            int result = await refreshLock.RunAsync(() => Task.FromResult(42), default);
+
+            Assert.Equal(42, result);
+        }
+        finally
+        {
+            release.Set();
+            await holder;
+        }
+    }
+
+    [Fact]
     public async Task Unauthorized_usage_call_triggers_one_refresh_and_retry()
     {
         var handler = new RoutedHandler(request =>
@@ -334,6 +403,42 @@ public sealed class ClineTokenRefreshTests : IDisposable
     }
 
     [Fact]
+    public async Task A_save_that_finds_no_staging_values_reports_failure_and_keeps_legacy_cache()
+    {
+        Directory.CreateDirectory(_cacheDirectory);
+        await File.WriteAllTextAsync(LegacyCachePath, """
+            {"accessToken":"file-token","refreshToken":"file-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
+            """);
+        bool removed = false;
+        _secrets.BeforeGet = key =>
+        {
+            if (removed || key is not { Scope: "cline", Key: "session.access-token.staging" })
+            {
+                return;
+            }
+            removed = true;
+            foreach (string stagingKey in new[]
+            {
+                "session.access-token.staging",
+                "session.expires-at.staging",
+                "session.refresh-token.staging",
+                "session.clear-refresh.staging"
+            })
+            {
+                _secrets.DeleteAsync("cline", stagingKey, default).GetAwaiter().GetResult();
+            }
+        };
+        var store = new ClineSessionStore(_secrets, LegacyCachePath);
+
+        ClineSession? loaded = await store.LoadAsync(default);
+
+        Assert.Null(loaded);
+        Assert.True(File.Exists(LegacyCachePath));
+        Assert.DoesNotContain(_secrets.Keys, key =>
+            key is { Scope: "cline", Key: "session.commit" });
+    }
+
+    [Fact]
     public async Task A_mid_write_failure_in_non_migration_save_leaves_previous_session_intact()
     {
         ClineSessionStore store = Store();
@@ -382,6 +487,25 @@ public sealed class ClineTokenRefreshTests : IDisposable
         Assert.NotNull(recovered);
         Assert.Equal("new-access", recovered!.AccessToken);
         Assert.Equal("new-refresh", recovered.RefreshToken);
+    }
+
+    [Fact]
+    public async Task Incomplete_recovery_keeps_the_commit_marker_and_never_exposes_mixed_live_keys()
+    {
+        ClineSessionStore store = Store();
+        await store.SaveAsync(
+            new ClineSession("old-access", "old-refresh", Now + TimeSpan.FromHours(1)), default);
+        _secrets.SetFaultFor = key => key is { Scope: "cline", Key: "session.refresh-token" }
+            ? new System.ComponentModel.Win32Exception(5)
+            : null;
+        await store.SaveAsync(
+            new ClineSession("new-access", "new-refresh", Now + TimeSpan.FromHours(2)), default);
+        await _secrets.DeleteAsync("cline", "session.refresh-token.staging", default);
+        _secrets.SetFaultFor = null;
+
+        Assert.Null(await store.LoadAsync(default));
+        Assert.Null(await store.LoadAsync(default));
+        Assert.Contains(_secrets.Keys, key => key is { Scope: "cline", Key: "session.commit" });
     }
 
     [Fact]
@@ -437,6 +561,42 @@ public sealed class ClineTokenRefreshTests : IDisposable
                 request.Headers.Authorization?.ToString(),
                 body));
             return respond(request);
+        }
+    }
+
+    private sealed class ConcurrentRefreshHandler : HttpMessageHandler
+    {
+        private int _refreshCount;
+        private int _usageCount;
+
+        public int RefreshCount => Volatile.Read(ref _refreshCount);
+
+        public int UsageCount => Volatile.Read(ref _usageCount);
+
+        public TaskCompletionSource FirstRefreshEntered { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource ReleaseFirstRefresh { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            if (request.RequestUri!.ToString() == RefreshUri)
+            {
+                Interlocked.Increment(ref _refreshCount);
+                FirstRefreshEntered.TrySetResult();
+                await ReleaseFirstRefresh.Task.WaitAsync(cancellationToken);
+                return Json("""
+                    {"success":true,"data":{"accessToken":"fresh-token","refreshToken":"rotated-refresh","expiresAt":"2026-07-24T13:05:00Z"}}
+                    """);
+            }
+
+            Interlocked.Increment(ref _usageCount);
+            return Json("""
+                {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":42,"resetsAt":null}]}}
+                """);
         }
     }
 }

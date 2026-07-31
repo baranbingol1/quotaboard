@@ -469,7 +469,9 @@ public sealed partial class UsagePage : Page
         ChartLegendItems.ItemsSource = result.ChartLegend.Select(item =>
             new UsageChartLegendViewModel(
                 item.Key,
-                item.Label,
+                item.IsOthers && item.PooledSeriesCount > 0
+                    ? F("Usage_OthersSelected", item.PooledSeriesCount)
+                    : item.Label,
                 FormatTokens(item.Tokens),
                 $"{100.0 * item.Tokens / legendTotal:0.#}%",
                 seriesBrushes[item.Key]))

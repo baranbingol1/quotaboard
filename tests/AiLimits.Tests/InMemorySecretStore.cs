@@ -25,10 +25,14 @@ internal sealed class InMemorySecretStore : ISecretStore
     /// <summary>Optional per-key fault selector applied only to writes.</summary>
     public Func<(string Scope, string Key), Exception?>? SetFaultFor { get; set; }
 
+    /// <summary>Optional hook invoked immediately before a value is read.</summary>
+    public Action<(string Scope, string Key)>? BeforeGet { get; set; }
+
     public IReadOnlyCollection<(string Scope, string Key)> Keys => _entries.Keys.ToArray();
 
     public Task SetAsync(string scope, string key, string secret, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ThrowIfFaulted(scope, key);
         if (SetFaultFor?.Invoke((scope, key)) is { } setFault)
         {
@@ -40,12 +44,15 @@ internal sealed class InMemorySecretStore : ISecretStore
 
     public Task<string?> GetAsync(string scope, string key, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ThrowIfFaulted(scope, key);
+        BeforeGet?.Invoke((scope, key));
         return Task.FromResult(_entries.TryGetValue((scope, key), out string? value) ? value : null);
     }
 
     public Task DeleteAsync(string scope, string key, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ThrowIfFaulted(scope, key);
         _entries.TryRemove((scope, key), out _);
         return Task.CompletedTask;

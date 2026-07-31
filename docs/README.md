@@ -20,6 +20,9 @@ shape of the code; the code itself is the specification.
 - [09 — Usage page critique](09-usage-critique.md): the first critique pass
   against the design docs — what was fixed, what was examined and accepted,
   and the ranked design backlog.
+- [10 — Review remediation plan](10-review-remediation-plan.md): the validated
+  findings from the July 2026 review, their re-rated severities, and the ordered
+  fix plan for each.
 - [Provider release checklist](provider-release-checklist.md): what must be
   true before a new provider adapter ships.
 

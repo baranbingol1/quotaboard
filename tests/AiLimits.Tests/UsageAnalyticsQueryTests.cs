@@ -124,6 +124,29 @@ public sealed class UsageAnalyticsQueryTests
     }
 
     [Fact]
+    public void Explicit_selection_uses_six_series_and_pools_the_remainder()
+    {
+        UsageAnalyticsRecord[] records = Enumerable.Range(1, 8)
+            .Select(index => Row(
+                0,
+                modelKey: $"model-{index}",
+                tokens: 900 - (index * 100)))
+            .ToArray();
+
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with
+        {
+            ChartSeries = UsageChartSeriesDimension.Model,
+            Models = records.Select(record => record.ModelKey).ToArray()
+        });
+
+        Assert.Equal(7, result.ChartLegend.Count);
+        UsageChartLegendItem others = Assert.Single(result.ChartLegend, item => item.IsOthers);
+        Assert.Equal(2, others.PooledSeriesCount);
+        Assert.All(result.Chart, bucket =>
+            Assert.Equal(bucket.Tokens, bucket.Segments.Sum(segment => segment.Tokens)));
+    }
+
+    [Fact]
     public void Chart_series_can_switch_to_recording_tool()
     {
         UsageAnalyticsRecord[] records =

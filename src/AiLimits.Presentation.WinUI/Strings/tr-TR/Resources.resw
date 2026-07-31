@@ -272,6 +272,7 @@
   <data name="Usage_SeriesProvider.Content" xml:space="preserve"><value>Sağlayıcı</value></data>
   <data name="Usage_SeriesHarness.Content" xml:space="preserve"><value>Araç</value></data>
   <data name="Usage_SeriesModel.Content" xml:space="preserve"><value>Model</value></data>
+  <data name="Usage_OthersSelected" xml:space="preserve"><value>Diğer ({0} seçim daha)</value></data>
   <data name="Usage_ChartEmpty.Text" xml:space="preserve"><value>Bu sorguyla eşleşen kullanım yok. Bir filtreyi temizleyin veya tarih aralığını genişletin.</value></data>
   <data name="Usage_TokensAxis.Text" xml:space="preserve"><value>TOKEN</value></data>
   <data name="Usage_MatchingEyebrow.Text" xml:space="preserve"><value>EŞLEŞEN VERİ</value></data>

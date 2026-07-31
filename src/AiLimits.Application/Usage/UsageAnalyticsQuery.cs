@@ -63,7 +63,12 @@ public sealed record UsageFacetSet(
 
 public sealed record UsageChartSegment(string Key, string Label, long Tokens, bool IsOthers);
 
-public sealed record UsageChartLegendItem(string Key, string Label, long Tokens, bool IsOthers);
+public sealed record UsageChartLegendItem(
+    string Key,
+    string Label,
+    long Tokens,
+    bool IsOthers,
+    int PooledSeriesCount = 0);
 
 public sealed record UsageChartBucket(
     DateOnly From,
@@ -339,19 +344,23 @@ public static class UsageAnalyticsQueryEngine
             .ThenBy(item => item.Label, StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
 
-        SeriesTotal[] primary = explicitSelection ? totals : totals.Take(3).ToArray();
+        SeriesTotal[] primary = totals.Take(explicitSelection ? 6 : 3).ToArray();
         var legend = primary
             .Select(item => new UsageChartLegendItem(item.Key, item.Label, item.Tokens, false))
             .ToList();
         HashSet<string> primaryKeys = primary
             .Select(item => item.Key)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        long othersTokens = explicitSelection
-            ? 0
-            : totals.Where(item => !primaryKeys.Contains(item.Key)).Sum(item => item.Tokens);
+        SeriesTotal[] pooled = totals.Where(item => !primaryKeys.Contains(item.Key)).ToArray();
+        long othersTokens = pooled.Sum(item => item.Tokens);
         if (othersTokens > 0)
         {
-            legend.Add(new UsageChartLegendItem("__others__", "Others", othersTokens, true));
+            legend.Add(new UsageChartLegendItem(
+                "__others__",
+                "Others",
+                othersTokens,
+                true,
+                explicitSelection ? pooled.Length : 0));
         }
 
         Dictionary<DateOnly, UsageAnalyticsRecord[]> recordsByBucket = records

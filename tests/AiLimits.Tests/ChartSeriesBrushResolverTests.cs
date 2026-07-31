@@ -1,5 +1,7 @@
 ﻿// SPDX-License-Identifier: Apache-2.0
 using AiLimits.Application.Usage;
+using AiLimits.Presentation.WinUI.Theming;
+using System.Xml.Linq;
 
 namespace AiLimits.Tests;
 
@@ -40,5 +42,51 @@ public sealed class ChartSeriesBrushResolverTests
     {
         Assert.Equal("ChartSeriesOthersBrush",
             ChartSeriesBrushResolver.ResolveResourceKey(5, true));
+    }
+
+    [Fact]
+    public void Precision_observatory_chart_ramp_matches_the_default_palette()
+    {
+        string repositoryRoot = FindRepositoryRoot();
+        XDocument document = XDocument.Load(Path.Combine(
+            repositoryRoot,
+            "src",
+            "AiLimits.Presentation.WinUI",
+            "Themes",
+            "PrecisionObservatory.xaml"));
+        XNamespace xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
+        XElement themeDictionaries = document.Descendants()
+            .Single(element => element.Name.LocalName == "ResourceDictionary.ThemeDictionaries");
+
+        AssertVariant("Light", color => color.Light);
+        AssertVariant("Dark", color => color.Dark);
+
+        void AssertVariant(string key, Func<ThemeColor, string> expectedColor)
+        {
+            XElement dictionary = themeDictionaries.Elements()
+                .Single(element => (string?)element.Attribute(xaml + "Key") == key);
+            for (int index = 0; index < ThemeCatalog.Tokyonight.ChartSeries.Count; index++)
+            {
+                string brushKey = $"ChartSeries{index + 1}Brush";
+                XElement brush = dictionary.Elements()
+                    .Single(element => (string?)element.Attribute(xaml + "Key") == brushKey);
+                string actual = ((string?)brush.Attribute("Color"))![3..];
+                Assert.Equal(
+                    expectedColor(ThemeCatalog.Tokyonight.ChartSeries[index]).TrimStart('#'),
+                    actual,
+                    ignoreCase: true);
+            }
+        }
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "AiLimits.slnx")))
+        {
+            directory = directory.Parent;
+        }
+        return directory?.FullName
+            ?? throw new DirectoryNotFoundException("Repository root was not found.");
     }
 }

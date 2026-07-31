@@ -34,9 +34,9 @@ public static class ThemeDictionaryBuilder
         var dictionary = new ResourceDictionary();
         dictionary.ThemeDictionaries["Light"] = BuildVariant(palette, dark: false, contentFontSource, metricFontSource);
         dictionary.ThemeDictionaries["Dark"] = BuildVariant(palette, dark: true, contentFontSource, metricFontSource);
-        // High contrast reuses the dark variant so custom brushes stay defined;
-        // WinUI's own controls still honor the system high-contrast palette.
-        dictionary.ThemeDictionaries["HighContrast"] = BuildVariant(palette, dark: true, contentFontSource, metricFontSource);
+        // Do not add a generated HighContrast variant. The static theme
+        // dictionary maps these semantic slots to Windows system colors; a
+        // palette-generated variant merged last would override those mappings.
         return dictionary;
     }
 

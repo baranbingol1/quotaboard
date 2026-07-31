@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http.Headers;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
 using AiLimits.Application.Abstractions;
@@ -25,7 +26,8 @@ internal sealed class ClinePassLimitStrategy(
     HttpClient http,
     IClock clock,
     Func<ClineCredential?>? credentialProbe = null,
-    ClineSessionStore? sessionStore = null) : ILimitFetchStrategy
+    ClineSessionStore? sessionStore = null,
+    IClineRefreshLock? refreshLock = null) : ILimitFetchStrategy
 {
     private static readonly Uri Uri = new("https://api.cline.bot/api/v1/users/me/plan/usage-limits");
 
@@ -37,6 +39,8 @@ internal sealed class ClinePassLimitStrategy(
     private const string NotConfiguredMessage =
         "No Cline credential. Set CLINE_API_KEY or sign in with the Cline CLI.";
 
+    private readonly IClineRefreshLock _refreshLock = refreshLock ?? ClineNamedRefreshLock.Instance;
+
     public string Id => "cline.pass-usage-limits-api";
 
     public int Order => 10;
@@ -46,7 +50,12 @@ internal sealed class ClinePassLimitStrategy(
             ? StrategyAvailabilityResult.Ready()
             : new StrategyAvailabilityResult(StrategyAvailability.NotConfigured, NotConfiguredMessage));
 
-    public async Task<FetchResult> FetchAsync(ProviderAccount account, CancellationToken cancellationToken)
+    public Task<FetchResult> FetchAsync(ProviderAccount account, CancellationToken cancellationToken) =>
+        sessionStore is null
+            ? FetchCoreAsync(account, cancellationToken)
+            : _refreshLock.RunAsync(() => FetchCoreAsync(account, cancellationToken), cancellationToken);
+
+    private async Task<FetchResult> FetchCoreAsync(ProviderAccount account, CancellationToken cancellationToken)
     {
         long started = Stopwatch.GetTimestamp();
 
@@ -274,4 +283,106 @@ internal sealed class ClinePassLimitStrategy(
 
     private ClineCredential? ResolveCredential() =>
         credentialProbe is not null ? credentialProbe() : ClineCredentialReader.Resolve();
+}
+
+/// <summary>
+/// Serializes the store load, refresh-token exchange, and save across app
+/// processes. A named <see cref="Mutex"/> is thread-affine, so the complete
+/// asynchronous operation runs synchronously on the worker thread that owns
+/// it. Timeout or lock setup failure deliberately degrades to the old unlocked
+/// behavior rather than hanging or failing a provider fetch.
+/// </summary>
+internal interface IClineRefreshLock
+{
+    Task<T> RunAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken);
+}
+
+internal sealed class ClineNamedRefreshLock : IClineRefreshLock
+{
+    // FetchCore can make one 15-second usage call followed by one 15-second
+    // refresh before saving. Keep ordinary network latency inside the lock;
+    // the timeout remains bounded and only exceptional contention falls back.
+    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(35);
+
+    public static ClineNamedRefreshLock Instance { get; } = new(CreateName(), DefaultTimeout);
+
+    private readonly string _name;
+    private readonly TimeSpan _timeout;
+
+    internal ClineNamedRefreshLock(string name, TimeSpan timeout)
+    {
+        _name = name;
+        _timeout = timeout;
+    }
+
+    public Task<T> RunAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        if (!OperatingSystem.IsWindows())
+        {
+            return operation();
+        }
+
+        return Task.Run(() => Run(operation, cancellationToken), CancellationToken.None);
+    }
+
+    private T Run<T>(Func<Task<T>> operation, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Mutex? mutex = null;
+        bool acquired = false;
+        try
+        {
+            try
+            {
+                mutex = new Mutex(initiallyOwned: false, _name);
+                int signaled = WaitHandle.WaitAny(
+                    [mutex, cancellationToken.WaitHandle],
+                    _timeout);
+                if (signaled == 1)
+                {
+                    throw new OperationCanceledException(cancellationToken);
+                }
+                acquired = signaled == 0;
+            }
+            catch (AbandonedMutexException)
+            {
+                acquired = true;
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException
+                or IOException
+                or WaitHandleCannotBeOpenedException)
+            {
+                // Best effort: fetch without serialization if the OS refuses
+                // to create or open the cross-process lock.
+            }
+
+            return operation().GetAwaiter().GetResult();
+        }
+        finally
+        {
+            if (acquired)
+            {
+                mutex!.ReleaseMutex();
+            }
+            mutex?.Dispose();
+        }
+    }
+
+    private static string CreateName()
+    {
+        string identity = Environment.UserName;
+        if (OperatingSystem.IsWindows())
+        {
+            try
+            {
+                using WindowsIdentity current = WindowsIdentity.GetCurrent();
+                identity = current.User?.Value ?? identity;
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or SystemException)
+            {
+            }
+        }
+        return $"Global\\QuotaBoard.ClineRefresh.{identity}";
+    }
 }

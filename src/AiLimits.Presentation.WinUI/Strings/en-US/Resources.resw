@@ -272,6 +272,7 @@
   <data name="Usage_SeriesProvider.Content" xml:space="preserve"><value>Provider</value></data>
   <data name="Usage_SeriesHarness.Content" xml:space="preserve"><value>Harness</value></data>
   <data name="Usage_SeriesModel.Content" xml:space="preserve"><value>Model</value></data>
+  <data name="Usage_OthersSelected" xml:space="preserve"><value>Others ({0} more selected)</value></data>
   <data name="Usage_ChartEmpty.Text" xml:space="preserve"><value>No usage matches this query. Clear a filter or widen the date range.</value></data>
   <data name="Usage_TokensAxis.Text" xml:space="preserve"><value>TOKENS</value></data>
   <data name="Usage_MatchingEyebrow.Text" xml:space="preserve"><value>MATCHING DATA</value></data>

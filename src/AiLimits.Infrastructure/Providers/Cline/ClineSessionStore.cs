@@ -32,7 +32,9 @@ internal sealed record ClineSession(string AccessToken, string? RefreshToken, Da
 /// staging write fails, the live keys are untouched and the staging keys are
 /// cleaned up. <see cref="LoadAsync"/> only ever reads live keys; if it finds
 /// a commit marker (a promotion was interrupted), it finishes the promotion
-/// before reading.
+/// before reading. The staging keys intentionally assume one writer; callers
+/// that can refresh must hold the cross-process lock in
+/// <see cref="ClinePassLimitStrategy"/> across load, refresh, and save.
 /// </para>
 ///
 /// Every operation is best-effort: if the secret store is unavailable the
@@ -137,9 +139,13 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
         try
         {
             await secrets.SetAsync(Scope, CommitKey, "1", cancellationToken).ConfigureAwait(false);
-            await PromoteStagingAsync(cancellationToken).ConfigureAwait(false);
-            await CleanupStagingAsync(cancellationToken).ConfigureAwait(false);
+            bool promoted = await PromoteStagingAsync(cancellationToken).ConfigureAwait(false);
             await secrets.DeleteAsync(Scope, CommitKey, cancellationToken).ConfigureAwait(false);
+            await CleanupStagingAsync(cancellationToken).ConfigureAwait(false);
+            if (!promoted)
+            {
+                return false;
+            }
         }
         catch (Exception ex) when (IsRecoverable(ex))
         {
@@ -189,6 +195,11 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
             // write and rename could have left one holding the same tokens.
             File.Delete(legacyCachePath + ".tmp");
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _legacyMigrationAttempted = false;
+            throw;
+        }
         catch (Exception ex) when (IsRecoverable(ex))
         {
         }
@@ -198,9 +209,13 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
     {
         try
         {
-            await PromoteStagingAsync(cancellationToken).ConfigureAwait(false);
-            await CleanupStagingAsync(cancellationToken).ConfigureAwait(false);
+            bool promoted = await PromoteStagingAsync(cancellationToken).ConfigureAwait(false);
+            if (!promoted)
+            {
+                return false;
+            }
             await secrets.DeleteAsync(Scope, CommitKey, cancellationToken).ConfigureAwait(false);
+            await CleanupStagingAsync(cancellationToken).ConfigureAwait(false);
             return true;
         }
         catch (Exception ex) when (IsRecoverable(ex))
@@ -210,21 +225,22 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
         }
     }
 
-    private async Task PromoteStagingAsync(CancellationToken cancellationToken)
+    private async Task<bool> PromoteStagingAsync(CancellationToken cancellationToken)
     {
         string? stagingAccess = await secrets.GetAsync(Scope, StagingAccessTokenKey, cancellationToken).ConfigureAwait(false);
         string? stagingExpires = await secrets.GetAsync(Scope, StagingExpiresAtKey, cancellationToken).ConfigureAwait(false);
         string? stagingRefresh = await secrets.GetAsync(Scope, StagingRefreshTokenKey, cancellationToken).ConfigureAwait(false);
         string? clearFlag = await secrets.GetAsync(Scope, StagingClearRefreshKey, cancellationToken).ConfigureAwait(false);
 
-        if (stagingAccess is not null)
+        if (stagingAccess is null || stagingExpires is null ||
+            clearFlag is not ("0" or "1") ||
+            (clearFlag == "0" && stagingRefresh is null))
         {
-            await secrets.SetAsync(Scope, AccessTokenKey, stagingAccess, cancellationToken).ConfigureAwait(false);
+            return false;
         }
-        if (stagingExpires is not null)
-        {
-            await secrets.SetAsync(Scope, ExpiresAtKey, stagingExpires, cancellationToken).ConfigureAwait(false);
-        }
+
+        await secrets.SetAsync(Scope, AccessTokenKey, stagingAccess, cancellationToken).ConfigureAwait(false);
+        await secrets.SetAsync(Scope, ExpiresAtKey, stagingExpires, cancellationToken).ConfigureAwait(false);
         if (clearFlag == "1")
         {
             await secrets.DeleteAsync(Scope, RefreshTokenKey, cancellationToken).ConfigureAwait(false);
@@ -233,6 +249,7 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
         {
             await secrets.SetAsync(Scope, RefreshTokenKey, stagingRefresh, cancellationToken).ConfigureAwait(false);
         }
+        return true;
     }
 
     private async Task CleanupStagingAsync(CancellationToken cancellationToken)

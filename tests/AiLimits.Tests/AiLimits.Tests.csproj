@@ -10,6 +10,7 @@
     <ProjectReference Include="..\..\src\AiLimits.Application\AiLimits.Application.csproj" />
     <ProjectReference Include="..\..\src\AiLimits.Infrastructure\AiLimits.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\AiLimits.Platform.Windows\AiLimits.Platform.Windows.csproj" />
+    <ProjectReference Include="..\..\src\AiLimits.Presentation.WinUI\AiLimits.Presentation.WinUI.csproj" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio">
