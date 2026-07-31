@@ -9,6 +9,7 @@
         IsSettingsVisible="True"
         CompactPaneLength="52"
         OpenPaneLength="214"
+        Loaded="OnNavigationLoaded"
         SelectionChanged="OnSelectionChanged"
         Background="{ThemeResource PageBackgroundBrush}">
         <NavigationView.PaneHeader>
