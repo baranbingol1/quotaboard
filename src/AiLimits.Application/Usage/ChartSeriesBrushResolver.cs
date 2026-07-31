@@ -9,7 +9,12 @@ namespace AiLimits.Application.Usage;
 /// This keeps categorical chart colors readable (especially Series-by-model,
 /// where many same-vendor models would otherwise collapse into one brand hue)
 /// while <c>ProviderColors</c> stays the source of truth for brand identity
-/// on product chrome (cards, connections, tray, model-mix accent strips).
+/// on product chrome (cards, connections, tray).
+///
+/// The Model Mix list resolves through this same ramp by row rank. Its rows and
+/// the Series-by-model legend are both ranked by tokens descending with a label
+/// tie-break over one record set, so row N and legend entry N are the same
+/// model and must not disagree about its colour.
 /// </summary>
 public static class ChartSeriesBrushResolver
 {

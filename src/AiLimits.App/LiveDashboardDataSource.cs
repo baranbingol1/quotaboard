@@ -49,6 +49,15 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
 
     private static readonly TimeSpan ScanInterval = TimeSpan.FromMinutes(1L);
 
+    /// <summary>
+    /// How many telemetry sources are drained at once. They are I/O bound
+    /// (subprocesses, log files, SQLite reads), so this is about overlapping
+    /// waits, not CPU; it matches the provider fetch batch.
+    /// </summary>
+    private const int MaxScanConcurrency = 4;
+
+    private const int ScanBatchSize = 512;
+
     private readonly HttpClient _httpClient = new HttpClient
     {
         Timeout = TimeSpan.FromSeconds(25L)
@@ -104,6 +113,8 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
     private ManualPriceOverrideSet _pricingOverrides = ManualPriceOverrideSet.Empty;
 
     private readonly SemaphoreSlim _loadGate = new SemaphoreSlim(1, 1);
+
+    private readonly SemaphoreSlim _usageWriteGate = new SemaphoreSlim(1, 1);
 
     private readonly string _databasePath;
 
@@ -390,57 +401,41 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         // Read by ProjectAsync: a projection taken while this runs has real
         // limits but incomplete usage totals, and has to say so.
         _scanInFlight = true;
-        int total = 0;
-        int successful = 0;
-        int emitted = 0;
-        string? firstFailure = null;
         // Token sources only read local telemetry, so keep scanning known
         // accounts even when their live credentials are gone (a CLI logout
         // must not make recorded history vanish).
-        foreach (ProviderAccount account in accounts)
-        {
-            if (!_adapterById.TryGetValue(account.Key.Provider, out IProviderAdapter value))
+        (ProviderAccount Account, ITokenUsageSource Source)[] work = accounts
+            .SelectMany(account => _adapterById.TryGetValue(account.Key.Provider, out IProviderAdapter adapter)
+                ? adapter.CreateTokenSources(account).Select(source => (Account: account, Source: source))
+                : [])
+            .ToArray();
+
+        int total = work.Length;
+        int successful = 0;
+        int emitted = 0;
+        string? firstFailure = null;
+        object failureGate = new object();
+
+        // The sources share nothing: each reads its own logs, database or CLI
+        // and writes through the serialised gate below. Running them one after
+        // another meant the slowest (Amp, minutes of subprocess launches) held
+        // up six others that together take seconds.
+        await Parallel.ForEachAsync(
+            work,
+            new ParallelOptions
             {
-                continue;
-            }
-            foreach (ITokenUsageSource source in value.CreateTokenSources(account))
+                MaxDegreeOfParallelism = MaxScanConcurrency,
+                CancellationToken = cancellationToken,
+            },
+            async (item, token) =>
             {
-                total++;
                 try
                 {
-                    ScannerCursor scannerCursor = await _usage.GetCursorAsync(account.Key, source.Id, cancellationToken).ConfigureAwait(false);
-                    List<TokenUsageEvent> batch = new List<TokenUsageEvent>(512);
-                    DateTimeOffset? lastObserved = scannerCursor?.LastObservedAt;
-                    await foreach (TokenUsageEvent item in source.ReadAsync(account, scannerCursor, cancellationToken).ConfigureAwait(false))
-                    {
-                        batch.Add(item);
-                        emitted++;
-                        if (lastObserved.HasValue)
-                        {
-                            DateTimeOffset occurredAt = item.OccurredAt;
-                            lastScanAt = lastObserved;
-                            if (!(occurredAt > lastScanAt))
-                            {
-                                goto IL_02bc;
-                            }
-                        }
-                        lastObserved = item.OccurredAt;
-                        goto IL_02bc;
-                        IL_02bc:
-                        if (batch.Count >= 512)
-                        {
-                            await _usage.AddEventsAsync(batch, cancellationToken).ConfigureAwait(false);
-                            batch.Clear();
-                        }
-                    }
-                    if (batch.Count > 0)
-                    {
-                        await _usage.AddEventsAsync(batch, cancellationToken).ConfigureAwait(false);
-                    }
-                    await _usage.SaveCursorAsync(account.Key, new ScannerCursor(source.Id, "incremental", lastObserved, null), cancellationToken).ConfigureAwait(false);
-                    successful++;
+                    int scanned = await ScanSourceAsync(item.Account, item.Source, token).ConfigureAwait(false);
+                    Interlocked.Add(ref emitted, scanned);
+                    Interlocked.Increment(ref successful);
                 }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
                 {
                     throw;
                 }
@@ -451,11 +446,15 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                     // from one that simply had no new events. Keep scanning the
                     // remaining sources, but remember that this one did not
                     // succeed and say so in diagnostics.
-                    firstFailure ??= DiagnosticRedactor.Redact(
+                    string message = DiagnosticRedactor.Redact(
                         ex is TokenScanException ? ex.Message : ex.GetType().Name);
+                    lock (failureGate)
+                    {
+                        firstFailure ??= message;
+                    }
                 }
-            }
-        }
+            }).ConfigureAwait(false);
+
         _scanInFlight = false;
         _lastScanAt = _clock.UtcNow;
         _scannerCount = total;
@@ -465,6 +464,109 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             : firstFailure is not null
                 ? F("Data_ScannerFailed", total - successful, total, firstFailure)
                 : F("Data_EventsInspected", emitted);
+    }
+
+    /// <summary>
+    /// Drains one telemetry source into the usage store and advances its cursor.
+    /// Returns the number of events it emitted.
+    /// </summary>
+    private async Task<int> ScanSourceAsync(ProviderAccount account, ITokenUsageSource source, CancellationToken cancellationToken)
+    {
+        ScannerCursor? cursor = await _usage.GetCursorAsync(account.Key, source.Id, cancellationToken).ConfigureAwait(false);
+        List<TokenUsageEvent> batch = new List<TokenUsageEvent>(ScanBatchSize);
+        // Only events that reached the database may advance the stored cursor;
+        // `pending` runs ahead of `committed` for whatever is still in the batch,
+        // so a mid-stream failure cannot skip past events that were never saved.
+        DateTimeOffset? committed = cursor?.LastObservedAt;
+        DateTimeOffset? pending = committed;
+        int emitted = 0;
+
+        // A source that tracks its own per-item state hands it back here; a null
+        // means "nothing to record", which must preserve what is already stored
+        // rather than erase it. Everything else keeps the historical marker.
+        string? SourcePosition() => source is IScanPositionSource stateful
+            ? stateful.Position ?? cursor?.Position
+            : "incremental";
+
+        // What the scan started from, for the failure path below.
+        string? StartingPosition() => source is IScanPositionSource ? cursor?.Position : "incremental";
+
+        ScannerCursor Checkpoint(string? position) => new ScannerCursor(source.Id, position, committed, null);
+
+        try
+        {
+            await foreach (TokenUsageEvent item in source.ReadAsync(account, cursor, cancellationToken).ConfigureAwait(false))
+            {
+                batch.Add(item);
+                emitted++;
+                if (!pending.HasValue || item.OccurredAt > pending.Value)
+                {
+                    pending = item.OccurredAt;
+                }
+                if (batch.Count >= ScanBatchSize)
+                {
+                    await WriteEventsAsync(batch, cancellationToken).ConfigureAwait(false);
+                    batch.Clear();
+                    committed = pending;
+                }
+            }
+            if (batch.Count > 0)
+            {
+                await WriteEventsAsync(batch, cancellationToken).ConfigureAwait(false);
+            }
+            committed = pending;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Keep the timestamp the writes actually reached, but NOT the
+            // source's new position. That position asserts each of its items was
+            // processed, and items it yielded may have died with the batch that
+            // failed to write — a skipped item would then never be revisited,
+            // because the position is consulted ahead of the timestamp window.
+            // Only `committed` is known to be on disk. Repeating a scan is the
+            // cheap mistake; silently dropping usage is not.
+            try
+            {
+                await WriteCursorAsync(account.Key, Checkpoint(StartingPosition()), cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception checkpointFailure) when (checkpointFailure is not OperationCanceledException)
+            {
+                // Bookkeeping must not replace the failure that actually matters.
+            }
+            throw;
+        }
+
+        await WriteCursorAsync(account.Key, Checkpoint(SourcePosition()), cancellationToken).ConfigureAwait(false);
+        return emitted;
+    }
+
+    // SQLite takes one writer at a time. Reads scale fine under WAL, but the
+    // parallel scan would otherwise have several 512-row insert transactions
+    // racing for the write lock and burning the busy timeout.
+    private async Task WriteEventsAsync(IReadOnlyList<TokenUsageEvent> batch, CancellationToken cancellationToken)
+    {
+        await _usageWriteGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await _usage.AddEventsAsync(batch, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _usageWriteGate.Release();
+        }
+    }
+
+    private async Task WriteCursorAsync(AccountKey account, ScannerCursor cursor, CancellationToken cancellationToken)
+    {
+        await _usageWriteGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await _usage.SaveCursorAsync(account, cursor, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _usageWriteGate.Release();
+        }
     }
 
     private async Task<DashboardData> ProjectAsync(IReadOnlyList<ProviderAccount> accounts, PricingCatalogSnapshot? catalog, bool fromCache, CancellationToken cancellationToken)
@@ -493,7 +595,10 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         long totalCacheWrite = rows.Sum((DailyUsageAggregate row) => row.CacheWriteTokens);
         long totalReasoning = rows.Sum((DailyUsageAggregate row) => row.ReasoningTokens);
         long totalTokens = ((IEnumerable<DailyUsageAggregate>)rows).Sum((Func<DailyUsageAggregate, long>)TotalTokens);
-        IReadOnlyList<PricedModelRow> priced = BuildModelRows(rows, catalog);
+        // One cache for the whole projection: every aggregation below asks about
+        // the same handful of (service, model) pairs over and over.
+        ModelResolutionCache resolutions = new ModelResolutionCache(_modelResolver, _catalogModelResolver);
+        IReadOnlyList<PricedModelRow> priced = BuildModelRows(rows, catalog, resolutions);
         IReadOnlyList<ProviderUsageViewModel> providerUsage = BuildProviderUsage(priced);
         IReadOnlyList<ProviderUsageViewModel> harnessUsage = BuildHarnessUsage(priced);
         decimal quotedCost = priced.Where((PricedModelRow item) => item.CostUsd.HasValue).Sum((PricedModelRow item) => item.CostUsd.GetValueOrDefault());
@@ -511,10 +616,10 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         IReadOnlyList<FetchAttemptViewModel> recentAttempts = await ReadRecentAttemptsAsync(cancellationToken).ConfigureAwait(false);
         IReadOnlyList<UsageDayViewModel> usageDays = BuildDailyRows(rows, today);
         IReadOnlyList<HeatmapCellViewModel> heatmapCells = BuildHeatmap(historyRows, today);
-        IReadOnlyList<UsageHistoryDayViewModel> usageHistory = BuildUsageHistory(historyRows, catalog);
+        IReadOnlyList<UsageHistoryDayViewModel> usageHistory = BuildUsageHistory(historyRows, catalog, resolutions);
         IReadOnlyList<UsageModelSliceViewModel> usageModelSlices = BuildUsageModelSlices(historyRows);
-        IReadOnlyList<UsageAnalyticsRecord> usageAnalyticsRecords = BuildUsageAnalyticsRecords(historyRows, catalog);
-        IReadOnlyList<ProjectUsageSliceViewModel> projectUsageSlices = BuildProjectUsageSlices(historyRows, catalog);
+        IReadOnlyList<UsageAnalyticsRecord> usageAnalyticsRecords = BuildUsageAnalyticsRecords(historyRows, catalog, resolutions);
+        IReadOnlyList<ProjectUsageSliceViewModel> projectUsageSlices = BuildProjectUsageSlices(historyRows, catalog, resolutions);
         string weekDeltaLabel = BuildWeekDelta(rows, today);
         decimal cacheSaved = priced.Sum((PricedModelRow item) => item.CacheSavedUsd);
         string cacheSavingsLabel = cacheSaved > 0m ? F("Data_CacheSavings", FormatUsd(cacheSaved)) : "";
@@ -617,7 +722,8 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
 
     private IReadOnlyList<UsageAnalyticsRecord> BuildUsageAnalyticsRecords(
         IReadOnlyList<DailyUsageAggregate> rows,
-        PricingCatalogSnapshot? catalog)
+        PricingCatalogSnapshot? catalog,
+        ModelResolutionCache resolutions)
     {
         return rows
             .GroupBy(row => new
@@ -633,10 +739,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             .Select(group =>
             {
                 DailyUsageAggregate[] values = group.ToArray();
-                IReadOnlyList<PricedModelRow> priced = BuildModelRows(values, catalog);
-                decimal? cost = priced.Any(item => item.CostUsd.HasValue)
-                    ? priced.Where(item => item.CostUsd.HasValue).Sum(item => item.CostUsd.GetValueOrDefault())
-                    : null;
+                decimal? cost = QuoteCost(values, catalog, resolutions);
                 string provider = RuntimeText.AuthorizationProvider(
                     UsageProviderClassifier.GetDisplayName(group.Key.Harness, group.Key.Provider));
                 // Key off the classified label, never the raw service id: the
@@ -697,25 +800,25 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
 
     private IReadOnlyList<UsageHistoryDayViewModel> BuildUsageHistory(
         IReadOnlyList<DailyUsageAggregate> rows,
-        PricingCatalogSnapshot? catalog)
+        PricingCatalogSnapshot? catalog,
+        ModelResolutionCache resolutions)
     {
         return rows
             .GroupBy(row => row.Day)
             .OrderBy(group => group.Key)
             .Select(group =>
             {
-                IReadOnlyList<PricedModelRow> priced = BuildModelRows(group.ToArray(), catalog);
-                decimal? cost = priced.Any(item => item.CostUsd.HasValue)
-                    ? priced.Where(item => item.CostUsd.HasValue).Sum(item => item.CostUsd.GetValueOrDefault())
-                    : null;
-                return new UsageHistoryDayViewModel(group.Key, group.Sum(TotalTokens), cost);
+                DailyUsageAggregate[] values = group.ToArray();
+                return new UsageHistoryDayViewModel(group.Key, values.Sum(TotalTokens),
+                    QuoteCost(values, catalog, resolutions));
             })
             .ToArray();
     }
 
     private IReadOnlyList<ProjectUsageSliceViewModel> BuildProjectUsageSlices(
         IReadOnlyList<DailyUsageAggregate> rows,
-        PricingCatalogSnapshot? catalog)
+        PricingCatalogSnapshot? catalog,
+        ModelResolutionCache resolutions)
     {
         return rows
             .GroupBy(row => new
@@ -730,22 +833,108 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             .Select(group =>
             {
                 DailyUsageAggregate[] projectRows = group.ToArray();
-                IReadOnlyList<PricedModelRow> priced = BuildModelRows(projectRows, catalog);
-                decimal? cost = priced.Any(item => item.CostUsd.HasValue)
-                    ? priced.Where(item => item.CostUsd.HasValue).Sum(item => item.CostUsd.GetValueOrDefault())
-                    : null;
                 return new ProjectUsageSliceViewModel(
                     group.Key.Day,
                     group.Key.ProjectKey,
                     group.Key.ProjectPath,
                     group.Key.RepositoryRootPath,
                     projectRows.Sum(TotalTokens),
-                    cost);
+                    QuoteCost(projectRows, catalog, resolutions));
             })
             .ToArray();
     }
 
-    private IReadOnlyList<PricedModelRow> BuildModelRows(IReadOnlyList<DailyUsageAggregate> rows, PricingCatalogSnapshot? catalog)
+    /// <summary>
+    /// Memoises model resolution for one projection. The catalog is fixed for
+    /// the duration, so the same (service, model) pair always resolves the same
+    /// way — and the history aggregations below ask about the same few dozen
+    /// pairs hundreds of times each.
+    /// </summary>
+    private sealed class ModelResolutionCache(ExplicitModelResolver explicitResolver, CatalogModelResolver catalogResolver)
+    {
+        private readonly Dictionary<(string Service, string Model), ModelResolution?> _entries = [];
+
+        public ModelResolution? Resolve(ServiceProviderId service, string rawModelId, PricingCatalogSnapshot? catalog)
+        {
+            (string, string) key = (service.Value, rawModelId);
+            if (_entries.TryGetValue(key, out ModelResolution? cached))
+            {
+                return cached;
+            }
+            ModelResolution? resolved = catalog is null
+                ? explicitResolver.Resolve(service, rawModelId)
+                : catalogResolver.Resolve(service, rawModelId, catalog);
+            _entries[key] = resolved;
+            return resolved;
+        }
+    }
+
+    /// <summary>
+    /// API-equivalent cost for a set of rows, using the same grouping and the
+    /// same all-or-nothing lane rules as <see cref="BuildModelRows"/>.
+    ///
+    /// The three history aggregations want only this number. They used to get
+    /// it by calling <see cref="BuildModelRows"/> once per group, which builds a
+    /// full <see cref="ModelUsageRowViewModel"/> — localized status string,
+    /// formatted token count, formatted currency — for every group and then
+    /// throws all of it away. That was ~1.6 s of the ~2 s projection, three
+    /// times per startup.
+    ///
+    /// Pricing cannot simply be summed per row: <c>CanPrice</c> rejects a whole
+    /// group when any lane carries tokens the catalog has no rate for, so the
+    /// aggregate must be formed before it is quoted.
+    /// </summary>
+    private decimal? QuoteCost(
+        IReadOnlyList<DailyUsageAggregate> rows,
+        PricingCatalogSnapshot? catalog,
+        ModelResolutionCache resolutions)
+    {
+        decimal total = 0m;
+        bool anyPriced = false;
+        foreach (IGrouping<(ProviderId Source, ServiceProviderId Service, string RawModelId), DailyUsageAggregate> group
+            in rows.GroupBy(row => (Source: row.Account.Provider, Service: row.Service, RawModelId: row.RawModelId)))
+        {
+            long input = 0L, output = 0L, cacheRead = 0L, cacheWrite = 0L, reasoning = 0L;
+            foreach (DailyUsageAggregate row in group)
+            {
+                input += row.InputTokens;
+                output += row.OutputTokens;
+                cacheRead += row.CacheReadTokens;
+                cacheWrite += row.CacheWriteTokens;
+                reasoning += row.ReasoningTokens;
+            }
+            if (input + output + cacheRead + cacheWrite + reasoning <= 0L)
+            {
+                continue;
+            }
+
+            decimal? cost = null;
+            if (catalog is not null)
+            {
+                ModelResolution? resolution = resolutions.Resolve(group.Key.Service, group.Key.RawModelId, catalog);
+                cost = _pricing.Quote(
+                    new TokenUsageEvent(group.First().Account, group.Key.Service, group.Key.RawModelId, _clock.UtcNow,
+                        input, output, cacheRead, cacheWrite, reasoning, "dashboard-aggregate"),
+                    resolution,
+                    catalog)?.CostUsd;
+            }
+            // Gap-fill only, exactly as in BuildModelRows: a manual rate applies
+            // solely when the catalog produced no quote.
+            if (!cost.HasValue
+                && _pricingOverrides.TryGet(group.Key.Service.Value, group.Key.RawModelId, out ManualModelPrice manual))
+            {
+                cost = manual.QuoteUsd(input, output, cacheRead, cacheWrite, reasoning);
+            }
+            if (cost.HasValue)
+            {
+                total += cost.Value;
+                anyPriced = true;
+            }
+        }
+        return anyPriced ? total : null;
+    }
+
+    private IReadOnlyList<PricedModelRow> BuildModelRows(IReadOnlyList<DailyUsageAggregate> rows, PricingCatalogSnapshot? catalog, ModelResolutionCache resolutions)
     {
         return (from item in (from row in rows
                 group row by (Source: row.Account.Provider, Service: row.Service, RawModelId: row.RawModelId)).Select(delegate(IGrouping<(ProviderId Source, ServiceProviderId Service, string RawModelId), DailyUsageAggregate> @group)
@@ -757,9 +946,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                 long num5 = @group.Sum((DailyUsageAggregate row) => row.ReasoningTokens);
                 decimal? manualCostUsd = null;
                 string? manualStatus = null;
-                ModelResolution? modelResolution = catalog is null
-                    ? _modelResolver.Resolve(@group.Key.Service, @group.Key.RawModelId)
-                    : _catalogModelResolver.Resolve(@group.Key.Service, @group.Key.RawModelId, catalog);
+                ModelResolution? modelResolution = resolutions.Resolve(@group.Key.Service, @group.Key.RawModelId, catalog);
                 ApiEquivalentQuote apiEquivalentQuote = null;
                 if (catalog is not null)
                 {
@@ -1499,6 +1686,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         _catalog.Dispose();
         _cursorHttpClient.Dispose();
         _httpClient.Dispose();
+        _usageWriteGate.Dispose();
         _loadGate.Dispose();
     }
 }

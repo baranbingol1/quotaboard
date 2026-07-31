@@ -40,6 +40,24 @@ public sealed class ModelsDevPricingCatalog : IPricingCatalog, IDisposable
 
     private readonly SemaphoreSlim _gate = new SemaphoreSlim(1, 1);
 
+    /// <summary>
+    /// Serialises <see cref="LoadAsync"/> so a second caller waits for the
+    /// first parse and then hits the memo, instead of parsing 3.3 MB again.
+    /// Separate from <see cref="_gate"/>, which RefreshAsync already holds when
+    /// it calls LoadAsync — SemaphoreSlim is not reentrant.
+    /// </summary>
+    private readonly SemaphoreSlim _loadGate = new SemaphoreSlim(1, 1);
+
+    /// <summary>
+    /// Last parsed catalog, keyed on the identity of the file it came from.
+    /// Reading, SHA-256ing and parsing the body took 40-80 ms and ~10 MB of
+    /// allocation on every GetCurrentAsync/RefreshAsync — three times per
+    /// startup — to produce a byte-identical result each time.
+    /// </summary>
+    private CachedCatalog? _memo;
+
+    private (DateTime BodyWriteTimeUtc, long BodyLength, DateTime MetadataWriteTimeUtc, long MetadataLength) _memoStamp;
+
     private string? _lastError;
 
     private DateTimeOffset? _lastAttemptAt;
@@ -228,14 +246,52 @@ public sealed class ModelsDevPricingCatalog : IPricingCatalog, IDisposable
     public void Dispose()
     {
         _gate.Dispose();
+        _loadGate.Dispose();
     }
 
     private async Task<CachedCatalog?> LoadAsync(CancellationToken cancellationToken)
     {
-        if (!File.Exists(_bodyPath) || !File.Exists(_metadataPath))
+        FileInfo body = new FileInfo(_bodyPath);
+        FileInfo metadataFile = new FileInfo(_metadataPath);
+        if (!body.Exists || !metadataFile.Exists)
         {
             return null;
         }
+        // Identity, not age: any rewrite goes through AtomicWriteAsync, which
+        // changes the stamps, so a stale memo cannot survive an update. The
+        // integrity check below still runs on every genuinely new file — this
+        // only skips re-verifying bytes we already verified and that have not
+        // changed since.
+        //
+        // The metadata file is part of the key, not just the body: a 304
+        // revalidation rewrites only the metadata (a fresh FetchedAt over an
+        // unchanged body), and keying on the body alone would serve the stale
+        // fetch time for the rest of the process lifetime.
+        (DateTime, long, DateTime, long) stamp =
+            (body.LastWriteTimeUtc, body.Length, metadataFile.LastWriteTimeUtc, metadataFile.Length);
+        await _loadGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (_memo is not null && _memoStamp == stamp)
+            {
+                return _memo;
+            }
+            CachedCatalog? loaded = await ReadAndParseAsync(cancellationToken).ConfigureAwait(false);
+            if (loaded is not null)
+            {
+                _memo = loaded;
+                _memoStamp = stamp;
+            }
+            return loaded;
+        }
+        finally
+        {
+            _loadGate.Release();
+        }
+    }
+
+    private async Task<CachedCatalog?> ReadAndParseAsync(CancellationToken cancellationToken)
+    {
         try
         {
             byte[] bytes = await File.ReadAllBytesAsync(_bodyPath, cancellationToken).ConfigureAwait(false);

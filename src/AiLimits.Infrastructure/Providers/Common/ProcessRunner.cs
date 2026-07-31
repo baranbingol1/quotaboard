@@ -21,7 +21,7 @@ public sealed class ProcessRunner : IProcessRunner
     /// characters. Output past the cap is drained and discarded so the child
     /// never deadlocks on a full pipe, and the result is flagged as truncated.
     /// </summary>
-    private static async Task<CappedStream> ReadCappedAsync(StreamReader reader, CancellationToken cancellationToken)
+    private static async Task<CappedStream> ReadCappedAsync(StreamReader reader, int maxChars, CancellationToken cancellationToken)
     {
         char[] buffer = new char[8192];
         StringBuilder builder = new StringBuilder();
@@ -33,7 +33,7 @@ public sealed class ProcessRunner : IProcessRunner
             {
                 break;
             }
-            int remaining = MaxStreamChars - builder.Length;
+            int remaining = maxChars - builder.Length;
             if (remaining > 0)
             {
                 builder.Append(buffer, 0, Math.Min(remaining, read));
@@ -45,8 +45,12 @@ public sealed class ProcessRunner : IProcessRunner
 
     private readonly record struct CappedStream(string Text, bool Truncated);
 
-    public async Task<ProcessResult> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken)
+    public Task<ProcessResult> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken) =>
+        RunAsync(executable, arguments, timeout, MaxStreamChars, cancellationToken);
+
+    public async Task<ProcessResult> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout, int maxOutputChars, CancellationToken cancellationToken)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxOutputChars, 1);
         ProcessStartInfo startInfo = new ProcessStartInfo
         {
             // Fully qualified, so the OS never gets to pick the binary for us.
@@ -73,8 +77,10 @@ public sealed class ProcessRunner : IProcessRunner
         }
         using CancellationTokenSource timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutSource.CancelAfter(timeout);
-        Task<CappedStream> outputTask = ReadCappedAsync(process.StandardOutput, timeoutSource.Token);
-        Task<CappedStream> errorTask = ReadCappedAsync(process.StandardError, timeoutSource.Token);
+        Task<CappedStream> outputTask = ReadCappedAsync(process.StandardOutput, maxOutputChars, timeoutSource.Token);
+        // stderr keeps the default bound: a command may legitimately emit a
+        // large payload on stdout, but a large diagnostic stream is noise.
+        Task<CappedStream> errorTask = ReadCappedAsync(process.StandardError, MaxStreamChars, timeoutSource.Token);
         try
         {
             await process.WaitForExitAsync(timeoutSource.Token).ConfigureAwait(false);
@@ -120,6 +126,16 @@ public sealed class ProcessRunner : IProcessRunner
 public interface IProcessRunner
 {
     Task<ProcessResult> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Runs with an explicit per-stream capture cap, for the few commands whose
+    /// legitimate output is far larger than the default bound (a full Amp
+    /// conversation transcript runs to several MB). Defaults to the two-argument
+    /// overload so existing implementations — including test fakes, which are
+    /// never near any cap — need no change.
+    /// </summary>
+    Task<ProcessResult> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout, int maxOutputChars, CancellationToken cancellationToken)
+        => RunAsync(executable, arguments, timeout, cancellationToken);
 }
 
 public sealed record ProcessResult(int ExitCode, string StandardOutput, string StandardError, TimeSpan Duration, bool OutputTruncated = false, bool ErrorTruncated = false);

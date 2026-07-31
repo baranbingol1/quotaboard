@@ -393,10 +393,17 @@ public sealed partial class UsagePage : Page
         double available = _chartViewportWidth > 0 ? _chartViewportWidth : 520;
         double barWidth = Math.Clamp((available - 2.0 * bucketCount) / bucketCount, 2, 14);
 
-        _allModelMixRows = result.ModelTrends.Select(trend =>
+        // Same ramp, same order as the chart's Series-by-model legend: both rank
+        // by tokens descending and tie-break on label, so row N and legend entry
+        // N are the same model and now agree on colour. Brand hues cannot do
+        // this job — every claude-* model normalises to the one Claude orange,
+        // which is exactly why the mix showed four indistinguishable rows while
+        // the chart drew those models in four different ramp slots. (The
+        // correspondence is with the Series-by-model legend; grouping the chart
+        // by provider colours it by brand, and makes no per-model claim.)
+        _allModelMixRows = result.ModelTrends.Select((trend, rank) =>
         {
-            Brush accent = new SolidColorBrush(
-                Theming.ThemeDictionaryBuilder.Parse(ProviderColors.Resolve(trend.Key, trend.Label)));
+            Brush accent = ChartSeriesBrush(rank, isOthers: false);
             long peak = Math.Max(1, trend.PeakBucketTokens);
             UsageSparkBarViewModel[] spark = trend.BucketTokens.Select((tokens, index) =>
             {

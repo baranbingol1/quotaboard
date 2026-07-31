@@ -352,6 +352,61 @@ public sealed class UsageAnalyticsQueryTests
     }
 
     [Fact]
+    public void Series_by_model_legend_is_a_rank_prefix_of_the_model_trends()
+    {
+        // UsagePage colours the Model Mix by row rank and the chart by legend
+        // index, both off ChartSeriesBrushResolver. That only yields one colour
+        // per model because these two lists are ranked identically — assert it,
+        // because a divergence here would silently repaint the mix.
+        UsageAnalyticsRecord[] records =
+        [
+            Row(0, modelKey: "claude-opus-5", tokens: 500),
+            Row(0, modelKey: "gpt-5.6-sol", tokens: 900),
+            Row(0, modelKey: "claude-fable-5", tokens: 700),
+            Row(0, modelKey: "claude-sonnet-5", tokens: 300),
+            Row(0, modelKey: "codex-auto-review", tokens: 100)
+        ];
+
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with
+        {
+            ChartSeries = UsageChartSeriesDimension.Model
+        });
+
+        string[] named = result.ChartLegend
+            .Where(item => !item.IsOthers)
+            .Select(item => item.Key)
+            .ToArray();
+
+        Assert.NotEmpty(named);
+        Assert.Equal(named, result.ModelTrends.Take(named.Length).Select(trend => trend.Key));
+    }
+
+    [Fact]
+    public void Ties_in_the_model_ranking_break_the_same_way_on_both_surfaces()
+    {
+        // Equal token counts are the case where two differently-written sorts
+        // drift apart; both must fall through to the same label tie-break.
+        UsageAnalyticsRecord[] records =
+        [
+            Row(0, modelKey: "b-model", tokens: 400),
+            Row(0, modelKey: "a-model", tokens: 400),
+            Row(0, modelKey: "c-model", tokens: 400)
+        ];
+
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with
+        {
+            ChartSeries = UsageChartSeriesDimension.Model
+        });
+
+        string[] named = result.ChartLegend
+            .Where(item => !item.IsOthers)
+            .Select(item => item.Key)
+            .ToArray();
+
+        Assert.Equal(named, result.ModelTrends.Take(named.Length).Select(trend => trend.Key));
+    }
+
+    [Fact]
     public void Weekly_grain_buckets_model_trends_by_week()
     {
         UsageAnalyticsRecord[] records =

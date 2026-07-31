@@ -64,8 +64,12 @@ ten palettes. Four rules, all enforceable by inspection of `ThemeCatalog`:
    any new palette against this rule before it ships.*
    The Usage chart and legend bind to `ChartSeries1Brush`…`ChartSeries6Brush`
    by legend order, with `ChartSeriesOthersBrush` for the pooled "Others"
-   bucket. `ProviderColors` stays the source of truth for brand identity on
-   product chrome (provider cards, connections, tray, model-mix accent strips).
+   bucket. The Model Mix list binds to the same ramp by row rank, so a model
+   keeps one colour across both surfaces; brand hues cannot serve there,
+   because every `claude-*` model normalises to the single Claude orange and
+   the list would show a column of identical bars. `ProviderColors` stays the
+   source of truth for brand identity on product chrome (provider cards,
+   connections, tray) and for the Series-by-provider chart dimension.
 2. **Slot 1 is the flagship's data voice.** Series 1 carries the dominant
    category and should be the palette's most legible color against
    `SurfaceBrush` — not its prettiest.

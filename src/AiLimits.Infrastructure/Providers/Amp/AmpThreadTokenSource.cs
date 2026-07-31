@@ -8,15 +8,27 @@ using AiLimits.Infrastructure.Providers.Common;
 
 namespace AiLimits.Infrastructure.Providers.Amp;
 
-public sealed class AmpThreadTokenSource : ITokenUsageSource
+public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSource
 {
     private const int PageSize = 20;
     // Safety valve for pathological accounts; a scan visiting this many
     // threads has almost certainly paged far past any real activity window.
     private const int MaxThreadsPerScan = 200;
+
+    /// <summary>
+    /// A thread export is a full conversation transcript, and real ones reach
+    /// several MB — one of this machine's is 6.25 MB. The default 4 MB stream
+    /// cap flagged those as truncated, which used to abort the entire scan.
+    /// This bound still stops a runaway CLI from growing the heap without
+    /// limit; it just sits above the range of a legitimate transcript.
+    /// </summary>
+    internal const int MaxExportChars = 64 * 1024 * 1024;
+
     private static readonly TimeSpan RescanOverlap = TimeSpan.FromDays(1);
     private readonly IProcessRunner runner;
     private readonly Func<string?> executableResolver;
+
+    private string? _position;
 
     public AmpThreadTokenSource(IProcessRunner runner)
         : this(runner, AmpCliStrategy.FindExecutable)
@@ -31,6 +43,9 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource
 
     public string Id => "amp.thread-exports";
 
+    /// <inheritdoc />
+    public string? Position => _position;
+
     public async IAsyncEnumerable<TokenUsageEvent> ReadAsync(
         ProviderAccount account,
         ScannerCursor? cursor,
@@ -40,12 +55,20 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource
         if (executable is null) yield break;
 
         DateTimeOffset? cutoff = cursor?.LastObservedAt?.Subtract(RescanOverlap);
+        // What we exported last time, keyed by thread. A thread whose `updated`
+        // still matches its recorded revision holds nothing we have not already
+        // ingested, so it costs one dictionary lookup instead of a 2.4 s
+        // subprocess. Without this the cutoff alone re-exported a rolling day
+        // of threads — 35 of them on this machine — on every single scan.
+        AmpScanState previous = AmpScanState.Parse(cursor?.Position);
+        var current = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        // Page through the full listing (newest-updated first). Earlier builds
+        // Page through the listing (newest-updated first). Earlier builds
         // fetched only the first 20 threads, permanently skipping history for
         // accounts with more.
         var summaries = new List<AmpThreadSummary>();
         var seenThreadIds = new HashSet<string>(StringComparer.Ordinal);
+        bool retriesOutstanding = previous.HasPendingRetries;
         for (int offset = 0; summaries.Count < MaxThreadsPerScan; offset += PageSize)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -55,9 +78,9 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource
                 TimeSpan.FromSeconds(20),
                 cancellationToken).ConfigureAwait(false);
             if (listResult.OutputTruncated)
-                throw new InvalidOperationException("Amp thread listing exceeded the capture limit and was truncated.");
+                throw new TokenScanException("Amp thread listing exceeded the capture limit and was truncated.");
             if (listResult.ExitCode != 0 || !AmpThreadParser.TryParseThreadList(listResult.StandardOutput, out IReadOnlyList<AmpThreadSummary> page))
-                throw new InvalidOperationException("Amp thread listing failed.");
+                throw new TokenScanException("Amp thread listing failed.");
             if (page.Count == 0) break;
 
             // New threads created mid-scan shift offset pages; ids dedupe the
@@ -67,25 +90,112 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource
             // Once an entire page is older than the rescan cutoff, deeper pages
             // cannot contain activity the cursor has not already covered.
             if (cutoff.HasValue && page.All(thread => thread.UpdatedAt.HasValue && thread.UpdatedAt < cutoff)) break;
+            // Likewise once an entire page is already at its recorded revision:
+            // the listing is ordered newest-updated first, so everything deeper
+            // is older still and equally covered. This is what keeps a steady
+            // state to a single page instead of six. It is suspended while any
+            // thread still owes a retry, because that thread may sit on a page
+            // this shortcut would never reach.
+            if (!retriesOutstanding && page.All(previous.IsUnchanged)) break;
+        }
+
+        // Carry forward the recorded revision of every thread still in the
+        // listing, not just the ones inside the cutoff window. Dropping the
+        // older ones would make the page-break above fail on the next scan —
+        // a page of old threads would no longer read as fully covered — and
+        // the listing would go back to costing every page.
+        foreach (AmpThreadSummary thread in summaries)
+        {
+            if (!previous.TryGetRecorded(thread.Id, out string? recorded))
+            {
+                continue;
+            }
+            // A retry marker on a thread the cutoff no longer selects can never
+            // be acted on, and carrying it would keep the paging shortcut
+            // suspended for good. Drop it: the thread has no recorded revision,
+            // so it is re-attempted the moment it comes back into the window.
+            if (string.Equals(recorded, AmpScanState.RetryMarker, StringComparison.Ordinal)
+                && cutoff.HasValue
+                && thread.UpdatedAt.HasValue
+                && thread.UpdatedAt < cutoff)
+            {
+                continue;
+            }
+            current[thread.Id] = recorded;
         }
 
         var allUsage = new List<AmpThreadUsage>();
+        int exported = 0;
+        int failed = 0;
+        int unchanged = 0;
         foreach (AmpThreadSummary thread in summaries
                      .Where(thread => !cutoff.HasValue || !thread.UpdatedAt.HasValue || thread.UpdatedAt >= cutoff)
                      .Take(MaxThreadsPerScan))
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (previous.IsUnchanged(thread))
+            {
+                current[thread.Id] = AmpScanState.Revision(thread);
+                unchanged++;
+                continue;
+            }
+
             ProcessResult exportResult = await runner.RunAsync(
                 executable,
                 ["threads", "export", thread.Id],
                 TimeSpan.FromSeconds(30),
+                MaxExportChars,
                 cancellationToken).ConfigureAwait(false);
-            if (exportResult.OutputTruncated)
-                throw new InvalidOperationException("Amp thread export exceeded the capture limit and was truncated.");
-            if (exportResult.ExitCode != 0
+
+            // One unreadable thread must not discard the whole scan. Before
+            // this, a single oversized export threw, the scan loop caught it,
+            // the cursor was never saved, and the same ~77 s of subprocess work
+            // was repeated and thrown away on every refresh — permanently.
+            //
+            // Exit code is tested first, and deliberately: a CLI that fails
+            // prints a diagnostic rather than JSON, so it would also fail the
+            // parse below and be written off as permanent. Only output that a
+            // *successful* command produced can be called undecodable.
+            if (exportResult.ExitCode != 0)
+            {
+                // Process-level failure (CLI hiccup, transient auth). Mark it as
+                // owing a retry rather than leaving it unrecorded: an unrecorded
+                // thread stops the *page* it sits on from reading as covered,
+                // but a page ahead of it can still cut the listing short, and
+                // the thread would then never be offered again until Amp
+                // happened to touch it.
+                failed++;
+                current[thread.Id] = AmpScanState.RetryMarker;
+                continue;
+            }
+            if (exportResult.OutputTruncated
                 || !AmpThreadParser.TryParseUsage(thread.Id, exportResult.StandardOutput, cutoff, out IReadOnlyList<AmpThreadUsage> usage))
-                throw new InvalidOperationException("Amp thread export failed.");
+            {
+                // Deterministic for this revision: retrying costs 2.4 s and
+                // fails again. Record it so the thread is reconsidered only
+                // once Amp actually changes it.
+                failed++;
+                current[thread.Id] = AmpScanState.Revision(thread);
+                continue;
+            }
             allUsage.AddRange(usage);
+            current[thread.Id] = AmpScanState.Revision(thread);
+            exported++;
+        }
+
+        // Only threads still in the listing are carried forward, so the stored
+        // state cannot grow without bound as threads age out. Published before
+        // the failure check below so even a scan that ends up reporting failure
+        // hands back the progress it did make.
+        _position = AmpScanState.Serialize(current);
+
+        if (exported == 0 && unchanged == 0 && failed > 0)
+        {
+            // Every thread we actually attempted failed and none were already
+            // covered: nothing was learned, which is a real failure worth
+            // surfacing. A partial failure is not — that is the whole point of
+            // the per-thread handling above.
+            throw new TokenScanException($"Amp could not export any of {failed} thread(s).");
         }
 
         foreach (AmpThreadUsage usage in allUsage.OrderBy(item => item.OccurredAt))
@@ -104,6 +214,80 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource
                 ProjectIdentity.Unknown);
         }
     }
+}
+
+/// <summary>
+/// Per-thread export watermark, persisted opaquely in
+/// <see cref="ScannerCursor.Position"/>: thread id → the <c>updated</c> stamp
+/// at which we last processed it. A thread still sitting at its recorded
+/// revision is skipped without spawning the CLI.
+/// </summary>
+internal sealed class AmpScanState
+{
+    private const string LegacyPosition = "incremental";
+
+    /// <summary>
+    /// Recorded in place of a revision for a thread whose export failed for a
+    /// reason that may not recur. It never compares equal to a real revision,
+    /// so the thread is always re-attempted, and its presence keeps the listing
+    /// paging far enough to reach it.
+    /// </summary>
+    public const string RetryMarker = "!retry";
+
+    private static readonly JsonSerializerOptions SerializerOptions =
+        new JsonSerializerOptions(JsonSerializerDefaults.Web);
+
+    private readonly Dictionary<string, string> _threads;
+
+    private AmpScanState(Dictionary<string, string> threads) => _threads = threads;
+
+    /// <summary>
+    /// A thread with no <c>updated</c> stamp has no revision to compare, so it
+    /// is never considered unchanged — correctness beats the saved subprocess.
+    /// </summary>
+    public bool IsUnchanged(AmpThreadSummary thread) =>
+        thread.UpdatedAt.HasValue
+        && _threads.TryGetValue(thread.Id, out string? recorded)
+        && string.Equals(recorded, Revision(thread), StringComparison.Ordinal);
+
+    /// <summary>True while some thread is recorded as owing a retry.</summary>
+    public bool HasPendingRetries =>
+        _threads.Values.Any(value => string.Equals(value, RetryMarker, StringComparison.Ordinal));
+
+    public bool TryGetRecorded(string threadId, out string? revision) =>
+        _threads.TryGetValue(threadId, out revision);
+
+    public static string Revision(AmpThreadSummary thread) =>
+        thread.UpdatedAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? string.Empty;
+
+    /// <summary>
+    /// Unparseable or legacy state ("incremental", written before per-thread
+    /// tracking existed) degrades to an empty watermark: one full rescan, then
+    /// the state is written in the new shape.
+    /// </summary>
+    public static AmpScanState Parse(string? position)
+    {
+        if (string.IsNullOrWhiteSpace(position)
+            || string.Equals(position, LegacyPosition, StringComparison.Ordinal))
+        {
+            return new AmpScanState([]);
+        }
+        try
+        {
+            Dictionary<string, string>? threads =
+                JsonSerializer.Deserialize<Dictionary<string, string>>(position, SerializerOptions);
+            return new AmpScanState(threads is null
+                ? []
+                : new Dictionary<string, string>(threads, StringComparer.Ordinal));
+        }
+        catch (JsonException)
+        {
+            return new AmpScanState([]);
+        }
+    }
+
+    public static string Serialize(Dictionary<string, string> threads) =>
+        JsonSerializer.Serialize(threads, SerializerOptions);
 }
 
 internal sealed record AmpThreadSummary(string Id, DateTimeOffset? UpdatedAt);

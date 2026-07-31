@@ -44,6 +44,26 @@ public interface ITokenUsageSource
 }
 
 /// <summary>
+/// Optional capability for a source whose per-scan work is expensive enough
+/// that it must remember what it already did — <see cref="ScannerCursor.LastObservedAt"/>
+/// alone cannot express "thread X was already exported at revision Y".
+///
+/// The scan loop reads <see cref="Position"/> once the enumeration has finished
+/// and persists it in <see cref="ScannerCursor.Position"/>, handing it back on
+/// the next scan. The value is opaque to the loop; only the source interprets
+/// it. Sources that need no such state simply do not implement this.
+/// </summary>
+public interface IScanPositionSource
+{
+    /// <summary>
+    /// Scan state to persist, or null to leave the stored position untouched.
+    /// Only meaningful after <see cref="ITokenUsageSource.ReadAsync"/> has been
+    /// enumerated to completion.
+    /// </summary>
+    string? Position { get; }
+}
+
+/// <summary>
 /// Optional provider capability: an inventory of redeemable rate-limit reset
 /// credits ("N resets left, expiring at X"). Implemented by adapters whose
 /// provider grants such credits; fetches are best-effort and must never fail

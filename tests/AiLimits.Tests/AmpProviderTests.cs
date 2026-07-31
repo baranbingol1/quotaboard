@@ -79,30 +79,259 @@ public sealed class AmpProviderTests
     }
 
     [Fact]
-    public async Task Thread_source_does_not_emit_or_advance_when_any_selected_export_fails()
+    public async Task One_unreadable_thread_does_not_discard_the_threads_that_did_export()
     {
-        var runner = new SequenceRunner(
-            """[{"id":"T-new","updated":"2026-07-19T12:00:00Z"},{"id":"T-old","updated":"2026-07-18T12:00:00Z"}]""",
-            """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}""",
-            "not-json");
+        // Regression: an unparseable export used to throw, so the scan loop
+        // caught it and never saved the cursor — the whole scan's work was
+        // discarded and repeated on the next refresh, forever.
+        var runner = new ScriptedRunner(
+            ScriptedReply.Ok("""[{"id":"T-new","updated":"2026-07-19T12:00:00Z"},{"id":"T-old","updated":"2026-07-18T12:00:00Z"}]"""),
+            ScriptedReply.Ok("""{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}"""),
+            ScriptedReply.Ok("not-json"));
         var source = new AmpThreadTokenSource(runner, () => "amp-test");
-        var account = new ProviderAccount(
-            new AccountKey(new ProviderId("amp"), "one"),
-            "Amp",
-            null,
-            "fixture",
-            1,
-            true);
-        var emitted = new List<TokenUsageEvent>();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-        {
-            await foreach (TokenUsageEvent item in source.ReadAsync(account, null, default))
-                emitted.Add(item);
-        });
+        List<TokenUsageEvent> emitted = await DrainAsync(source, cursor: null);
+
+        TokenUsageEvent kept = Assert.Single(emitted);
+        Assert.Equal("amp:T-new:1", kept.SourceEventId);
+        Assert.Equal(3, runner.CallCount);
+        Assert.NotNull(((IScanPositionSource)source).Position);
+    }
+
+    [Fact]
+    public async Task An_oversized_export_is_skipped_rather_than_failing_the_scan()
+    {
+        // A real 6.25 MB transcript on this machine tripped the process
+        // runner's capture cap. Truncation is a property of that one thread,
+        // not of the source.
+        var runner = new ScriptedRunner(
+            ScriptedReply.Ok("""[{"id":"T-huge","updated":"2026-07-19T12:00:00Z"},{"id":"T-small","updated":"2026-07-19T11:00:00Z"}]"""),
+            ScriptedReply.Capped("{\"messages\":[ truncated"),
+            ScriptedReply.Ok("""{"messages":[{"messageId":9,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T11:00:00Z","outputTokens":5}}]}"""));
+        var source = new AmpThreadTokenSource(runner, () => "amp-test");
+
+        List<TokenUsageEvent> emitted = await DrainAsync(source, cursor: null);
+
+        TokenUsageEvent kept = Assert.Single(emitted);
+        Assert.Equal("amp:T-small:9", kept.SourceEventId);
+    }
+
+    [Fact]
+    public async Task A_scan_where_every_export_fails_is_reported_as_a_scan_failure()
+    {
+        var runner = new ScriptedRunner(
+            ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-19T12:00:00Z"}]"""),
+            ScriptedReply.Ok("not-json"));
+        var source = new AmpThreadTokenSource(runner, () => "amp-test");
+
+        await Assert.ThrowsAsync<TokenScanException>(() => DrainAsync(source, cursor: null));
+    }
+
+    [Fact]
+    public async Task A_thread_still_at_its_recorded_revision_is_not_exported_again()
+    {
+        const string listing = """[{"id":"T-a","updated":"2026-07-19T12:00:00Z"},{"id":"T-b","updated":"2026-07-18T12:00:00Z"}]""";
+        const string export = """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}""";
+
+        var first = new ScriptedRunner(
+            ScriptedReply.Ok(listing), ScriptedReply.Ok(export), ScriptedReply.Ok(export));
+        var firstSource = new AmpThreadTokenSource(first, () => "amp-test");
+        await DrainAsync(firstSource, cursor: null);
+        string? position = ((IScanPositionSource)firstSource).Position;
+
+        Assert.Equal(3, first.CallCount);
+        Assert.NotNull(position);
+
+        // Same listing, same revisions: the second scan must cost one listing
+        // call and nothing else. This is what takes the steady-state scan from
+        // 35 subprocess launches down to zero.
+        var second = new ScriptedRunner(ScriptedReply.Ok(listing));
+        var secondSource = new AmpThreadTokenSource(second, () => "amp-test");
+        List<TokenUsageEvent> emitted = await DrainAsync(
+            secondSource,
+            new ScannerCursor(secondSource.Id, position, null, null));
 
         Assert.Empty(emitted);
-        Assert.Equal(3, runner.CallCount);
+        Assert.Equal(1, second.CallCount);
+        Assert.Equal("list", second.Calls[0][1]);
+    }
+
+    [Fact]
+    public async Task A_changed_revision_is_exported_again()
+    {
+        const string export = """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}""";
+        var first = new ScriptedRunner(
+            ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-19T12:00:00Z"}]"""),
+            ScriptedReply.Ok(export));
+        var firstSource = new AmpThreadTokenSource(first, () => "amp-test");
+        await DrainAsync(firstSource, cursor: null);
+        string? position = ((IScanPositionSource)firstSource).Position;
+
+        // Same thread id, newer `updated` — Amp appended to the conversation.
+        var second = new ScriptedRunner(
+            ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-20T12:00:00Z"}]"""),
+            ScriptedReply.Ok(export));
+        var secondSource = new AmpThreadTokenSource(second, () => "amp-test");
+        List<TokenUsageEvent> emitted = await DrainAsync(
+            secondSource,
+            new ScannerCursor(secondSource.Id, position, null, null));
+
+        Assert.Single(emitted);
+        Assert.Equal(2, second.CallCount);
+        Assert.Equal("export", second.Calls[1][1]);
+    }
+
+    [Fact]
+    public async Task A_failure_next_to_already_covered_threads_does_not_fail_the_scan()
+    {
+        const string export = """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}""";
+        var first = new ScriptedRunner(
+            ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-19T12:00:00Z"}]"""),
+            ScriptedReply.Ok(export));
+        var firstSource = new AmpThreadTokenSource(first, () => "amp-test");
+        await DrainAsync(firstSource, cursor: null);
+        string? position = ((IScanPositionSource)firstSource).Position;
+
+        // T-a is already covered, T-b is new and unreadable. Nothing exported,
+        // but the scan still knows 1 of 2 threads is accounted for, so it must
+        // not report itself as a total failure — that would cost the cursor.
+        var second = new ScriptedRunner(
+            ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-19T12:00:00Z"},{"id":"T-b","updated":"2026-07-19T13:00:00Z"}]"""),
+            ScriptedReply.Ok("not-json"));
+        var secondSource = new AmpThreadTokenSource(second, () => "amp-test");
+
+        List<TokenUsageEvent> emitted = await DrainAsync(
+            secondSource,
+            new ScannerCursor(secondSource.Id, position, null, null));
+
+        Assert.Empty(emitted);
+        Assert.NotNull(((IScanPositionSource)secondSource).Position);
+    }
+
+    [Fact]
+    public async Task A_thread_outside_the_cutoff_keeps_its_recorded_revision()
+    {
+        // The watermark must cover every listed thread, not just the ones the
+        // cutoff selects; otherwise the next scan cannot recognise a page as
+        // fully covered and pages through the whole listing again.
+        const string export = """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}""";
+        var first = new ScriptedRunner(
+            ScriptedReply.Ok("""[{"id":"T-new","updated":"2026-07-19T12:00:00Z"},{"id":"T-ancient","updated":"2026-01-01T00:00:00Z"}]"""),
+            ScriptedReply.Ok(export),
+            ScriptedReply.Ok(export));
+        var firstSource = new AmpThreadTokenSource(first, () => "amp-test");
+        await DrainAsync(firstSource, cursor: null);
+        string? position = ((IScanPositionSource)firstSource).Position;
+
+        // Now rescan with a cutoff that excludes T-ancient entirely.
+        var second = new ScriptedRunner(
+            ScriptedReply.Ok("""[{"id":"T-new","updated":"2026-07-19T12:00:00Z"},{"id":"T-ancient","updated":"2026-01-01T00:00:00Z"}]"""));
+        var secondSource = new AmpThreadTokenSource(second, () => "amp-test");
+        await DrainAsync(
+            secondSource,
+            new ScannerCursor(secondSource.Id, position, new DateTimeOffset(2026, 7, 19, 0, 0, 0, TimeSpan.Zero), null));
+
+        Assert.Contains("T-ancient", ((IScanPositionSource)secondSource).Position);
+        Assert.Equal(1, second.CallCount);
+    }
+
+    [Fact]
+    public async Task A_failed_process_is_retried_next_scan_rather_than_written_off()
+    {
+        // A CLI that exits non-zero prints a diagnostic, not JSON, so it also
+        // fails to parse. It must still be treated as transient — recording it
+        // would skip that thread until Amp happened to touch it again.
+        var first = new ScriptedRunner(
+            ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-19T12:00:00Z"}]"""),
+            new ScriptedReply("amp: network unreachable", 1, false));
+        var firstSource = new AmpThreadTokenSource(first, () => "amp-test");
+
+        await Assert.ThrowsAsync<TokenScanException>(() => DrainAsync(firstSource, cursor: null));
+        string? position = ((IScanPositionSource)firstSource).Position;
+        // Recorded as owing a retry, never as a revision: the marker must not
+        // compare equal to any real `updated`, or the thread would be skipped.
+        Assert.Contains("T-a", position);
+        Assert.Contains(AmpScanState.RetryMarker, position);
+        Assert.DoesNotContain("2026-07-19T12:00:00", position);
+
+        var second = new ScriptedRunner(
+            ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-19T12:00:00Z"}]"""),
+            ScriptedReply.Ok("""{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}"""));
+        var secondSource = new AmpThreadTokenSource(second, () => "amp-test");
+        List<TokenUsageEvent> emitted = await DrainAsync(
+            secondSource,
+            new ScannerCursor(secondSource.Id, position, null, null));
+
+        Assert.Single(emitted);
+        Assert.Equal("export", second.Calls[1][1]);
+    }
+
+    [Fact]
+    public async Task An_outstanding_retry_keeps_the_listing_paging_past_a_covered_page()
+    {
+        // The "page fully covered" shortcut would otherwise stop at page one and
+        // never offer the failed thread again, losing its usage until Amp
+        // happened to touch it.
+        string fullPage = "[" + string.Join(",", Enumerable.Range(0, 20).Select(i =>
+            $$"""{"id":"T-{{i}}","updated":"2026-07-19T12:00:00Z"}""")) + "]";
+        const string export = """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}""";
+
+        // First scan: every thread on page one exports, the one on page two
+        // fails at the process level.
+        var replies = new List<ScriptedReply> { ScriptedReply.Ok(fullPage) };
+        replies.Add(ScriptedReply.Ok("""[{"id":"T-late","updated":"2026-07-19T11:00:00Z"}]"""));
+        for (int i = 0; i < 20; i++) replies.Add(ScriptedReply.Ok(export));
+        replies.Add(new ScriptedReply("amp: transient", 1, false));
+
+        var first = new ScriptedRunner(replies.ToArray());
+        var firstSource = new AmpThreadTokenSource(first, () => "amp-test");
+        await DrainAsync(firstSource, cursor: null);
+        string? position = ((IScanPositionSource)firstSource).Position;
+        Assert.Contains("T-late", position);
+
+        // Second scan: page one is entirely covered, but T-late still owes a
+        // retry, so the listing must go on to page two and re-attempt it.
+        var second = new ScriptedRunner(
+            ScriptedReply.Ok(fullPage),
+            ScriptedReply.Ok("""[{"id":"T-late","updated":"2026-07-19T11:00:00Z"}]"""),
+            ScriptedReply.Ok(export));
+        var secondSource = new AmpThreadTokenSource(second, () => "amp-test");
+        List<TokenUsageEvent> emitted = await DrainAsync(
+            secondSource,
+            new ScannerCursor(secondSource.Id, position, null, null));
+
+        Assert.Single(emitted);
+        Assert.Equal(3, second.CallCount);
+        Assert.Equal("export", second.Calls[2][1]);
+        Assert.Equal("T-late", second.Calls[2][2]);
+    }
+
+    [Fact]
+    public async Task A_legacy_incremental_position_falls_back_to_a_full_rescan()
+    {
+        // Cursors written before per-thread tracking hold the literal string
+        // "incremental"; it must not be read as a watermark.
+        var runner = new ScriptedRunner(
+            ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-19T12:00:00Z"}]"""),
+            ScriptedReply.Ok("""{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}"""));
+        var source = new AmpThreadTokenSource(runner, () => "amp-test");
+
+        List<TokenUsageEvent> emitted = await DrainAsync(
+            source,
+            new ScannerCursor(source.Id, "incremental", null, null));
+
+        Assert.Single(emitted);
+        Assert.Equal(2, runner.CallCount);
+    }
+
+    private static async Task<List<TokenUsageEvent>> DrainAsync(AmpThreadTokenSource source, ScannerCursor? cursor)
+    {
+        var account = new ProviderAccount(
+            new AccountKey(new ProviderId("amp"), "one"), "Amp", null, "fixture", 1, true);
+        var emitted = new List<TokenUsageEvent>();
+        await foreach (TokenUsageEvent item in source.ReadAsync(account, cursor, default))
+            emitted.Add(item);
+        return emitted;
     }
 
     [Fact]
@@ -215,6 +444,40 @@ public sealed class AmpProviderTests
                 Assert.Equal(MeterUnit.Usd, balance.Unit);
             });
         Assert.Equal("dev@example.com", snapshot.Extensions["email"].GetString());
+    }
+
+    private sealed record ScriptedReply(string Output, int ExitCode, bool Truncated)
+    {
+        public static ScriptedReply Ok(string output) => new(output, 0, false);
+
+        public static ScriptedReply Capped(string output) => new(output, 0, true);
+    }
+
+    /// <summary>
+    /// Like <see cref="SequenceRunner"/> but able to reproduce a capture-capped
+    /// (truncated) or non-zero-exit reply, which is what the per-thread failure
+    /// handling turns on. Only the four-argument overload is implemented; the
+    /// interface's default routes the capped call here.
+    /// </summary>
+    private sealed class ScriptedRunner(params ScriptedReply[] replies) : IProcessRunner
+    {
+        private int index;
+        public int CallCount => index;
+        public List<string[]> Calls { get; } = [];
+
+        public Task<ProcessResult> RunAsync(
+            string executable,
+            IReadOnlyList<string> arguments,
+            TimeSpan timeout,
+            CancellationToken cancellationToken)
+        {
+            Calls.Add(arguments.ToArray());
+            Assert.True(index < replies.Length,
+                $"Unexpected process call #{index + 1}: {string.Join(' ', arguments)}");
+            ScriptedReply reply = replies[index++];
+            return Task.FromResult(new ProcessResult(
+                reply.ExitCode, reply.Output, string.Empty, TimeSpan.Zero, reply.Truncated));
+        }
     }
 
     private sealed class SequenceRunner(params string[] outputs) : IProcessRunner
