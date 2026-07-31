@@ -25,10 +25,50 @@ files left on the build agent, so upload corruption or tampering is caught.
 For every archive: the .sha256 sidecar must match, the full archive must pass
 publish-layout and architecture validation, every shipped EXE/DLL must carry
 an Authenticode signature, and (when -Repository is set) build-provenance
-attestation must verify. SPDX SBOM assets must exist for every ZIP, parse as
-valid SPDX JSON with a non-empty packages array, and mention QuotaBoard.exe.
-Any mismatch fails the run.
+attestation must verify.
+
+SBOMs get the same treatment as archives, not a weaker structural one: an
+SPDX asset must exist for every ZIP, match its own .sha256 sidecar, verify
+against its build-provenance attestation, and parse as SPDX JSON with a
+non-empty packages array naming QuotaBoard.exe. Structure alone would let a
+stale or substituted document through, because any well-formed SPDX file
+satisfies it. Any mismatch fails the run.
 #>
+
+# Both archives and SBOMs ship with a sidecar holding "<sha256>  <filename>".
+function Assert-Sha256Sidecar {
+    param([Parameter(Mandatory)][System.IO.FileInfo]$Asset)
+
+    $sidecarPath = "$($Asset.FullName).sha256"
+    if (-not (Test-Path -LiteralPath $sidecarPath)) {
+        throw "Missing sha256 sidecar for $($Asset.Name)"
+    }
+    $expected = ((Get-Content -LiteralPath $sidecarPath -Raw).Trim() -split '\s+', 2)[0].ToLowerInvariant()
+    $actual = (Get-FileHash -LiteralPath $Asset.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actual -ne $expected) {
+        throw "SHA256 mismatch for $($Asset.Name): sidecar says $expected, download hashes to $actual"
+    }
+}
+
+# `gh attestation verify` checks the in-toto statement against the repository's
+# signing origin; a non-zero exit means the asset's provenance cannot be
+# verified (missing, tampered, or from a different repo).
+function Assert-Attestation {
+    param(
+        [Parameter(Mandatory)][System.IO.FileInfo]$Asset,
+        [string]$Repo
+    )
+
+    if (-not $Repo) {
+        return
+    }
+    Write-Host "Verifying attestation for $($Asset.Name)..."
+    & gh attestation verify $Asset.FullName --repo $Repo 2>&1 | ForEach-Object { Write-Host $_ }
+    if ($LASTEXITCODE -ne 0) {
+        throw "$($Asset.Name): attestation verification failed (exit $LASTEXITCODE)"
+    }
+    Write-Host "$($Asset.Name): attestation ok"
+}
 
 $resolvedDistDir = [System.IO.Path]::GetFullPath($DistDir)
 if (-not (Test-Path -LiteralPath $resolvedDistDir)) {
@@ -43,16 +83,7 @@ if (-not $zips) {
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 foreach ($zip in $zips) {
-    $sidecarPath = "$($zip.FullName).sha256"
-    if (-not (Test-Path -LiteralPath $sidecarPath)) {
-        throw "Missing sha256 sidecar for $($zip.Name)"
-    }
-
-    $expected = ((Get-Content -LiteralPath $sidecarPath -Raw).Trim() -split '\s+', 2)[0].ToLowerInvariant()
-    $actual = (Get-FileHash -LiteralPath $zip.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($actual -ne $expected) {
-        throw "SHA256 mismatch for $($zip.Name): sidecar says $expected, download hashes to $actual"
-    }
+    Assert-Sha256Sidecar -Asset $zip
 
     if ($zip.Name -notmatch '(?i)-win-(x64|arm64)\.zip$') {
         throw "$($zip.Name): cannot infer architecture; expected a -win-x64.zip or -win-arm64.zip suffix"
@@ -88,19 +119,7 @@ foreach ($zip in $zips) {
 
     Write-Host "$($zip.Name): sha256 ok, $entryCount entries, signature ok"
 
-    # Verify the build-provenance attestation that the build job created for
-    # this archive. `gh attestation verify` checks the in-toto statement
-    # against the repository's signing origin; a non-zero exit means the
-    # archive's provenance cannot be verified (missing, tampered, or from a
-    # different repo).
-    if ($Repository) {
-        Write-Host "Verifying attestation for $($zip.Name)..."
-        & gh attestation verify $zip.FullName --repo $Repository 2>&1 | ForEach-Object { Write-Host $_ }
-        if ($LASTEXITCODE -ne 0) {
-            throw "$($zip.Name): attestation verification failed (exit $LASTEXITCODE)"
-        }
-        Write-Host "$($zip.Name): attestation ok"
-    }
+    Assert-Attestation -Asset $zip -Repo $Repository
 }
 
 # --- SBOM validation -------------------------------------------------------
@@ -126,6 +145,11 @@ foreach ($zipBase in $zipBases) {
 }
 
 foreach ($sbom in $sboms) {
+    # Hash and provenance first: without them the structural checks below only
+    # prove the document is well-formed SPDX, not that it came from this build.
+    Assert-Sha256Sidecar -Asset $sbom
+    Assert-Attestation -Asset $sbom -Repo $Repository
+
     $raw = Get-Content -LiteralPath $sbom.FullName -Raw
     try {
         $doc = $raw | ConvertFrom-Json -ErrorAction Stop
@@ -156,7 +180,7 @@ foreach ($sbom in $sboms) {
         throw "$($sbom.Name) does not list QuotaBoard/QuotaBoard.exe in its packages"
     }
 
-    Write-Host "$($sbom.Name): SPDX $($doc.spdxVersion), $($packages.Count) packages, QuotaBoard.exe present"
+    Write-Host "$($sbom.Name): sha256 ok, SPDX $($doc.spdxVersion), $($packages.Count) packages, QuotaBoard.exe present"
 }
 
 Write-Host "All release assets verified."

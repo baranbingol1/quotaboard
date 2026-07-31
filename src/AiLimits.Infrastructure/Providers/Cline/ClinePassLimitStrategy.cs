@@ -53,7 +53,33 @@ internal sealed class ClinePassLimitStrategy(
     public Task<FetchResult> FetchAsync(ProviderAccount account, CancellationToken cancellationToken) =>
         sessionStore is null
             ? FetchCoreAsync(account, cancellationToken)
-            : _refreshLock.RunAsync(() => FetchCoreAsync(account, cancellationToken), cancellationToken);
+            : FetchSerializedAsync(account, cancellationToken);
+
+    /// <summary>
+    /// The store stages a save under fixed keys and tolerates exactly one
+    /// writer, so a fetch that does not own the lock must not run: two
+    /// unserialized writers can promote a mixed access/expiry/refresh triple
+    /// into the live keys, or leave the live keys holding a refresh token the
+    /// other writer already rotated away. Losing one refresh cycle is
+    /// recoverable; a corrupted session costs the user a CLI re-login.
+    /// </summary>
+    private async Task<FetchResult> FetchSerializedAsync(ProviderAccount account, CancellationToken cancellationToken)
+    {
+        long started = Stopwatch.GetTimestamp();
+        try
+        {
+            return await _refreshLock.RunAsync(
+                () => FetchCoreAsync(account, cancellationToken), cancellationToken).ConfigureAwait(false);
+        }
+        catch (ClineRefreshLockException ex)
+        {
+            // TemporarilyUnavailable renders as retrying rather than as a
+            // sign-in prompt, and TryNextStrategy still lets the local-history
+            // source fill the card this cycle.
+            return FetchResult.Failure(FetchFailureKind.TemporarilyUnavailable, ex.Message,
+                FallbackPolicy.TryNextStrategy, Id, Stopwatch.GetElapsedTime(started));
+        }
+    }
 
     private async Task<FetchResult> FetchCoreAsync(ProviderAccount account, CancellationToken cancellationToken)
     {
@@ -286,11 +312,19 @@ internal sealed class ClinePassLimitStrategy(
 }
 
 /// <summary>
+/// The cross-process refresh lock could not be taken. <see cref="ClineSessionStore"/>
+/// stages a save under fixed keys and tolerates exactly one writer, so the
+/// caller has to fail the fetch instead of proceeding without ownership.
+/// </summary>
+internal sealed class ClineRefreshLockException(string message, Exception? innerException = null)
+    : Exception(message, innerException);
+
+/// <summary>
 /// Serializes the store load, refresh-token exchange, and save across app
 /// processes. A named <see cref="Mutex"/> is thread-affine, so the complete
 /// asynchronous operation runs synchronously on the worker thread that owns
-/// it. Timeout or lock setup failure deliberately degrades to the old unlocked
-/// behavior rather than hanging or failing a provider fetch.
+/// it. Failing to take the lock throws <see cref="ClineRefreshLockException"/>;
+/// it never runs the operation unowned.
 /// </summary>
 internal interface IClineRefreshLock
 {
@@ -299,10 +333,21 @@ internal interface IClineRefreshLock
 
 internal sealed class ClineNamedRefreshLock : IClineRefreshLock
 {
-    // FetchCore can make one 15-second usage call followed by one 15-second
-    // refresh before saving. Keep ordinary network latency inside the lock;
-    // the timeout remains bounded and only exceptional contention falls back.
-    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(35);
+    // Worst case inside the lock is a usage call, a 401-triggered refresh and
+    // a usage retry — three 15-second requests — plus the secret-store round
+    // trips around them. The wait has to outlast that: contention now fails
+    // the fetch instead of bypassing the lock, so timing out while the owner
+    // is merely slow would throw away a refresh for no reason.
+    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(60);
+
+    private const string GlobalPrefix = @"Global\";
+    private const string LocalPrefix = @"Local\";
+
+    internal const string ContendedMessage =
+        "Another QuotaBoard refresh is using the Cline session; retrying shortly.";
+
+    internal const string UnavailableMessage =
+        "The Cline session lock is unavailable on this machine; retrying shortly.";
 
     public static ClineNamedRefreshLock Instance { get; } = new(CreateName(), DefaultTimeout);
 
@@ -329,13 +374,12 @@ internal sealed class ClineNamedRefreshLock : IClineRefreshLock
     private T Run<T>(Func<Task<T>> operation, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        Mutex? mutex = null;
+        Mutex mutex = OpenMutex();
         bool acquired = false;
         try
         {
             try
             {
-                mutex = new Mutex(initiallyOwned: false, _name);
                 int signaled = WaitHandle.WaitAny(
                     [mutex, cancellationToken.WaitHandle],
                     _timeout);
@@ -347,27 +391,61 @@ internal sealed class ClineNamedRefreshLock : IClineRefreshLock
             }
             catch (AbandonedMutexException)
             {
+                // The previous owner died holding the lock, so we own it now.
+                // Whatever staging it left behind is reconciled by LoadAsync's
+                // commit-marker recovery.
                 acquired = true;
             }
-            catch (Exception ex) when (ex is UnauthorizedAccessException
-                or IOException
-                or WaitHandleCannotBeOpenedException)
-            {
-                // Best effort: fetch without serialization if the OS refuses
-                // to create or open the cross-process lock.
-            }
 
+            if (!acquired)
+            {
+                throw new ClineRefreshLockException(ContendedMessage);
+            }
             return operation().GetAwaiter().GetResult();
         }
         finally
         {
             if (acquired)
             {
-                mutex!.ReleaseMutex();
+                mutex.ReleaseMutex();
             }
-            mutex?.Dispose();
+            mutex.Dispose();
         }
     }
+
+    /// <summary>
+    /// A <c>Global\</c> name also serializes across terminal-server sessions,
+    /// but creating one needs SeCreateGlobalPrivilege, which a locked-down
+    /// machine can withhold. Session-local serialization still covers every
+    /// instance such a user can launch, so fall back to it rather than lose
+    /// the provider outright.
+    /// </summary>
+    private Mutex OpenMutex()
+    {
+        try
+        {
+            return new Mutex(initiallyOwned: false, _name);
+        }
+        catch (Exception ex) when (IsLockSetupFailure(ex))
+        {
+            if (!_name.StartsWith(GlobalPrefix, StringComparison.Ordinal))
+            {
+                throw new ClineRefreshLockException(UnavailableMessage, ex);
+            }
+            try
+            {
+                return new Mutex(initiallyOwned: false,
+                    string.Concat(LocalPrefix, _name.AsSpan(GlobalPrefix.Length)));
+            }
+            catch (Exception fallbackFailure) when (IsLockSetupFailure(fallbackFailure))
+            {
+                throw new ClineRefreshLockException(UnavailableMessage, fallbackFailure);
+            }
+        }
+    }
+
+    private static bool IsLockSetupFailure(Exception ex) =>
+        ex is UnauthorizedAccessException or IOException or WaitHandleCannotBeOpenedException;
 
     private static string CreateName()
     {

@@ -217,8 +217,14 @@ jobs:
           if (-not (Test-Path $manifest)) { throw "SBOM was not generated at $manifest" }
           # Ship the SBOM as its own release asset, not inside the zip: it
           # describes the zip's contents and should be verifiable separately.
+          # "Separately" still has to mean "verifiably": the SBOM gets the same
+          # sha256 sidecar as the archive and is attested alongside it below,
+          # so a stale or substituted SPDX document cannot pass verification.
           New-Item -ItemType Directory -Force dist | Out-Null
-          Move-Item $manifest "dist\QuotaBoard-${{ steps.version.outputs.version }}-win-${{ matrix.arch }}.sbom.spdx.json"
+          $sbomName = "QuotaBoard-${{ steps.version.outputs.version }}-win-${{ matrix.arch }}.sbom.spdx.json"
+          Move-Item $manifest "dist\$sbomName"
+          $sbomHash = (Get-FileHash "dist\$sbomName" -Algorithm SHA256).Hash.ToLower()
+          "$sbomHash  $sbomName" | Out-File "dist\$sbomName.sha256" -Encoding ascii
           Remove-Item (Join-Path $env:PUBLISH_DIR '_manifest') -Recurse -Force
 
       - name: Package
@@ -233,10 +239,15 @@ jobs:
           "$hash  $name.zip" | Out-File "dist\$name.zip.sha256" -Encoding ascii
           Write-Host "$name.zip  $hash"
 
+      # The SBOM is a subject too, not just the archive: attesting only the zip
+      # would leave the SBOM as the one asset with no cryptographic tie to the
+      # build that produced it.
       - name: Attest build provenance
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
-          subject-path: dist/*.zip
+          subject-path: |
+            dist/*.zip
+            dist/*.spdx.json
 
       - name: Upload package
         uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
@@ -307,7 +318,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
           gh release download $env:TAG --dir dist `
-            --pattern '*.zip' --pattern '*.zip.sha256' --pattern '*.spdx.json'
+            --pattern '*.zip' --pattern '*.sha256' --pattern '*.spdx.json'
 
       - name: Verify hashes, signatures, attestation, and SBOM
         shell: pwsh

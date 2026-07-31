@@ -159,8 +159,24 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
 
     /// <summary>
     /// Moves a session left behind by an older build's plaintext
-    /// <c>cline-session.json</c> into the secret store, then deletes the file.
-    /// Runs at most once per instance, and is a no-op once the file is gone.
+    /// <c>cline-session.json</c> into the secret store, then deletes it. Runs
+    /// at most once per instance, and is a no-op once the files are gone.
+    ///
+    /// <para>
+    /// Older builds wrote a sibling <c>.tmp</c> and renamed it over the real
+    /// path, so a crash mid-write can leave either file — or only the
+    /// <c>.tmp</c>, when the real path had never been written — holding a
+    /// complete token pair. Both are candidates, and both have to end up gone.
+    /// </para>
+    ///
+    /// <para>
+    /// A candidate that cannot be parsed is deleted rather than kept. It holds
+    /// no session anyone can recover, but it does hold credential material in
+    /// plaintext under the user's profile, and every later run reaches the same
+    /// verdict — so keeping it only means keeping tokens at rest forever. That
+    /// is the opposite trade from a vault that is merely unavailable, where the
+    /// file is still the only copy of a usable session and is kept for retry.
+    /// </para>
     /// </summary>
     private async Task MigrateLegacyCacheAsync(CancellationToken cancellationToken)
     {
@@ -169,20 +185,26 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
             return;
         }
         _legacyMigrationAttempted = true;
+        string tempPath = legacyCachePath + ".tmp";
         try
         {
-            if (!File.Exists(legacyCachePath))
+            ClineSession? session = null;
+            bool anyPresent = false;
+            foreach (string path in new[] { legacyCachePath, tempPath })
+            {
+                if (!File.Exists(path))
+                {
+                    continue;
+                }
+                anyPresent = true;
+                session ??= TryReadLegacyFile(path);
+            }
+            if (!anyPresent)
             {
                 return;
             }
-            if (ReadLegacyFile(legacyCachePath) is not { } session)
-            {
-                // Unparseable: there is nothing to migrate, so there is no
-                // safe point at which deleting the file loses usable tokens.
-                // Keep it rather than destroy data we could not read.
-                return;
-            }
-            if (!await TrySaveAsync(session, cancellationToken).ConfigureAwait(false))
+            if (session is not null &&
+                !await TrySaveAsync(session, cancellationToken).ConfigureAwait(false))
             {
                 // The vault is unavailable right now; keep the plaintext copy
                 // and retry on the next load instead of deleting the only
@@ -191,9 +213,7 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
                 return;
             }
             File.Delete(legacyCachePath);
-            // Older builds wrote through a sibling temp file; a crash between
-            // write and rename could have left one holding the same tokens.
-            File.Delete(legacyCachePath + ".tmp");
+            File.Delete(tempPath);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -202,6 +222,32 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
         }
         catch (Exception ex) when (IsRecoverable(ex))
         {
+            // A locked or unreadable file, or a vault fault. The migration is
+            // idempotent — re-reading and re-saving a candidate that is still
+            // there costs nothing — so let the next load retry it rather than
+            // latching a half-finished cleanup.
+            _legacyMigrationAttempted = false;
+        }
+    }
+
+    /// <summary>
+    /// Reads a legacy candidate, returning null when the file is present but
+    /// holds no usable session. Genuine I/O faults propagate so the caller can
+    /// retry instead of deleting a file it never managed to read.
+    /// </summary>
+    private static ClineSession? TryReadLegacyFile(string path)
+    {
+        try
+        {
+            return ReadLegacyFile(path);
+        }
+        catch (JsonException)
+        {
+            // Truncated or corrupt. The old writer emitted accessToken and
+            // refreshToken before expiresAt, so a truncated file can still
+            // hold both tokens intact — which is exactly why it must not stay
+            // on disk.
+            return null;
         }
     }
 

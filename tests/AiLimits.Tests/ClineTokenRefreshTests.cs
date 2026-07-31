@@ -151,8 +151,11 @@ public sealed class ClineTokenRefreshTests : IDisposable
     }
 
     [Fact]
-    public async Task Named_lock_timeout_runs_the_fetch_unlocked()
+    public async Task Named_lock_contention_fails_instead_of_running_the_operation_unlocked()
     {
+        // The store's staging keys tolerate one writer. Running the operation
+        // without the mutex is what lets two processes promote a mixed
+        // access/expiry/refresh triple into the live keys.
         string name = $"Local\\QuotaBoard.Tests.ClineRefresh.{Guid.NewGuid():N}";
         using var acquired = new ManualResetEventSlim();
         using var release = new ManualResetEventSlim();
@@ -169,16 +172,52 @@ public sealed class ClineTokenRefreshTests : IDisposable
         try
         {
             var refreshLock = new ClineNamedRefreshLock(name, TimeSpan.Zero);
+            bool ran = false;
 
-            int result = await refreshLock.RunAsync(() => Task.FromResult(42), default);
+            await Assert.ThrowsAsync<ClineRefreshLockException>(() => refreshLock.RunAsync(
+                () =>
+                {
+                    ran = true;
+                    return Task.FromResult(42);
+                },
+                default));
 
-            Assert.Equal(42, result);
+            Assert.False(ran);
         }
         finally
         {
             release.Set();
             await holder;
         }
+    }
+
+    [Fact]
+    public async Task A_contended_lock_reports_temporarily_unavailable_and_leaves_the_store_alone()
+    {
+        var handler = new RoutedHandler(_ => Json("{}"));
+        var strategy = new ClinePassLimitStrategy(new HttpClient(handler), new FixedClock(),
+            () => new ClineCredential("stale-token", "Cline CLI account",
+                ExpiresAt: Now - TimeSpan.FromHours(1), RefreshToken: "stored-refresh",
+                IsWorkOsSession: true),
+            Store(),
+            new ContendedRefreshLock());
+
+        FetchResult result = await strategy.FetchAsync(Account(), default);
+
+        Assert.False(result.IsSuccess);
+        // Retryable, and never rendered as a sign-in prompt: the credential is
+        // fine, the lock simply was not free.
+        Assert.Equal(FetchFailureKind.TemporarilyUnavailable, result.FailureKind);
+        Assert.Equal(FallbackPolicy.TryNextStrategy, result.FallbackPolicy);
+        // Nothing in the protected load/refresh/save path may have run.
+        Assert.Empty(handler.Requests);
+        Assert.Null(await Store().LoadAsync(default));
+    }
+
+    private sealed class ContendedRefreshLock : IClineRefreshLock
+    {
+        public Task<T> RunAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken) =>
+            throw new ClineRefreshLockException("contended");
     }
 
     [Fact]
@@ -295,6 +334,76 @@ public sealed class ClineTokenRefreshTests : IDisposable
         // The tokens must now only exist in the vault.
         Assert.Equal("file-token", await _secrets.GetAsync("cline", "session.access-token", default));
         Assert.Equal("file-refresh", await _secrets.GetAsync("cline", "session.refresh-token", default));
+    }
+
+    [Fact]
+    public async Task A_truncated_legacy_cache_is_deleted_rather_than_left_in_plaintext()
+    {
+        Directory.CreateDirectory(_cacheDirectory);
+        // A crash mid-write. The old writer emitted accessToken and
+        // refreshToken before expiresAt, so both tokens are intact even though
+        // the document no longer parses — keeping the file would keep a usable
+        // refresh token in plaintext forever, since every later run reaches
+        // this same verdict.
+        await File.WriteAllTextAsync(LegacyCachePath,
+            """{"accessToken":"file-token","refreshToken":"file-refresh","expiresAt":"2026-07-2""");
+
+        ClineSession? migrated = await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(default);
+
+        Assert.Null(migrated);
+        Assert.False(File.Exists(LegacyCachePath));
+    }
+
+    [Fact]
+    public async Task A_legacy_cache_missing_its_expiry_is_deleted_rather_than_left_in_plaintext()
+    {
+        Directory.CreateDirectory(_cacheDirectory);
+        // Parses fine, fails validation on a field that is not the tokens.
+        await File.WriteAllTextAsync(LegacyCachePath, """
+            {"accessToken":"file-token","refreshToken":"file-refresh"}
+            """);
+
+        Assert.Null(await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(default));
+        Assert.False(File.Exists(LegacyCachePath));
+    }
+
+    [Fact]
+    public async Task An_orphaned_temp_file_is_migrated_even_when_the_real_path_never_existed()
+    {
+        Directory.CreateDirectory(_cacheDirectory);
+        // The old writer wrote a sibling .tmp and renamed it over the real
+        // path. A crash before the very first rename leaves only the .tmp,
+        // which the "does the real path exist?" check used to skip entirely.
+        await File.WriteAllTextAsync(LegacyCachePath + ".tmp", """
+            {"accessToken":"tmp-token","refreshToken":"tmp-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
+            """);
+
+        ClineSession? migrated = await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(default);
+
+        Assert.NotNull(migrated);
+        Assert.Equal("tmp-token", migrated!.AccessToken);
+        Assert.Equal("tmp-refresh", migrated.RefreshToken);
+        Assert.False(File.Exists(LegacyCachePath + ".tmp"));
+        Assert.Equal("tmp-token", await _secrets.GetAsync("cline", "session.access-token", default));
+    }
+
+    [Fact]
+    public async Task An_unreadable_legacy_cache_keeps_a_readable_sibling_temp_file()
+    {
+        Directory.CreateDirectory(_cacheDirectory);
+        await File.WriteAllTextAsync(LegacyCachePath, "{ this is not json");
+        await File.WriteAllTextAsync(LegacyCachePath + ".tmp", """
+            {"accessToken":"tmp-token","refreshToken":"tmp-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
+            """);
+
+        ClineSession? migrated = await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(default);
+
+        // The corrupt file yields nothing, but the sibling still holds the
+        // session, so the migration completes and both paths go away.
+        Assert.NotNull(migrated);
+        Assert.Equal("tmp-token", migrated!.AccessToken);
+        Assert.False(File.Exists(LegacyCachePath));
+        Assert.False(File.Exists(LegacyCachePath + ".tmp"));
     }
 
     [Fact]

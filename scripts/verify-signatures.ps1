@@ -53,6 +53,12 @@ foreach ($target in $targets) {
     if ($signature.Status -in 'HashMismatch', 'NotSigned') {
         throw "$relative has an invalid Authenticode signature ($($signature.Status)): $($signature.StatusMessage)"
     }
+    # A catalog signature is registered on the machine that installed the
+    # file, not carried inside it, so it does not survive being zipped and
+    # unpacked on the user's machine. Only an embedded signature ships.
+    if ($signature.SignatureType -ne 'Authenticode') {
+        throw "$relative is $($signature.SignatureType)-signed rather than embedded; the signature would not survive packaging"
+    }
 
     $verifyOutput = & $signTool verify /pa $target.FullName 2>&1
     if ($LASTEXITCODE -ne 0) {
