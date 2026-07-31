@@ -143,7 +143,7 @@ public sealed record UsageChartBarViewModel(
     double ItemWidth,
     double BarWidth,
     IReadOnlyList<UsageChartSegmentViewModel> Segments,
-    string HoverDetails);
+    IReadOnlyList<UsageChartHoverDetailViewModel> HoverDetails);
 
 public sealed record UsageChartSegmentViewModel(
     string Key,
@@ -151,6 +151,11 @@ public sealed record UsageChartSegmentViewModel(
     string Tokens,
     long RawTokens,
     double Height,
+    Brush Brush);
+
+public sealed record UsageChartHoverDetailViewModel(
+    string Label,
+    string ValueLabel,
     Brush Brush);
 
 public sealed record UsageChartLegendViewModel(

@@ -270,7 +270,22 @@
                                         <StackPanel>
                                             <TextBlock x:Name="ChartHoverRangeText" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource TextSecondaryBrush}"/>
                                             <TextBlock x:Name="ChartHoverTokensText" FontFamily="{ThemeResource MetricFont}" FontSize="16" FontWeight="SemiBold" Margin="0,3,0,0"/>
-                                            <TextBlock x:Name="ChartHoverDetailsText" FontFamily="{ThemeResource MetricFont}" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" Margin="0,7,0,0" TextWrapping="Wrap" MaxWidth="320" LineHeight="18" LineStackingStrategy="BlockLineHeight"/>
+                                            <ItemsControl x:Name="ChartHoverDetails" Margin="0,7,0,0" MaxWidth="320">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid ColumnSpacing="8" Margin="0,2">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <Border Width="9" Height="9" CornerRadius="2" Background="{Binding Brush}" VerticalAlignment="Center"/>
+                                                            <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" MaxWidth="190"/>
+                                                            <TextBlock Grid.Column="2" Text="{Binding ValueLabel}" FontFamily="{ThemeResource MetricFont}" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
                                         </StackPanel>
                                     </Border>
                                 </Canvas>

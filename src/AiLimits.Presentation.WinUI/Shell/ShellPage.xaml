@@ -13,9 +13,9 @@
         SelectionChanged="OnSelectionChanged"
         Background="{ThemeResource PageBackgroundBrush}">
         <NavigationView.PaneHeader>
-            <StackPanel Margin="6,10,0,14">
-                <TextBlock x:Uid="Shell_Brand" FontFamily="{ThemeResource MetricFont}" FontWeight="SemiBold" CharacterSpacing="120" />
-            </StackPanel>
+            <Grid Margin="14,0,0,0" VerticalAlignment="Stretch">
+                <TextBlock x:Uid="Shell_Brand" VerticalAlignment="Center" FontFamily="{ThemeResource MetricFont}" FontWeight="SemiBold" CharacterSpacing="120" />
+            </Grid>
         </NavigationView.PaneHeader>
         <NavigationView.MenuItems>
             <NavigationViewItem x:Uid="Shell_Overview" Tag="overview">

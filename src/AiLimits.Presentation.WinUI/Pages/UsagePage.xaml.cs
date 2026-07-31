@@ -216,7 +216,7 @@ public sealed partial class UsagePage : Page
     {
         ChartHoverRangeText.Text = bar.RangeLabel;
         ChartHoverTokensText.Text = F("Usage_HoverTokens", bar.Tokens);
-        ChartHoverDetailsText.Text = bar.HoverDetails;
+        ChartHoverDetails.ItemsSource = bar.HoverDetails;
         ChartHoverCard.Visibility = Visibility.Visible;
         ChartHoverCard.Measure(new Windows.Foundation.Size(340, double.PositiveInfinity));
     }
@@ -459,7 +459,9 @@ public sealed partial class UsagePage : Page
             .Select((item, index) => new
             {
                 item.Key,
-                Brush = ChartSeriesBrush(index, item.IsOthers),
+                Brush = _chartSeriesDimension == UsageChartSeriesDimension.Provider && !item.IsOthers
+                    ? new SolidColorBrush(Theming.ThemeDictionaryBuilder.Parse(ProviderColors.Resolve(item.Key, item.Label)))
+                    : ChartSeriesBrush(index, item.IsOthers),
             })
             .ToDictionary(item => item.Key, item => item.Brush, StringComparer.OrdinalIgnoreCase);
 
@@ -496,13 +498,14 @@ public sealed partial class UsagePage : Page
                     seriesBrushes[segment.Key]))
                 .ToArray();
 
-            string hoverDetails = string.Join(
-                "\n",
-                bucket.Segments
-                    .Where(segment => segment.Tokens > 0)
-                    .Select(segment =>
-                        $"{segment.Label} · {FormatTokens(segment.Tokens)} · " +
-                        $"{(bucket.Tokens == 0 ? 0 : 100.0 * segment.Tokens / bucket.Tokens):0.#}%"));
+            UsageChartHoverDetailViewModel[] hoverDetails = segments
+                .Where(segment => segment.RawTokens > 0)
+                .Select(segment => new UsageChartHoverDetailViewModel(
+                    segment.Label,
+                    $"{segment.Tokens} · " +
+                    $"{(bucket.Tokens == 0 ? 0 : 100.0 * segment.RawTokens / bucket.Tokens):0.#}%",
+                    segment.Brush))
+                .ToArray();
 
             string tokens = FormatTokens(bucket.Tokens);
             return new UsageChartBarViewModel(
