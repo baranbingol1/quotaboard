@@ -10,6 +10,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-binaries.ps1')
 
 function Resolve-SignTool {
     $onPath = Get-Command signtool.exe -ErrorAction SilentlyContinue
@@ -44,11 +45,16 @@ if ($targets.Count -eq 0) {
 }
 
 $signTool = Resolve-SignTool
+$ownedPaths = @(Get-QuotaBoardOwnedBinaryPaths -RootPath $root)
 foreach ($target in $targets) {
     $relative = [System.IO.Path]::GetRelativePath($root, $target.FullName)
     $signature = Get-AuthenticodeSignature -LiteralPath $target.FullName
+    $isOwned = $ownedPaths -contains $target.FullName
     if (-not $signature.SignerCertificate) {
-        throw "$relative carries no Authenticode signature"
+        if ($isOwned) {
+            throw "$relative carries no Authenticode signature"
+        }
+        continue
     }
     if ($signature.Status -in 'HashMismatch', 'NotSigned') {
         throw "$relative has an invalid Authenticode signature ($($signature.Status)): $($signature.StatusMessage)"
@@ -57,18 +63,21 @@ foreach ($target in $targets) {
     # file, not carried inside it, so it does not survive being zipped and
     # unpacked on the user's machine. Only an embedded signature ships.
     if ($signature.SignatureType -ne 'Authenticode') {
-        throw "$relative is $($signature.SignatureType)-signed rather than embedded; the signature would not survive packaging"
+        if ($isOwned) {
+            throw "$relative is $($signature.SignatureType)-signed rather than embedded; the signature would not survive packaging"
+        }
+        continue
     }
 
     $verifyOutput = & $signTool verify /pa $target.FullName 2>&1
     if ($LASTEXITCODE -ne 0) {
         $verifyText = ($verifyOutput | Out-String).Trim()
         $untrustedRoot = $verifyText -match 'terminated in a root certificate which is not trusted'
-        if ($RequireTrustedSignature -or -not $untrustedRoot) {
+        if (-not $isOwned -or $RequireTrustedSignature -or -not $untrustedRoot) {
             throw "${relative}: signtool verify failed: $verifyText"
         }
         Write-Warning "$relative signature is intact but chains to an untrusted test root (expected for self-signed CI builds)."
     }
 }
 
-Write-Host "Verified Authenticode signatures on $($targets.Count) shipped executable(s) and library/libraries."
+Write-Host "Verified all project-owned signatures and every existing embedded vendor signature; unsigned vendor binaries were left unchanged."

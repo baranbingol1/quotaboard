@@ -11,5 +11,8 @@
          a tag whose name disagrees with this, so the number in Windows'
          file-properties dialog always matches the release it came from. -->
     <Version>0.1.1</Version>
+    <!-- SignPath's release artifact policy identifies every project-owned PE
+         as part of the same QuotaBoard product. -->
+    <Product>QuotaBoard</Product>
   </PropertyGroup>
 </Project>

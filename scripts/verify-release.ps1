@@ -4,9 +4,9 @@ param(
     [Parameter(Mandatory)]
     [string]$DistDir,
 
-    # When true (SignPath signing enabled), every shipped executable/library
-    # must chain to a trusted root. When false, intact self-signed test
-    # signatures are accepted.
+    # When true (SignPath signing enabled), every project-owned binary must
+    # chain to a trusted root. Existing vendor signatures are always checked;
+    # unsigned vendor binaries are permitted and remain untouched.
     [bool]$RequireTrustedSignature = $false,
 
     # GitHub repository (owner/repo) for `gh attestation verify`. When set,
@@ -23,8 +23,9 @@ Post-release verification.
 Runs against assets re-downloaded from the published GitHub release, not the
 files left on the build agent, so upload corruption or tampering is caught.
 For every archive: the .sha256 sidecar must match, the full archive must pass
-publish-layout and architecture validation, every shipped EXE/DLL must carry
-an Authenticode signature, and (when -Repository is set) build-provenance
+publish-layout and architecture validation, every project-owned PE must carry
+an Authenticode signature, existing vendor signatures must remain valid, and
+(when -Repository is set) build-provenance
 attestation must verify.
 
 SBOMs get the same treatment as archives, not a weaker structural one: an

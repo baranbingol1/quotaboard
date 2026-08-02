@@ -6,6 +6,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-binaries.ps1')
 
 <#
 Throwaway fallback signing for the release pipeline.
@@ -14,19 +15,9 @@ When the repository enables SignPath (SIGNPATH_ENABLED=true plus its secrets),
 the release workflow signs with a trusted certificate instead and never calls
 this script. Without that setup this script still exercises the Authenticode
 path end to end: it generates a self-signed code-signing certificate inside
-the job, signs the binaries that carry no embedded signature of their own,
-and deletes the certificate afterwards.
-
-It signs those binaries ONLY. `signtool sign` without /as replaces a primary
-signature, and this package ships roughly 300 PE files of which the large
-majority are already Authenticode-signed by Microsoft or another vendor.
-Signing them all would strip those publisher identities and reattribute the
-whole runtime to a throwaway certificate — worse for provenance and endpoint
-reputation than leaving them alone.
-
-Catalog-signed files are signed. Catalog membership is registered on the
-build machine and does not survive being zipped, so for those files an
-embedded signature is the only one that reaches the user.
+the job, signs only the project-owned binaries declared in
+release-binaries.ps1, and deletes the certificate afterwards. Vendor files
+are never signing targets, regardless of their current signature state.
 
 The resulting signature is NOT trusted. Windows SmartScreen will keep warning,
 and verify-release.ps1 accepts it only when trusted signing is not required.
@@ -57,35 +48,21 @@ if (-not (Test-Path -LiteralPath $resolvedPublishDir)) {
     throw "Publish directory does not exist: $resolvedPublishDir"
 }
 
-$candidates = @(Get-ChildItem -LiteralPath $resolvedPublishDir -Recurse -File |
-    Where-Object { $_.Extension -in '.exe', '.dll' })
-if ($candidates.Count -eq 0) {
-    throw "No .exe or .dll files found in $resolvedPublishDir"
-}
-
-# SignatureType is the deciding property, not Status: 'Authenticode' means the
-# file carries its own embedded signature and must be left untouched, while
-# 'Catalog' and 'None' both mean nothing verifiable survives packaging.
 $targets = @()
-$preserved = @()
-foreach ($candidate in $candidates) {
-    $signature = Get-AuthenticodeSignature -LiteralPath $candidate.FullName
+foreach ($candidate in @(Get-QuotaBoardOwnedBinaryPaths -RootPath $resolvedPublishDir)) {
+    $signature = Get-AuthenticodeSignature -LiteralPath $candidate
     if ($signature.Status -eq 'HashMismatch') {
-        throw "$($candidate.FullName) has a broken Authenticode signature (HashMismatch); refusing to sign over it."
+        throw "$candidate has a broken Authenticode signature (HashMismatch); refusing to sign over it."
     }
     if ($signature.SignatureType -eq 'Authenticode') {
-        $preserved += $candidate.FullName
-        continue
+        throw "$candidate is already embedded-signed; refusing to replace its project signature."
     }
-    $targets += $candidate.FullName
-}
-if ($targets.Count -eq 0) {
-    throw "Every PE in $resolvedPublishDir is already signed; expected the first-party binaries to be unsigned."
+    $targets += $candidate
 }
 
 $signTool = Resolve-SignTool
 Write-Host "Using signtool: $signTool"
-Write-Host "Preserving $($preserved.Count) existing vendor signature(s); signing $($targets.Count) unsigned or catalog-only file(s)."
+Write-Host "Signing $($targets.Count) project-owned file(s); vendor binaries are not signing targets."
 Write-Host "Signing with a THROWAWAY self-signed certificate. This signature is NOT trusted; it only proves the signing pipeline works."
 $targets | ForEach-Object { Write-Host "  sign: $($_.Substring($resolvedPublishDir.Length).TrimStart('\'))" }
 
@@ -112,4 +89,4 @@ finally {
     Remove-Item -LiteralPath "Cert:\CurrentUser\My\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host "Signed $($targets.Count) file(s) (untrusted test signature); $($preserved.Count) vendor signature(s) left intact."
+Write-Host "Signed $($targets.Count) project-owned file(s) with untrusted test signatures."

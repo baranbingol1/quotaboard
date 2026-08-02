@@ -65,6 +65,7 @@ jobs:
     timeout-minutes: 45
     # id-token + attestations are for the provenance attestation step.
     permissions:
+      actions: read
       contents: read
       id-token: write
       attestations: write
@@ -130,13 +131,27 @@ jobs:
       # secrets plus the project/policy slugs below. Without them the
       # fallback step signs with a throwaway self-signed certificate instead,
       # so the signing path is still exercised end to end.
+      - name: Stage project-owned binaries for SignPath
+        if: vars.SIGNPATH_ENABLED == 'true'
+        shell: pwsh
+        env:
+          PUBLISH_DIR: ${{ runner.temp }}\AiLimits\release\win-${{ matrix.arch }}
+          SIGNING_INPUT_DIR: ${{ runner.temp }}\AiLimits\release\win-${{ matrix.arch }}-signing-input
+        run: |
+          . ./scripts/release-binaries.ps1
+          Remove-Item -LiteralPath $env:SIGNING_INPUT_DIR -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $env:SIGNING_INPUT_DIR | Out-Null
+          Get-QuotaBoardOwnedBinaryPaths -RootPath $env:PUBLISH_DIR | ForEach-Object {
+              Copy-Item -LiteralPath $_ -Destination $env:SIGNING_INPUT_DIR
+          }
+
       - name: Upload unsigned binaries for SignPath
         if: vars.SIGNPATH_ENABLED == 'true'
         id: unsigned
         uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
         with:
           name: unsigned-${{ matrix.arch }}
-          path: ${{ runner.temp }}\AiLimits\release\win-${{ matrix.arch }}
+          path: ${{ runner.temp }}\AiLimits\release\win-${{ matrix.arch }}-signing-input
           if-no-files-found: error
 
       - name: Prepare clean SignPath output directory
@@ -177,20 +192,20 @@ jobs:
               if (-not (Test-Path -LiteralPath $env:SIGNED_DIR -PathType Container)) {
                   throw "SignPath did not produce $env:SIGNED_DIR"
               }
-              $relativeInventory = {
-                  param($root)
-                  @(Get-ChildItem -LiteralPath $root -Recurse -File | ForEach-Object {
-                      [System.IO.Path]::GetRelativePath($root, $_.FullName)
-                  } | Sort-Object)
-              }
-              $unsigned = & $relativeInventory $env:UNSIGNED_DIR
-              $signed = & $relativeInventory $env:SIGNED_DIR
-              $difference = @(Compare-Object $unsigned $signed)
+              . ./scripts/release-binaries.ps1
+              $expected = @(Get-QuotaBoardOwnedBinaryNames | Sort-Object)
+              $signed = @(Get-ChildItem -LiteralPath $env:SIGNED_DIR -Recurse -File | ForEach-Object {
+                  [System.IO.Path]::GetRelativePath($env:SIGNED_DIR, $_.FullName)
+              } | Sort-Object)
+              $difference = @(Compare-Object $expected $signed)
               if ($difference.Count -gt 0) {
                   $detail = ($difference | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }) -join "`n"
-                  throw "SignPath output inventory differs from unsigned input:`n$detail"
+                  throw "SignPath output inventory differs from the project-owned allowlist:`n$detail"
               }
-              $selected = $env:SIGNED_DIR
+              foreach ($name in $expected) {
+                  Copy-Item -LiteralPath (Join-Path $env:SIGNED_DIR $name) -Destination (Join-Path $env:UNSIGNED_DIR $name) -Force
+              }
+              $selected = $env:UNSIGNED_DIR
           } else {
               $selected = $env:UNSIGNED_DIR
           }
