@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 using System.Text.Json;
+using AiLimits.Application.Abstractions;
 using AiLimits.Domain;
 using AiLimits.Infrastructure.Providers.Claude;
 using AiLimits.Infrastructure.Providers.Codex;
@@ -189,6 +190,34 @@ public sealed class ScannerTests
         Assert.Empty(adapter.CreateLimitStrategies(Account("opencode")));
     }
 
+    [Fact]
+    public void OptedInFailureCheckpointReplacesOnlyTheStartingPosition()
+    {
+        var source = new FailureCheckpointSource("safe-retry-state");
+        DateTimeOffset committed = DateTimeOffset.Parse("2026-08-02T12:00:00Z");
+
+        ScannerCursor cursor = ScanFailureCheckpoint.ResolveCursor(
+            source, source.Id, "starting-state", committed);
+
+        Assert.Equal("safe-retry-state", cursor.Position);
+        Assert.Equal(committed, cursor.LastObservedAt);
+        Assert.Null(cursor.Fingerprint);
+    }
+
+    [Fact]
+    public void OrdinaryStatefulSourceKeepsItsStartingPositionAfterFailure()
+    {
+        var source = new OrdinaryPositionSource("advanced-uncommitted-state");
+        DateTimeOffset committed = DateTimeOffset.Parse("2026-08-02T12:00:00Z");
+
+        ScannerCursor cursor = ScanFailureCheckpoint.ResolveCursor(
+            source, source.Id, "starting-state", committed);
+
+        Assert.Equal("starting-state", cursor.Position);
+        Assert.Equal(committed, cursor.LastObservedAt);
+        Assert.Null(cursor.Fingerprint);
+    }
+
 
     private static ProviderAccount Account(string provider) => new(
         new AccountKey(new ProviderId(provider), "one"), "one", null, "fixture", 1, true);
@@ -204,6 +233,38 @@ public sealed class ScannerTests
     {
         public Task<ProcessResult> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken) =>
             Task.FromResult(new ProcessResult(0, path, string.Empty, TimeSpan.Zero));
+    }
+
+    private sealed class FailureCheckpointSource(string checkpoint) : ITokenUsageSource, IScanFailureCheckpointSource
+    {
+        public string Id => "failure-checkpoint";
+        public string? FailureCheckpoint => checkpoint;
+        public async IAsyncEnumerable<TokenUsageEvent> ReadAsync(
+            ProviderAccount account,
+            ScannerCursor? cursor,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+            if (cancellationToken.IsCancellationRequested)
+            {
+                yield break;
+            }
+            throw new InvalidOperationException();
+        }
+    }
+
+    private sealed class OrdinaryPositionSource(string position) : ITokenUsageSource, IScanPositionSource
+    {
+        public string Id => "ordinary";
+        public string? Position => position;
+        public async IAsyncEnumerable<TokenUsageEvent> ReadAsync(
+            ProviderAccount account,
+            ScannerCursor? cursor,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+            yield break;
+        }
     }
 
     private sealed class TemporaryDirectory : IDisposable

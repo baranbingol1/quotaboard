@@ -519,7 +519,9 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             // cheap mistake; silently dropping usage is not.
             try
             {
-                await WriteCursorAsync(account.Key, Checkpoint(StartingPosition()), cancellationToken).ConfigureAwait(false);
+                ScannerCursor failureCheckpoint = ScanFailureCheckpoint.ResolveCursor(
+                    source, source.Id, StartingPosition(), committed);
+                await WriteCursorAsync(account.Key, failureCheckpoint, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception checkpointFailure) when (checkpointFailure is not OperationCanceledException)
             {

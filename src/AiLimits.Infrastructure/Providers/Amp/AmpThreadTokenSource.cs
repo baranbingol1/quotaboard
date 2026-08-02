@@ -8,7 +8,7 @@ using AiLimits.Infrastructure.Providers.Common;
 
 namespace AiLimits.Infrastructure.Providers.Amp;
 
-public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSource
+public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSource, IScanFailureCheckpointSource
 {
     private const int PageSize = 20;
     // Safety valve for pathological accounts; a scan visiting this many
@@ -45,6 +45,8 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
 
     /// <inheritdoc />
     public string? Position => _position;
+
+    public string? FailureCheckpoint => _position;
 
     public async IAsyncEnumerable<TokenUsageEvent> ReadAsync(
         ProviderAccount account,

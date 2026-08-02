@@ -64,6 +64,32 @@ public interface IScanPositionSource
 }
 
 /// <summary>
+/// Opt-in capability for a source that can expose an opaque position known to
+/// be safe after failed enumeration. Unlike <see cref="IScanPositionSource.Position"/>,
+/// this value must not cover any yielded event that may still be uncommitted.
+/// </summary>
+public interface IScanFailureCheckpointSource
+{
+    string? FailureCheckpoint { get; }
+}
+
+/// <summary>Conservative position selection for a failed source scan.</summary>
+public static class ScanFailureCheckpoint
+{
+    public static ScannerCursor ResolveCursor(
+        ITokenUsageSource source,
+        string sourceId,
+        string? startingPosition,
+        DateTimeOffset? committedAt) =>
+        new(sourceId,
+            source is IScanFailureCheckpointSource checkpointSource
+            ? checkpointSource.FailureCheckpoint ?? startingPosition
+            : startingPosition,
+            committedAt,
+            null);
+}
+
+/// <summary>
 /// Optional provider capability: an inventory of redeemable rate-limit reset
 /// credits ("N resets left, expiring at X"). Implemented by adapters whose
 /// provider grants such credits; fetches are best-effort and must never fail

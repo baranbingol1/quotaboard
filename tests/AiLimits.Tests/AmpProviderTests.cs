@@ -121,10 +121,13 @@ public sealed class AmpProviderTests
     {
         var runner = new ScriptedRunner(
             ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-19T12:00:00Z"}]"""),
-            ScriptedReply.Ok("not-json"));
+            ScriptedReply.Failed("transient export failure"));
         var source = new AmpThreadTokenSource(runner, () => "amp-test");
 
         await Assert.ThrowsAsync<TokenScanException>(() => DrainAsync(source, cursor: null));
+
+        string? checkpoint = ((IScanFailureCheckpointSource)source).FailureCheckpoint;
+        Assert.Contains(AmpScanState.RetryMarker, checkpoint);
     }
 
     [Fact]
@@ -264,6 +267,9 @@ public sealed class AmpProviderTests
 
         Assert.Single(emitted);
         Assert.Equal("export", second.Calls[1][1]);
+        string? recoveredPosition = ((IScanPositionSource)secondSource).Position;
+        Assert.DoesNotContain(AmpScanState.RetryMarker, recoveredPosition);
+        Assert.Contains("2026-07-19T12:00:00", recoveredPosition);
     }
 
     [Fact]
@@ -449,6 +455,8 @@ public sealed class AmpProviderTests
     private sealed record ScriptedReply(string Output, int ExitCode, bool Truncated)
     {
         public static ScriptedReply Ok(string output) => new(output, 0, false);
+
+        public static ScriptedReply Failed(string output) => new(output, 1, false);
 
         public static ScriptedReply Capped(string output) => new(output, 0, true);
     }
