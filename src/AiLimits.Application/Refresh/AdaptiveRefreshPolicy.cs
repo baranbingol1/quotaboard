@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 using System;
+using AiLimits.Domain;
 
 namespace AiLimits.Application.Refresh;
 
@@ -76,4 +77,14 @@ public sealed class AdaptiveRefreshPolicy
             _ => null
         };
     }
+
+    /// <summary>
+    /// Whether a failed publication should use the scheduler's fast retry
+    /// ladder. Authentication, authorization, malformed and unsupported
+    /// failures remain actionable rather than being retried aggressively.
+    /// </summary>
+    public static bool IsTransientFailure(RefreshPublication publication) =>
+        publication.Status is RefreshPublicationStatus.FailedWithCachedData or RefreshPublicationStatus.FailedWithoutData
+        && publication.Attempts.Any(attempt => attempt.FailureKind is
+            FetchFailureKind.Network or FetchFailureKind.Timeout or FetchFailureKind.TemporarilyUnavailable);
 }

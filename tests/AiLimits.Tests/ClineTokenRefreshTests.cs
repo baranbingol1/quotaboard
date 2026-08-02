@@ -455,6 +455,42 @@ public sealed class ClineTokenRefreshTests : IDisposable
     }
 
     [Fact]
+    public async Task Retained_legacy_file_never_overwrites_a_rotated_committed_vault_session()
+    {
+        Directory.CreateDirectory(_cacheDirectory);
+        await File.WriteAllTextAsync(LegacyCachePath, """
+            {"accessToken":"legacy-access","refreshToken":"legacy-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
+            """);
+        var store = new ClineSessionStore(_secrets, LegacyCachePath);
+
+        // Reads remain possible, but Windows denies deletion until this handle
+        // closes. This deterministically leaves plaintext after a successful
+        // stage/commit/promotion.
+        using (new FileStream(LegacyCachePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            ClineSession? migrated = await store.LoadAsync(default);
+            Assert.Equal("legacy-access", migrated!.AccessToken);
+            Assert.True(File.Exists(LegacyCachePath));
+
+            await store.SaveAsync(
+                new ClineSession("rotated-access", "rotated-refresh", Now + TimeSpan.FromHours(2)), default);
+
+            ClineSession? sameStore = await store.LoadAsync(default);
+            Assert.Equal("rotated-access", sameStore!.AccessToken);
+            Assert.Equal("rotated-refresh", sameStore.RefreshToken);
+
+            ClineSession? afterRestart = await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(default);
+            Assert.Equal("rotated-access", afterRestart!.AccessToken);
+            Assert.Equal("rotated-refresh", afterRestart.RefreshToken);
+            Assert.True(File.Exists(LegacyCachePath));
+        }
+
+        ClineSession? retried = await store.LoadAsync(default);
+        Assert.Equal("rotated-access", retried!.AccessToken);
+        Assert.False(File.Exists(LegacyCachePath));
+    }
+
+    [Fact]
     public async Task A_partially_written_migration_keeps_the_plaintext_cache()
     {
         Directory.CreateDirectory(_cacheDirectory);

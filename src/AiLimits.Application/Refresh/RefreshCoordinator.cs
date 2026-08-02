@@ -201,6 +201,8 @@ public sealed class RefreshCoordinator : IDisposable
             TimeSpan? retryAfterHint = null;
             string? unavailableStrategyId = null;
             string? unavailableReason = null;
+            string? temporarilyUnavailableStrategyId = null;
+            string? temporarilyUnavailableReason = null;
             IReadOnlyList<ILimitFetchStrategy> strategies;
             try
             {
@@ -235,7 +237,11 @@ public sealed class RefreshCoordinator : IDisposable
                 {
                     if (availability.Availability == StrategyAvailability.TemporarilyUnavailable)
                     {
-                        attempts.Add(await RecordAttemptAsync(account.Key, strategy.Id, TimeSpan.Zero, FetchFailureKind.TemporarilyUnavailable, availability.SafeReason, cancellationToken).ConfigureAwait(false));
+                        // Availability-only failures are persisted only when no
+                        // strategy produced a real attempt. Otherwise their
+                        // later timestamp would hide the actionable failure.
+                        temporarilyUnavailableStrategyId ??= strategy.Id;
+                        temporarilyUnavailableReason ??= availability.SafeReason;
                     }
                     else
                     {
@@ -280,6 +286,13 @@ public sealed class RefreshCoordinator : IDisposable
                     continue;
                 }
                 break;
+            }
+            if (attempts.Count == 0 && temporarilyUnavailableStrategyId is not null)
+            {
+                attempts.Add(await RecordAttemptAsync(account.Key, temporarilyUnavailableStrategyId, TimeSpan.Zero,
+                    FetchFailureKind.TemporarilyUnavailable,
+                    temporarilyUnavailableReason ?? "The provider is temporarily unavailable.",
+                    cancellationToken).ConfigureAwait(false));
             }
             if (attempts.Count == 0 && unavailableStrategyId is not null)
             {

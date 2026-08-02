@@ -355,21 +355,13 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             })
             .ToArray();
         RefreshPublication[] publications = await Task.WhenAll(tasks).ConfigureAwait(false);
-        _lastRefreshHadTransientFailure = publications.Any(IsTransientFailure);
+        _lastRefreshHadTransientFailure = publications.Any(AdaptiveRefreshPolicy.IsTransientFailure);
         _lastRetryAfterHint = publications
             .Select(publication => publication.RetryAfterHint)
             .Where(hint => hint.HasValue)
             .DefaultIfEmpty(null)
             .Max();
         progress?.Report(new RefreshProgress(total, total, string.Empty));
-    }
-
-    // A failed refresh whose attempts died on connectivity (offline, timeout)
-    // deserves the scheduler's fast retry ladder; auth or parse failures do not.
-    private static bool IsTransientFailure(RefreshPublication publication)
-    {
-        return publication.Status is RefreshPublicationStatus.FailedWithCachedData or RefreshPublicationStatus.FailedWithoutData
-            && publication.Attempts.Any(attempt => attempt.FailureKind is FetchFailureKind.Network or FetchFailureKind.Timeout);
     }
 
     private async Task<RefreshPublication> RefreshAccountAsync(ProviderAccount account, CancellationToken cancellationToken)

@@ -169,14 +169,16 @@ public sealed class RefreshCoordinatorTests
     }
 
     [Fact]
-    public async Task TemporarilyUnavailableAvailabilityIsPersistedWithItsOwnFailureKind()
+    public async Task AllTemporarilyUnavailableStrategiesPersistOneRepresentativeFailure()
     {
         var account = new ProviderAccount(new AccountKey(new ProviderId("fake"), "one"),
             "one", null, "fixture", 4, true);
         var accounts = new MemoryAccounts(account);
         var snapshots = new MemorySnapshots();
         var coordinator = new RefreshCoordinator(
-            [new FakeAdapter(new SkippedStrategy("locked-db", StrategyAvailability.TemporarilyUnavailable))],
+            [new FakeAdapter(
+                new SkippedStrategy("locked-db", StrategyAvailability.TemporarilyUnavailable) { Order = 1 },
+                new SkippedStrategy("busy-vault", StrategyAvailability.TemporarilyUnavailable) { Order = 2 })],
             accounts, snapshots, new SnapshotMerger(), new FixedClock(), NullLogger<RefreshCoordinator>.Instance);
 
         var publication = await coordinator.RefreshAsync(new RefreshRequest(account.Key, 4));
@@ -188,8 +190,14 @@ public sealed class RefreshCoordinatorTests
         Assert.Equal(FetchFailureKind.TemporarilyUnavailable, Assert.Single(snapshots.Attempts).FailureKind);
     }
 
-    [Fact]
-    public async Task ALaterAvailabilitySkipDoesNotMaskAnEarlierRealFailure()
+    [Theory]
+    [InlineData(FetchFailureKind.Authentication)]
+    [InlineData(FetchFailureKind.Authorization)]
+    [InlineData(FetchFailureKind.Network)]
+    [InlineData(FetchFailureKind.Timeout)]
+    [InlineData(FetchFailureKind.RateLimited)]
+    public async Task ALaterTemporaryAvailabilityDoesNotMaskAnEarlierActionableFailure(
+        FetchFailureKind failureKind)
     {
         var account = new ProviderAccount(new AccountKey(new ProviderId("fake"), "one"),
             "one", null, "fixture", 4, true);
@@ -197,16 +205,16 @@ public sealed class RefreshCoordinatorTests
         var snapshots = new MemorySnapshots();
         var coordinator = new RefreshCoordinator(
             [new FakeAdapter(
-                new FailingStrategy(FetchFailureKind.Network) { Order = 1 },
-                new SkippedStrategy("not-configured", StrategyAvailability.NotConfigured) { Order = 2 })],
+                new FailingStrategy(failureKind) { Order = 1 },
+                new SkippedStrategy("locked-db", StrategyAvailability.TemporarilyUnavailable) { Order = 2 })],
             accounts, snapshots, new SnapshotMerger(), new FixedClock(), NullLogger<RefreshCoordinator>.Instance);
 
         var publication = await coordinator.RefreshAsync(new RefreshRequest(account.Key, 4));
 
         Assert.Equal(RefreshPublicationStatus.FailedWithoutData, publication.Status);
         var attempt = Assert.Single(publication.Attempts);
-        Assert.Equal(FetchFailureKind.Network, attempt.FailureKind);
-        Assert.Equal(FetchFailureKind.Network, Assert.Single(snapshots.Attempts).FailureKind);
+        Assert.Equal(failureKind, attempt.FailureKind);
+        Assert.Equal(failureKind, Assert.Single(snapshots.Attempts).FailureKind);
     }
 
     [Fact]

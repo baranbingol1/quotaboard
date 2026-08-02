@@ -65,7 +65,6 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
 
     public async Task<ClineSession?> LoadAsync(CancellationToken cancellationToken)
     {
-        await MigrateLegacyCacheAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             // A commit marker means a previous save was interrupted between
@@ -79,21 +78,48 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
                 }
             }
 
-            string? accessToken = await secrets.GetAsync(Scope, AccessTokenKey, cancellationToken).ConfigureAwait(false);
-            string? expires = await secrets.GetAsync(Scope, ExpiresAtKey, cancellationToken).ConfigureAwait(false);
-            if (string.IsNullOrWhiteSpace(accessToken) || expires is null ||
-                !DateTimeOffset.TryParse(expires, CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out DateTimeOffset expiresAt))
+            ClineSession? live = await ReadLiveSessionAsync(cancellationToken).ConfigureAwait(false);
+            if (live is not null)
             {
-                return null;
+                // A committed, structurally valid vault session is authoritative.
+                // In particular, never write a retained legacy file back over a
+                // newer session merely because an earlier deletion was denied.
+                CleanupLegacyFilesBestEffort();
+                return live;
             }
-            string? refreshToken = await secrets.GetAsync(Scope, RefreshTokenKey, cancellationToken).ConfigureAwait(false);
-            return new ClineSession(accessToken, string.IsNullOrWhiteSpace(refreshToken) ? null : refreshToken, expiresAt);
+        }
+        catch (Exception ex) when (IsRecoverable(ex))
+        {
+            // The vault's state is unknown, not empty. Retain any plaintext
+            // fallback and retry once the vault is available again.
+            return null;
+        }
+
+        // The vault was available but had no structurally valid live session.
+        // Only this state is allowed to migrate legacy plaintext into it.
+        await MigrateLegacyCacheAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await ReadLiveSessionAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (IsRecoverable(ex))
         {
             return null;
         }
+    }
+
+    private async Task<ClineSession?> ReadLiveSessionAsync(CancellationToken cancellationToken)
+    {
+        string? accessToken = await secrets.GetAsync(Scope, AccessTokenKey, cancellationToken).ConfigureAwait(false);
+        string? expires = await secrets.GetAsync(Scope, ExpiresAtKey, cancellationToken).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(accessToken) || expires is null ||
+            !DateTimeOffset.TryParse(expires, CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out DateTimeOffset expiresAt))
+        {
+            return null;
+        }
+        string? refreshToken = await secrets.GetAsync(Scope, RefreshTokenKey, cancellationToken).ConfigureAwait(false);
+        return new ClineSession(accessToken, string.IsNullOrWhiteSpace(refreshToken) ? null : refreshToken, expiresAt);
     }
 
     public Task SaveAsync(ClineSession session, CancellationToken cancellationToken) =>
@@ -226,6 +252,24 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
             // idempotent — re-reading and re-saving a candidate that is still
             // there costs nothing — so let the next load retry it rather than
             // latching a half-finished cleanup.
+            _legacyMigrationAttempted = false;
+        }
+    }
+
+    private void CleanupLegacyFilesBestEffort()
+    {
+        if (_legacyMigrationAttempted || legacyCachePath is null)
+        {
+            return;
+        }
+        _legacyMigrationAttempted = true;
+        try
+        {
+            File.Delete(legacyCachePath);
+            File.Delete(legacyCachePath + ".tmp");
+        }
+        catch (Exception ex) when (IsRecoverable(ex))
+        {
             _legacyMigrationAttempted = false;
         }
     }

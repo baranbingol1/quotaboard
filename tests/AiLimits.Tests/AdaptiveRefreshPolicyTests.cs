@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 using AiLimits.Application.Refresh;
+using AiLimits.Domain;
 
 namespace AiLimits.Tests;
 
@@ -71,5 +72,25 @@ public sealed class AdaptiveRefreshPolicyTests
     public void RetryLadderExhaustsOutsideAttemptRange(int attempt)
     {
         Assert.Null(AdaptiveRefreshPolicy.TransientRetryDelay(attempt));
+    }
+
+    [Theory]
+    [InlineData(FetchFailureKind.Network, true)]
+    [InlineData(FetchFailureKind.Timeout, true)]
+    [InlineData(FetchFailureKind.TemporarilyUnavailable, true)]
+    [InlineData(FetchFailureKind.Authentication, false)]
+    [InlineData(FetchFailureKind.Authorization, false)]
+    [InlineData(FetchFailureKind.MalformedResponse, false)]
+    [InlineData(FetchFailureKind.Unsupported, false)]
+    public void OnlySchedulerTransientFailureKindsEnterTheFastRetryLadder(
+        FetchFailureKind failureKind,
+        bool expected)
+    {
+        var attempt = new FetchAttempt("attempt", new AccountKey(new ProviderId("fake"), "one"),
+            "strategy", Now, TimeSpan.Zero, failureKind, "message");
+        var publication = new RefreshPublication(RefreshPublicationStatus.FailedWithoutData,
+            null, [attempt], 1, "failed");
+
+        Assert.Equal(expected, AdaptiveRefreshPolicy.IsTransientFailure(publication));
     }
 }
