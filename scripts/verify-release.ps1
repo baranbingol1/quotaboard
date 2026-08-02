@@ -11,7 +11,17 @@ param(
 
     # GitHub repository (owner/repo) for `gh attestation verify`. When set,
     # each release ZIP is verified against its build-provenance attestation.
-    [string]$Repository
+    [string]$Repository,
+
+    [string]$ExpectedSignerWorkflow,
+
+    [string]$ExpectedSourceRef,
+
+    [string]$ExpectedSourceDigest,
+
+    [string]$ExpectedVersion,
+
+    [string]$ExpectedSignerCertificateSha256
 )
 
 $ErrorActionPreference = 'Stop'
@@ -57,14 +67,20 @@ function Assert-Sha256Sidecar {
 function Assert-Attestation {
     param(
         [Parameter(Mandatory)][System.IO.FileInfo]$Asset,
-        [string]$Repo
+        [string]$Repo,
+        [string]$SignerWorkflow,
+        [string]$SourceRef,
+        [string]$SourceDigest
     )
 
     if (-not $Repo) {
         return
     }
     Write-Host "Verifying attestation for $($Asset.Name)..."
-    & gh attestation verify $Asset.FullName --repo $Repo 2>&1 | ForEach-Object { Write-Host $_ }
+    & gh attestation verify $Asset.FullName --repo $Repo `
+        --signer-workflow $SignerWorkflow `
+        --source-ref $SourceRef `
+        --source-digest $SourceDigest 2>&1 | ForEach-Object { Write-Host $_ }
     if ($LASTEXITCODE -ne 0) {
         throw "$($Asset.Name): attestation verification failed (exit $LASTEXITCODE)"
     }
@@ -74,6 +90,31 @@ function Assert-Attestation {
 $resolvedDistDir = [System.IO.Path]::GetFullPath($DistDir)
 if (-not (Test-Path -LiteralPath $resolvedDistDir)) {
     throw "Asset directory does not exist: $resolvedDistDir"
+}
+$missingAttestationIdentity = [string]::IsNullOrWhiteSpace($ExpectedSignerWorkflow) `
+    -or [string]::IsNullOrWhiteSpace($ExpectedSourceRef) `
+    -or [string]::IsNullOrWhiteSpace($ExpectedSourceDigest)
+if ($Repository -and $missingAttestationIdentity) {
+    throw 'Attestation verification requires the expected signer workflow, source ref, and source digest.'
+}
+if ([string]::IsNullOrWhiteSpace($ExpectedVersion)) {
+    throw 'Release verification requires -ExpectedVersion.'
+}
+
+$expectedAssets = @(
+    foreach ($architecture in 'x64', 'arm64') {
+        $baseName = "QuotaBoard-$ExpectedVersion-win-$architecture"
+        "$baseName.zip"
+        "$baseName.zip.sha256"
+        "$baseName.sbom.spdx.json"
+        "$baseName.sbom.spdx.json.sha256"
+    }
+) | Sort-Object
+$actualAssets = @(Get-ChildItem -LiteralPath $resolvedDistDir -File | Select-Object -ExpandProperty Name | Sort-Object)
+$assetDifference = @(Compare-Object $expectedAssets $actualAssets)
+if ($assetDifference.Count -gt 0) {
+    $detail = ($assetDifference | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }) -join "`n"
+    throw "Release asset inventory does not exactly match version ${ExpectedVersion}:`n$detail"
 }
 
 $zips = Get-ChildItem -LiteralPath $resolvedDistDir -Filter '*.zip' -File
@@ -109,7 +150,10 @@ foreach ($zip in $zips) {
         if ($LASTEXITCODE -ne 0) {
             throw "$($zip.Name): publish validation failed (exit $LASTEXITCODE)"
         }
-        & (Join-Path $scriptDir 'verify-signatures.ps1') -RootPath $tempDir -RequireTrustedSignature $RequireTrustedSignature
+        & (Join-Path $scriptDir 'verify-signatures.ps1') `
+            -RootPath $tempDir `
+            -RequireTrustedSignature $RequireTrustedSignature `
+            -ExpectedSignerCertificateSha256 $ExpectedSignerCertificateSha256
         if ($LASTEXITCODE -ne 0) {
             throw "$($zip.Name): signature verification failed (exit $LASTEXITCODE)"
         }
@@ -120,7 +164,10 @@ foreach ($zip in $zips) {
 
     Write-Host "$($zip.Name): sha256 ok, $entryCount entries, signature ok"
 
-    Assert-Attestation -Asset $zip -Repo $Repository
+    Assert-Attestation -Asset $zip -Repo $Repository `
+        -SignerWorkflow $ExpectedSignerWorkflow `
+        -SourceRef $ExpectedSourceRef `
+        -SourceDigest $ExpectedSourceDigest
 }
 
 # --- SBOM validation -------------------------------------------------------
@@ -149,7 +196,10 @@ foreach ($sbom in $sboms) {
     # Hash and provenance first: without them the structural checks below only
     # prove the document is well-formed SPDX, not that it came from this build.
     Assert-Sha256Sidecar -Asset $sbom
-    Assert-Attestation -Asset $sbom -Repo $Repository
+    Assert-Attestation -Asset $sbom -Repo $Repository `
+        -SignerWorkflow $ExpectedSignerWorkflow `
+        -SourceRef $ExpectedSourceRef `
+        -SourceDigest $ExpectedSourceDigest
 
     $raw = Get-Content -LiteralPath $sbom.FullName -Raw
     try {

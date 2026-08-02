@@ -187,6 +187,7 @@ jobs:
           UNSIGNED_DIR: ${{ runner.temp }}\AiLimits\release\win-${{ matrix.arch }}
           SIGNED_DIR: ${{ runner.temp }}\AiLimits\release\win-${{ matrix.arch }}-signed
           SIGNPATH_ENABLED: ${{ vars.SIGNPATH_ENABLED }}
+          SIGNPATH_EXPECTED_CERTIFICATE_SHA256: ${{ vars.SIGNPATH_EXPECTED_CERTIFICATE_SHA256 }}
         run: |
           if ($env:SIGNPATH_ENABLED -eq 'true') {
               if (-not (Test-Path -LiteralPath $env:SIGNED_DIR -PathType Container)) {
@@ -212,7 +213,10 @@ jobs:
 
           ./scripts/validate-publish.ps1 -Architecture ${{ matrix.arch }} -OutputPath $selected
           if ($LASTEXITCODE -ne 0) { throw "Signed publish validation exited $LASTEXITCODE" }
-          ./scripts/verify-signatures.ps1 -RootPath $selected -RequireTrustedSignature ($env:SIGNPATH_ENABLED -eq 'true')
+          ./scripts/verify-signatures.ps1 `
+            -RootPath $selected `
+            -RequireTrustedSignature ($env:SIGNPATH_ENABLED -eq 'true') `
+            -ExpectedSignerCertificateSha256 $env:SIGNPATH_EXPECTED_CERTIFICATE_SHA256
           if ($LASTEXITCODE -ne 0) { throw "Signature verification exited $LASTEXITCODE" }
           "PUBLISH_DIR=$selected" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
 
@@ -339,13 +343,25 @@ jobs:
         shell: pwsh
         env:
           SIGNPATH_ENABLED: ${{ vars.SIGNPATH_ENABLED }}
+          SIGNPATH_EXPECTED_CERTIFICATE_SHA256: ${{ vars.SIGNPATH_EXPECTED_CERTIFICATE_SHA256 }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          ./scripts/verify-release.ps1
-          -DistDir dist
-          -RequireTrustedSignature ($env:SIGNPATH_ENABLED -eq 'true')
-          -Repository $env:GITHUB_REPOSITORY
+        run: |
+          if (-not $env:GITHUB_REF_NAME.StartsWith('v')) {
+            throw "Release tag must start with v: $env:GITHUB_REF_NAME"
+          }
+          ./scripts/verify-release.ps1 `
+            -DistDir dist `
+            -RequireTrustedSignature ($env:SIGNPATH_ENABLED -eq 'true') `
+            -ExpectedSignerCertificateSha256 $env:SIGNPATH_EXPECTED_CERTIFICATE_SHA256 `
+            -Repository $env:GITHUB_REPOSITORY `
+            -ExpectedSignerWorkflow "$env:GITHUB_REPOSITORY/.github/workflows/release.yml" `
+            -ExpectedSourceRef $env:GITHUB_REF `
+            -ExpectedSourceDigest $env:GITHUB_SHA `
+            -ExpectedVersion $env:GITHUB_REF_NAME.Substring(1)
 
       - name: Publish verified release
         shell: pwsh

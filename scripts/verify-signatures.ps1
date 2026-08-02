@@ -6,7 +6,12 @@ param(
     # Trusted SignPath releases must chain to a trusted root. The fallback
     # certificate is deliberately untrusted, but its signatures must still be
     # present and cryptographically intact.
-    [bool]$RequireTrustedSignature = $false
+    [bool]$RequireTrustedSignature = $false,
+
+    # SHA-256 of the complete DER-encoded SignPath signer certificate. This is
+    # intentionally configured only after a rehearsal exposes the certificate.
+    # Certificate rotation requires a reviewed update and another rehearsal.
+    [string]$ExpectedSignerCertificateSha256
 )
 
 $ErrorActionPreference = 'Stop'
@@ -43,6 +48,13 @@ $targets = @(Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object {
 if ($targets.Count -eq 0) {
     throw "No .exe or .dll files found to verify in $root"
 }
+if ($RequireTrustedSignature -and [string]::IsNullOrWhiteSpace($ExpectedSignerCertificateSha256)) {
+    throw 'Trusted signature verification requires -ExpectedSignerCertificateSha256.'
+}
+$expectedCertificateSha256 = $ExpectedSignerCertificateSha256.Trim().ToLowerInvariant()
+if ($expectedCertificateSha256 -and $expectedCertificateSha256 -notmatch '^[0-9a-f]{64}$') {
+    throw 'Expected signer certificate SHA-256 must contain exactly 64 hexadecimal characters.'
+}
 
 $signTool = Resolve-SignTool
 $ownedPaths = @(Get-QuotaBoardOwnedBinaryPaths -RootPath $root)
@@ -67,6 +79,15 @@ foreach ($target in $targets) {
             throw "$relative is $($signature.SignatureType)-signed rather than embedded; the signature would not survive packaging"
         }
         continue
+    }
+
+    if ($isOwned -and $RequireTrustedSignature) {
+        $actualCertificateSha256 = [Convert]::ToHexString(
+            [System.Security.Cryptography.SHA256]::HashData($signature.SignerCertificate.RawData)
+        ).ToLowerInvariant()
+        if ($actualCertificateSha256 -ne $expectedCertificateSha256) {
+            throw "$relative was signed by certificate SHA-256 $actualCertificateSha256; expected $expectedCertificateSha256"
+        }
     }
 
     $verifyOutput = & $signTool verify /pa $target.FullName 2>&1

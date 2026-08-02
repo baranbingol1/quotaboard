@@ -37,7 +37,10 @@ public sealed class ReleaseSigningContractTests
     [Fact]
     public void ReleaseWorkflowSubmitsOnlyAllowlistedFilesAndOverlaysSignedOutput()
     {
-        string workflow = File.ReadAllText(Path.Combine(FindRepositoryRoot(), ".github", "workflows", "release.yml"));
+        string root = FindRepositoryRoot();
+        string workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "release.yml"));
+        string releaseVerifier = File.ReadAllText(Path.Combine(root, "scripts", "verify-release.ps1"));
+        string signatureVerifier = File.ReadAllText(Path.Combine(root, "scripts", "verify-signatures.ps1"));
 
         Assert.Contains("Stage project-owned binaries for SignPath", workflow, StringComparison.Ordinal);
         Assert.Contains("Get-QuotaBoardOwnedBinaryPaths -RootPath $env:PUBLISH_DIR", workflow, StringComparison.Ordinal);
@@ -50,6 +53,21 @@ public sealed class ReleaseSigningContractTests
         Assert.Contains("github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}", workflow, StringComparison.Ordinal);
         Assert.Contains("permissions:\n      actions: read", workflow.Replace("\r\n", "\n"), StringComparison.Ordinal);
         Assert.Contains("-RequireTrustedSignature ($env:SIGNPATH_ENABLED -eq 'true')", workflow, StringComparison.Ordinal);
+
+        // Trusted releases identify QuotaBoard's actual signer rather than any
+        // certificate that happens to chain to a public root.
+        Assert.Contains("ExpectedSignerCertificateSha256", signatureVerifier, StringComparison.Ordinal);
+        Assert.Contains("SIGNPATH_EXPECTED_CERTIFICATE_SHA256", workflow, StringComparison.Ordinal);
+
+        // Provenance and inventory must describe this exact release, not any
+        // older internally-consistent artifact set from the same repository.
+        Assert.Contains("--signer-workflow", releaseVerifier, StringComparison.Ordinal);
+        Assert.Contains("--source-ref", releaseVerifier, StringComparison.Ordinal);
+        Assert.Contains("--source-digest", releaseVerifier, StringComparison.Ordinal);
+        Assert.Contains("ExpectedVersion", releaseVerifier, StringComparison.Ordinal);
+        Assert.Contains("GITHUB_REF", workflow, StringComparison.Ordinal);
+        Assert.Contains("GITHUB_SHA", workflow, StringComparison.Ordinal);
+        Assert.Contains(".github/workflows/release.yml", workflow, StringComparison.Ordinal);
     }
 
     private static string FindRepositoryRoot()
