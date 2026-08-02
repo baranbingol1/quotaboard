@@ -14,6 +14,9 @@
         <Style x:Key="QueryPanelStyle" TargetType="Border" BasedOn="{StaticResource SurfaceBorderStyle}">
             <Setter Property="Padding" Value="18" />
         </Style>
+        <DataTemplate x:Key="FacetItemTemplate">
+            <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{Binding Label}" />
+        </DataTemplate>
         <Style x:Key="FacetListStyle" TargetType="ListView">
             <Setter Property="SelectionMode" Value="Multiple" />
             <Setter Property="IsMultiSelectCheckBoxEnabled" Value="True" />
@@ -23,9 +26,6 @@
             <Setter Property="CornerRadius" Value="7" />
             <Setter Property="ItemTemplate" Value="{StaticResource FacetItemTemplate}" />
         </Style>
-        <DataTemplate x:Key="FacetItemTemplate">
-            <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{Binding Label}" />
-        </DataTemplate>
         <Style x:Key="ChartSeriesToggleStyle" TargetType="ToggleButton">
             <Setter Property="MinHeight" Value="28" />
             <Setter Property="Padding" Value="10,4" />

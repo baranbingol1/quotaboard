@@ -79,6 +79,38 @@ public sealed class ChartSeriesBrushResolverTests
         }
     }
 
+    [Fact]
+    public void UsagePageDeclaresFacetTemplateBeforeTheStyleThatReferencesIt()
+    {
+        XDocument document = XDocument.Load(Path.Combine(
+            FindRepositoryRoot(), "src", "AiLimits.Presentation.WinUI", "Pages", "UsagePage.xaml"));
+        XNamespace xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
+        XElement resources = document.Descendants()
+            .Single(element => element.Name.LocalName == "Page.Resources");
+        XElement[] declarations = resources.Elements().ToArray();
+
+        int template = Array.FindIndex(declarations,
+            element => (string?)element.Attribute(xaml + "Key") == "FacetItemTemplate");
+        int style = Array.FindIndex(declarations,
+            element => (string?)element.Attribute(xaml + "Key") == "FacetListStyle");
+
+        Assert.True(template >= 0 && template < style);
+    }
+
+    [Fact]
+    public void UsagePageThemeCallbackRerendersChartAndModelMixWithoutQuerying()
+    {
+        string source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(), "src", "AiLimits.Presentation.WinUI", "Pages", "UsagePage.xaml.cs"));
+        int callbackStart = source.IndexOf("private void OnThemeApplied", StringComparison.Ordinal);
+        int callbackEnd = source.IndexOf("private void OnProviderSelectionChanged", callbackStart, StringComparison.Ordinal);
+        string callback = source[callbackStart..callbackEnd];
+
+        Assert.Contains("RenderChart(_lastResult)", callback, StringComparison.Ordinal);
+        Assert.Contains("RenderModelMix(_lastResult)", callback, StringComparison.Ordinal);
+        Assert.DoesNotContain("QueryUsage", callback, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);

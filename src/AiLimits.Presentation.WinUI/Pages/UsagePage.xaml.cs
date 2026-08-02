@@ -78,6 +78,7 @@ public sealed partial class UsagePage : Page
             if (_lastResult is not null)
             {
                 RenderChart(_lastResult);
+                RenderModelMix(_lastResult);
             }
         });
 
