@@ -327,8 +327,6 @@
   <data name="Usage_ModelMixSubtitleMany" xml:space="preserve"><value>Bu sorguda {0} model var; en yeni etkinlik sağda.</value></data>
   <data name="Usage_SparkTooltip" xml:space="preserve"><value>{0} · {1} token</value></data>
   <data name="Usage_SparkAutomation" xml:space="preserve"><value>{0}, {1}: {2} token</value></data>
-  <data name="Usage_BarTooltip" xml:space="preserve"><value>{0}
-{1} token</value></data>
   <data name="Usage_BarAutomation" xml:space="preserve"><value>{0}, {1} token</value></data>
   <data name="Usage_ProjectSourceNote" xml:space="preserve"><value>{0} için çalışma dizini bildirilmiyor; bu kullanım {1} altına düşer.</value></data>
   <data name="Usage_JoinAnd" xml:space="preserve"><value> ve </value></data>

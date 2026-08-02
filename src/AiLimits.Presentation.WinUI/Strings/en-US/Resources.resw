@@ -327,8 +327,6 @@
   <data name="Usage_ModelMixSubtitleMany" xml:space="preserve"><value>{0} models in this query, newest activity on the right.</value></data>
   <data name="Usage_SparkTooltip" xml:space="preserve"><value>{0} · {1} tokens</value></data>
   <data name="Usage_SparkAutomation" xml:space="preserve"><value>{0}, {1}: {2} tokens</value></data>
-  <data name="Usage_BarTooltip" xml:space="preserve"><value>{0}
-{1} tokens</value></data>
   <data name="Usage_BarAutomation" xml:space="preserve"><value>{0}, {1} tokens</value></data>
   <data name="Usage_ProjectSourceNote" xml:space="preserve"><value>No working directory is reported for {0}, so that usage lands under {1}.</value></data>
   <data name="Usage_JoinAnd" xml:space="preserve"><value> and </value></data>

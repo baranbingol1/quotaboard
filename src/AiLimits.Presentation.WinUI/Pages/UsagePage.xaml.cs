@@ -521,7 +521,6 @@ public sealed partial class UsagePage : Page
                 label,
                 range,
                 tokens,
-                F("Usage_BarTooltip", range, tokens),
                 F("Usage_BarAutomation", range, tokens),
                 bucket.Tokens == 0 ? 0 : Math.Max(2, PlotHeight * bucket.Tokens / maximum),
                 geometry.ItemWidth,

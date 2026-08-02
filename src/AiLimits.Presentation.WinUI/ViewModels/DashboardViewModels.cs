@@ -137,7 +137,6 @@ public sealed record UsageChartBarViewModel(
     string Label,
     string RangeLabel,
     string Tokens,
-    string Tooltip,
     string AutomationName,
     double Height,
     double ItemWidth,

@@ -243,7 +243,6 @@
                                                   IsTabStop="True" UseSystemFocusVisuals="True" FocusVisualMargin="-2"
                                                   AutomationProperties.Name="{Binding AutomationName}"
                                                   GotFocus="OnChartBarGotFocus" LostFocus="OnChartBarLostFocus"
-                                                  ToolTipService.ToolTip="{Binding Tooltip}"
                                                   PointerEntered="OnChartBarPointerMoved" PointerMoved="OnChartBarPointerMoved" PointerExited="OnChartBarPointerExited">
                                                 <Grid.RowDefinitions><RowDefinition Height="210"/><RowDefinition Height="38"/></Grid.RowDefinitions>
                                                 <StackPanel Width="{Binding BarWidth}" VerticalAlignment="Bottom" HorizontalAlignment="Center">
