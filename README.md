@@ -60,3 +60,15 @@ Font License 1.1; their license texts ship alongside them in
 Model pricing metadata is fetched at runtime from [models.dev](https://models.dev/).
 QuotaBoard records the accepted catalog's timestamp and SHA-256 hash with every
 API-equivalent figure it displays.
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io/),
+certificate by [SignPath Foundation](https://signpath.org/).
+
+- Committer and reviewer: Baran Bingöl ([@baranbingol1](https://github.com/baranbingol1))
+- Signing approver: Baran Bingöl ([@baranbingol1](https://github.com/baranbingol1))
+
+Official releases are built from this public repository using GitHub Actions.
+Each release signing request requires approval by the signing approver. See the
+[privacy policy](PRIVACY.md) for QuotaBoard's data and network practices.

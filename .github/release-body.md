@@ -29,3 +29,13 @@ so there is no .NET to install.
 
 Delete the folder you extracted. To remove the local database, pricing cache and
 preferences as well, delete `%LOCALAPPDATA%\QuotaBoard`.
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io/),
+certificate by [SignPath Foundation](https://signpath.org/).
+
+When SignPath signing is enabled, signed release binaries are built from this
+public repository using GitHub Actions. See the repository's
+[Code signing policy](https://github.com/baranbingol1/quotaboard#code-signing-policy)
+and [privacy policy](https://github.com/baranbingol1/quotaboard/blob/main/PRIVACY.md).
