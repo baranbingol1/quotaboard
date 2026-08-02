@@ -29,6 +29,7 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
     private readonly Func<string?> executableResolver;
 
     private string? _position;
+    private bool _hasYieldedEvent;
 
     public AmpThreadTokenSource(IProcessRunner runner)
         : this(runner, AmpCliStrategy.FindExecutable)
@@ -46,13 +47,14 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
     /// <inheritdoc />
     public string? Position => _position;
 
-    public string? FailureCheckpoint => _position;
+    public string? FailureCheckpoint => _hasYieldedEvent ? null : _position;
 
     public async IAsyncEnumerable<TokenUsageEvent> ReadAsync(
         ProviderAccount account,
         ScannerCursor? cursor,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        _hasYieldedEvent = false;
         string? executable = executableResolver();
         if (executable is null) yield break;
 
@@ -71,6 +73,7 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
         var summaries = new List<AmpThreadSummary>();
         var seenThreadIds = new HashSet<string>(StringComparer.Ordinal);
         bool retriesOutstanding = previous.HasPendingRetries;
+        bool completeListing = false;
         for (int offset = 0; summaries.Count < MaxThreadsPerScan; offset += PageSize)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -83,15 +86,25 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
                 throw new TokenScanException("Amp thread listing exceeded the capture limit and was truncated.");
             if (listResult.ExitCode != 0 || !AmpThreadParser.TryParseThreadList(listResult.StandardOutput, out IReadOnlyList<AmpThreadSummary> page))
                 throw new TokenScanException("Amp thread listing failed.");
-            if (page.Count == 0) break;
+            if (page.Count == 0)
+            {
+                completeListing = true;
+                break;
+            }
 
             // New threads created mid-scan shift offset pages; ids dedupe the
             // re-served entries.
             summaries.AddRange(page.Where(thread => seenThreadIds.Add(thread.Id)));
-            if (page.Count < PageSize) break;
+            if (page.Count < PageSize)
+            {
+                completeListing = true;
+                break;
+            }
             // Once an entire page is older than the rescan cutoff, deeper pages
             // cannot contain activity the cursor has not already covered.
-            if (cutoff.HasValue && page.All(thread => thread.UpdatedAt.HasValue && thread.UpdatedAt < cutoff)) break;
+            if (!retriesOutstanding
+                && cutoff.HasValue
+                && page.All(thread => thread.UpdatedAt.HasValue && thread.UpdatedAt < cutoff)) break;
             // Likewise once an entire page is already at its recorded revision:
             // the listing is ordered newest-updated first, so everything deeper
             // is older still and equally covered. This is what keeps a steady
@@ -112,18 +125,18 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
             {
                 continue;
             }
-            // A retry marker on a thread the cutoff no longer selects can never
-            // be acted on, and carrying it would keep the paging shortcut
-            // suspended for good. Drop it: the thread has no recorded revision,
-            // so it is re-attempted the moment it comes back into the window.
-            if (string.Equals(recorded, AmpScanState.RetryMarker, StringComparison.Ordinal)
-                && cutoff.HasValue
-                && thread.UpdatedAt.HasValue
-                && thread.UpdatedAt < cutoff)
-            {
-                continue;
-            }
             current[thread.Id] = recorded;
+        }
+
+        // Reaching the safety cap does not prove that an unseen pending thread
+        // disappeared. Keep its marker until a complete listing proves that it
+        // no longer exists.
+        if (!completeListing)
+        {
+            foreach (string pendingThreadId in previous.PendingRetryThreadIds)
+            {
+                current.TryAdd(pendingThreadId, AmpScanState.RetryMarker);
+            }
         }
 
         var allUsage = new List<AmpThreadUsage>();
@@ -131,7 +144,10 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
         int failed = 0;
         int unchanged = 0;
         foreach (AmpThreadSummary thread in summaries
-                     .Where(thread => !cutoff.HasValue || !thread.UpdatedAt.HasValue || thread.UpdatedAt >= cutoff)
+                     .Where(thread => previous.IsPendingRetry(thread.Id)
+                         || !cutoff.HasValue
+                         || !thread.UpdatedAt.HasValue
+                         || thread.UpdatedAt >= cutoff)
                      .Take(MaxThreadsPerScan))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -171,13 +187,17 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
                 continue;
             }
             if (exportResult.OutputTruncated
-                || !AmpThreadParser.TryParseUsage(thread.Id, exportResult.StandardOutput, cutoff, out IReadOnlyList<AmpThreadUsage> usage))
+                || !AmpThreadParser.TryParseUsage(
+                    thread.Id,
+                    exportResult.StandardOutput,
+                    previous.IsPendingRetry(thread.Id) ? null : cutoff,
+                    out IReadOnlyList<AmpThreadUsage> usage))
             {
-                // Deterministic for this revision: retrying costs 2.4 s and
-                // fails again. Record it so the thread is reconsidered only
-                // once Amp actually changes it.
+                // A later QuotaBoard parser may understand this output, and a
+                // truncated or temporarily malformed export may recover. Never
+                // turn unreadable data into a successful ingestion watermark.
                 failed++;
-                current[thread.Id] = AmpScanState.Revision(thread);
+                current[thread.Id] = AmpScanState.RetryMarker;
                 continue;
             }
             allUsage.AddRange(usage);
@@ -202,6 +222,10 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
 
         foreach (AmpThreadUsage usage in allUsage.OrderBy(item => item.OccurredAt))
         {
+            // From this point the source position can cover events that the
+            // caller has not committed yet. A downstream persistence failure
+            // must therefore fall back to the scan's starting position.
+            _hasYieldedEvent = true;
             yield return new TokenUsageEvent(
                 account.Key,
                 new ServiceProviderId("amp"),
@@ -255,6 +279,14 @@ internal sealed class AmpScanState
     /// <summary>True while some thread is recorded as owing a retry.</summary>
     public bool HasPendingRetries =>
         _threads.Values.Any(value => string.Equals(value, RetryMarker, StringComparison.Ordinal));
+
+    public IEnumerable<string> PendingRetryThreadIds =>
+        _threads.Where(pair => string.Equals(pair.Value, RetryMarker, StringComparison.Ordinal))
+            .Select(pair => pair.Key);
+
+    public bool IsPendingRetry(string threadId) =>
+        _threads.TryGetValue(threadId, out string? recorded)
+        && string.Equals(recorded, RetryMarker, StringComparison.Ordinal);
 
     public bool TryGetRecorded(string threadId, out string? revision) =>
         _threads.TryGetValue(threadId, out revision);

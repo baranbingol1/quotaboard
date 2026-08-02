@@ -131,6 +131,71 @@ public sealed class AmpProviderTests
     }
 
     [Fact]
+    public async Task A_source_that_has_started_yielding_exposes_no_failure_checkpoint()
+    {
+        var runner = new ScriptedRunner(
+            ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-19T12:00:00Z"}]"""),
+            ScriptedReply.Ok("""{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}"""));
+        var source = new AmpThreadTokenSource(runner, () => "amp-test");
+        var account = new ProviderAccount(
+            new AccountKey(new ProviderId("amp"), "one"), "Amp", null, "fixture", 1, true);
+
+        await using IAsyncEnumerator<TokenUsageEvent> enumerator =
+            source.ReadAsync(account, null, default).GetAsyncEnumerator();
+
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Null(((IScanFailureCheckpointSource)source).FailureCheckpoint);
+    }
+
+    [Fact]
+    public async Task An_old_pending_retry_bypasses_the_overlap_cutoff()
+    {
+        var runner = new ScriptedRunner(
+            ScriptedReply.Ok("""[{"id":"T-ancient","updated":"2026-01-01T00:00:00Z"}]"""),
+            ScriptedReply.Ok("""{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-01-01T00:00:00Z","outputTokens":20}}]}"""));
+        var source = new AmpThreadTokenSource(runner, () => "amp-test");
+        var cursor = new ScannerCursor(
+            source.Id,
+            """{"T-ancient":"!retry"}""",
+            new DateTimeOffset(2026, 7, 20, 0, 0, 0, TimeSpan.Zero),
+            null);
+
+        List<TokenUsageEvent> emitted = await DrainAsync(source, cursor);
+
+        Assert.Single(emitted);
+        Assert.Equal("amp:T-ancient:1", emitted[0].SourceEventId);
+        Assert.DoesNotContain(AmpScanState.RetryMarker, ((IScanPositionSource)source).Position);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task An_unreadable_export_is_retried_at_the_same_revision(bool truncated)
+    {
+        const string listing = """[{"id":"T-a","updated":"2026-07-19T12:00:00Z"}]""";
+        var first = new ScriptedRunner(
+            ScriptedReply.Ok(listing),
+            truncated ? ScriptedReply.Capped("truncated") : ScriptedReply.Ok("not-json"));
+        var firstSource = new AmpThreadTokenSource(first, () => "amp-test");
+
+        await Assert.ThrowsAsync<TokenScanException>(() => DrainAsync(firstSource, cursor: null));
+        string? pendingPosition = ((IScanPositionSource)firstSource).Position;
+        Assert.Contains(AmpScanState.RetryMarker, pendingPosition);
+
+        var second = new ScriptedRunner(
+            ScriptedReply.Ok(listing),
+            ScriptedReply.Ok("""{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}"""));
+        var secondSource = new AmpThreadTokenSource(second, () => "amp-test");
+
+        List<TokenUsageEvent> emitted = await DrainAsync(
+            secondSource,
+            new ScannerCursor(secondSource.Id, pendingPosition, null, null));
+
+        Assert.Single(emitted);
+        Assert.DoesNotContain(AmpScanState.RetryMarker, ((IScanPositionSource)secondSource).Position);
+    }
+
+    [Fact]
     public async Task A_thread_still_at_its_recorded_revision_is_not_exported_again()
     {
         const string listing = """[{"id":"T-a","updated":"2026-07-19T12:00:00Z"},{"id":"T-b","updated":"2026-07-18T12:00:00Z"}]""";
