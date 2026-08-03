@@ -73,7 +73,6 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
         var summaries = new List<AmpThreadSummary>();
         var seenThreadIds = new HashSet<string>(StringComparer.Ordinal);
         bool retriesOutstanding = previous.HasPendingRetries;
-        bool completeListing = false;
         for (int offset = 0; summaries.Count < MaxThreadsPerScan; offset += PageSize)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -88,7 +87,6 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
                 throw new TokenScanException("Amp thread listing failed.");
             if (page.Count == 0)
             {
-                completeListing = true;
                 break;
             }
 
@@ -97,7 +95,6 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
             summaries.AddRange(page.Where(thread => seenThreadIds.Add(thread.Id)));
             if (page.Count < PageSize)
             {
-                completeListing = true;
                 break;
             }
             // Once an entire page is older than the rescan cutoff, deeper pages
@@ -128,21 +125,19 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
             current[thread.Id] = recorded;
         }
 
-        // Reaching the safety cap does not prove that an unseen pending thread
-        // disappeared. Keep its marker until a complete listing proves that it
-        // no longer exists.
-        if (!completeListing)
+        // Offset pages are not a stable snapshot: insertion and deletion can
+        // move a thread across an already-read boundary. Never interpret an
+        // unseen pending id as proof that it disappeared.
+        foreach (string pendingThreadId in previous.PendingRetryThreadIds)
         {
-            foreach (string pendingThreadId in previous.PendingRetryThreadIds)
-            {
-                current.TryAdd(pendingThreadId, AmpScanState.RetryMarker);
-            }
+            current.TryAdd(pendingThreadId, AmpScanState.RetryMarker);
         }
 
         var allUsage = new List<AmpThreadUsage>();
         int exported = 0;
         int failed = 0;
         int unchanged = 0;
+        var attemptedThreadIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (AmpThreadSummary thread in summaries
                      .Where(thread => previous.IsPendingRetry(thread.Id)
                          || !cutoff.HasValue
@@ -151,6 +146,7 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
                      .Take(MaxThreadsPerScan))
         {
             cancellationToken.ThrowIfCancellationRequested();
+            attemptedThreadIds.Add(thread.Id);
             if (previous.IsUnchanged(thread))
             {
                 current[thread.Id] = AmpScanState.Revision(thread);
@@ -205,10 +201,43 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
             exported++;
         }
 
-        // Only threads still in the listing are carried forward, so the stored
-        // state cannot grow without bound as threads age out. Published before
-        // the failure check below so even a scan that ends up reporting failure
-        // hands back the progress it did make.
+        // A retry may sit beyond the normal 200-thread traversal, or shift
+        // behind an offset boundary while pages are being read. Export those
+        // ids directly so the safety cap cannot starve recovery indefinitely.
+        // Without a listing revision, a successful retry is left unrecorded;
+        // its stable event ids make replay safe, and a future thread update
+        // brings it back into the normal overlap window.
+        foreach (string pendingThreadId in previous.PendingRetryThreadIds.Where(id => !attemptedThreadIds.Contains(id)))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ProcessResult retryResult = await runner.RunAsync(
+                executable,
+                ["threads", "export", pendingThreadId],
+                TimeSpan.FromSeconds(30),
+                MaxExportChars,
+                cancellationToken).ConfigureAwait(false);
+            if (retryResult.ExitCode != 0
+                || retryResult.OutputTruncated
+                || !AmpThreadParser.TryParseUsage(
+                    pendingThreadId,
+                    retryResult.StandardOutput,
+                    null,
+                    out IReadOnlyList<AmpThreadUsage> retryUsage))
+            {
+                failed++;
+                current[pendingThreadId] = AmpScanState.RetryMarker;
+                continue;
+            }
+
+            allUsage.AddRange(retryUsage);
+            current.Remove(pendingThreadId);
+            exported++;
+        }
+
+        // Successful revisions are retained only for listed threads. Pending
+        // markers are deliberately retained until their direct export succeeds.
+        // Publish before the failure check so a scan with no yielded events can
+        // safely preserve its retry progress.
         _position = AmpScanState.Serialize(current);
 
         if (exported == 0 && unchanged == 0 && failed > 0)

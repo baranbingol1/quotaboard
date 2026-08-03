@@ -167,6 +167,68 @@ public sealed class AmpProviderTests
         Assert.DoesNotContain(AmpScanState.RetryMarker, ((IScanPositionSource)source).Position);
     }
 
+    [Fact]
+    public async Task A_pending_retry_skipped_by_mutable_pagination_is_exported_directly()
+    {
+        var runner = new ScriptedRunner(
+            ScriptedReply.Ok("""[{"id":"T-other","updated":"2026-01-01T00:00:00Z"}]"""),
+            ScriptedReply.Ok("""{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-01-01T00:00:00Z","outputTokens":20}}]}"""));
+        var source = new AmpThreadTokenSource(runner, () => "amp-test");
+        var cursor = new ScannerCursor(
+            source.Id,
+            """{"T-pending":"!retry"}""",
+            new DateTimeOffset(2026, 7, 20, 0, 0, 0, TimeSpan.Zero),
+            null);
+
+        List<TokenUsageEvent> emitted = await DrainAsync(source, cursor);
+
+        Assert.Equal("T-pending", runner.Calls[1][2]);
+        Assert.Equal("amp:T-pending:1", Assert.Single(emitted).SourceEventId);
+        Assert.DoesNotContain(AmpScanState.RetryMarker, ((IScanPositionSource)source).Position);
+    }
+
+    [Fact]
+    public async Task A_seen_pending_retry_beyond_the_listing_safety_cap_is_exported_directly()
+    {
+        var replies = new List<ScriptedReply>();
+        for (int page = 0; page < 9; page++)
+        {
+            string listing = "[" + string.Join(",", Enumerable.Range(page * 20, 20).Select(index =>
+                $$"""{"id":"T-{{index}}","updated":"2026-01-01T00:00:00Z"}""")) + "]";
+            replies.Add(ScriptedReply.Ok(listing));
+        }
+        // Mutable offset pagination can repeat entries. This page adds only ten
+        // new ids, leaving room for one more full page to overflow the cap.
+        string duplicatePage = "[" + string.Join(",", Enumerable.Range(0, 10)
+            .Concat(Enumerable.Range(180, 10))
+            .Select(index => $$"""{"id":"T-{{index}}","updated":"2026-01-01T00:00:00Z"}""")) + "]";
+        replies.Add(ScriptedReply.Ok(duplicatePage));
+        string overflowPage = "[" + string.Join(",", Enumerable.Range(190, 19)
+            .Select(index => $$"""{"id":"T-{{index}}","updated":"2026-01-01T00:00:00Z"}"""))
+            + "," + """{"id":"T-pending","updated":"2026-01-01T00:00:00Z"}]""";
+        replies.Add(ScriptedReply.Ok(overflowPage));
+        replies.Add(ScriptedReply.Ok(
+            """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-01-01T00:00:00Z","outputTokens":20}}]}"""));
+        var runner = new ScriptedRunner([.. replies]);
+        var source = new AmpThreadTokenSource(runner, () => "amp-test");
+        var previous = Enumerable.Range(0, 200).ToDictionary(
+            index => $"T-{index}",
+            _ => "2026-01-01T00:00:00.0000000+00:00",
+            StringComparer.Ordinal);
+        previous["T-pending"] = AmpScanState.RetryMarker;
+        var cursor = new ScannerCursor(
+            source.Id,
+            AmpScanState.Serialize(previous),
+            null,
+            null);
+
+        List<TokenUsageEvent> emitted = await DrainAsync(source, cursor);
+
+        Assert.Equal(12, runner.CallCount);
+        Assert.Equal("T-pending", runner.Calls[^1][2]);
+        Assert.Equal("amp:T-pending:1", Assert.Single(emitted).SourceEventId);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
