@@ -68,6 +68,11 @@ public sealed class ReleaseSigningContractTests
         Assert.Contains("GITHUB_REF", workflow, StringComparison.Ordinal);
         Assert.Contains("GITHUB_SHA", workflow, StringComparison.Ordinal);
         Assert.Contains(".github/workflows/release.yml", workflow, StringComparison.Ordinal);
+        Assert.Contains("gh release download $env:TAG --dir dist", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("--pattern '*.zip'", workflow, StringComparison.Ordinal);
+        Assert.Contains("github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')", workflow, StringComparison.Ordinal);
+        Assert.Contains("Compare-Object $expectedAssets $actualAssets -CaseSensitive", releaseVerifier, StringComparison.Ordinal);
+        Assert.Contains("but no expected certificate is configured", signatureVerifier, StringComparison.Ordinal);
     }
 
     private static string FindRepositoryRoot()

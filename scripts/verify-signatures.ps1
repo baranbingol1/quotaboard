@@ -48,10 +48,11 @@ $targets = @(Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object {
 if ($targets.Count -eq 0) {
     throw "No .exe or .dll files found to verify in $root"
 }
-if ($RequireTrustedSignature -and [string]::IsNullOrWhiteSpace($ExpectedSignerCertificateSha256)) {
-    throw 'Trusted signature verification requires -ExpectedSignerCertificateSha256.'
+$expectedCertificateSha256 = if ([string]::IsNullOrWhiteSpace($ExpectedSignerCertificateSha256)) {
+    ''
+} else {
+    $ExpectedSignerCertificateSha256.Trim().ToLowerInvariant()
 }
-$expectedCertificateSha256 = $ExpectedSignerCertificateSha256.Trim().ToLowerInvariant()
 if ($expectedCertificateSha256 -and $expectedCertificateSha256 -notmatch '^[0-9a-f]{64}$') {
     throw 'Expected signer certificate SHA-256 must contain exactly 64 hexadecimal characters.'
 }
@@ -85,6 +86,9 @@ foreach ($target in $targets) {
         $actualCertificateSha256 = [Convert]::ToHexString(
             [System.Security.Cryptography.SHA256]::HashData($signature.SignerCertificate.RawData)
         ).ToLowerInvariant()
+        if (-not $expectedCertificateSha256) {
+            throw "$relative has signer certificate SHA-256 $actualCertificateSha256, but no expected certificate is configured. Verify this value independently against the SignPath-assigned certificate, configure it, and rerun the rehearsal."
+        }
         if ($actualCertificateSha256 -ne $expectedCertificateSha256) {
             throw "$relative was signed by certificate SHA-256 $actualCertificateSha256; expected $expectedCertificateSha256"
         }

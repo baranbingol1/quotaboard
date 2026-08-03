@@ -111,7 +111,7 @@ $expectedAssets = @(
     }
 ) | Sort-Object
 $actualAssets = @(Get-ChildItem -LiteralPath $resolvedDistDir -File | Select-Object -ExpandProperty Name | Sort-Object)
-$assetDifference = @(Compare-Object $expectedAssets $actualAssets)
+$assetDifference = @(Compare-Object $expectedAssets $actualAssets -CaseSensitive)
 if ($assetDifference.Count -gt 0) {
     $detail = ($assetDifference | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }) -join "`n"
     throw "Release asset inventory does not exactly match version ${ExpectedVersion}:`n$detail"

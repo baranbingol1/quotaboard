@@ -286,7 +286,7 @@ jobs:
   release:
     name: Publish release
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -336,8 +336,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
-          gh release download $env:TAG --dir dist `
-            --pattern '*.zip' --pattern '*.sha256' --pattern '*.spdx.json'
+          gh release download $env:TAG --dir dist
 
       - name: Verify hashes, signatures, attestation, and SBOM
         shell: pwsh
