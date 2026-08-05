@@ -382,7 +382,11 @@ public sealed class AmpProviderTests
         // compare equal to any real `updated`, or the thread would be skipped.
         Assert.Contains("T-a", position);
         Assert.Contains(AmpScanState.RetryMarker, position);
-        Assert.DoesNotContain("2026-07-19T12:00:00", position);
+        // The revision rides along inside the marker so that new content can
+        // grant a fresh retry budget. What must never happen is the thread
+        // being recorded *as* that revision, which would compare equal and skip
+        // it — so the check is on the recorded value, not the whole document.
+        Assert.DoesNotContain("\"T-a\":\"2026-07-19T12:00:00", position);
 
         var second = new ScriptedRunner(
             ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-19T12:00:00Z"}]"""),
@@ -455,6 +459,98 @@ public sealed class AmpProviderTests
 
         Assert.Single(emitted);
         Assert.Equal(2, runner.CallCount);
+    }
+
+    [Fact]
+    public async Task A_thread_that_can_never_be_parsed_stops_being_retried()
+    {
+        // Amp wrote `usage` without a `model` before mid-2026 and the parser
+        // rejects those, so the export succeeds and is unreadable every single
+        // time. Left unbounded this pins HasPendingRetries true forever, which
+        // suspends both listing shortcuts on every future scan.
+        const string listing = """
+            [{"id":"T-old","updated":"2026-06-09T00:48:32Z"},{"id":"T-new","updated":"2026-06-09T01:00:00Z"}]
+            """;
+        const string modelless = """
+            {"messages":[{"messageId":1,"usage":{"timestamp":"2026-06-09T00:48:32.566Z","outputTokens":55,"cacheCreationInputTokens":14669}}]}
+            """;
+        const string good = """
+            {"messages":[{"messageId":2,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-06-09T01:00:00Z","outputTokens":20}}]}
+            """;
+
+        string? position = null;
+        int exportsOfOldThread = 0;
+        for (int scan = 0; scan < 6; scan++)
+        {
+            var replies = new List<ScriptedReply> { ScriptedReply.Ok(listing) };
+            // T-old is offered first and always fails; T-new exports on scan one
+            // and is unchanged afterwards.
+            replies.Add(ScriptedReply.Ok(modelless));
+            replies.Add(ScriptedReply.Ok(good));
+            var runner = new ScriptedRunner([.. replies]);
+            var source = new AmpThreadTokenSource(runner, () => "amp-test");
+
+            await DrainAsync(source, new ScannerCursor(source.Id, position, null, null));
+            position = ((IScanPositionSource)source).Position;
+            exportsOfOldThread += runner.Calls.Count(call => call is ["threads", "export", "T-old"]);
+        }
+
+        // Three attempts, then written off — not retried on every scan forever.
+        Assert.Equal(3, exportsOfOldThread);
+        Assert.DoesNotContain(AmpScanState.RetryMarker, position);
+        // Written off, but never as a revision: an export we could not read must
+        // not masquerade as successfully ingested.
+        Assert.Contains("T-old", position);
+        Assert.DoesNotContain("\"T-old\":\"2026-06-09T00:48:32", position);
+    }
+
+    [Fact]
+    public async Task A_spent_retry_lets_the_listing_shortcut_resume()
+    {
+        // The cost of an unbounded retry is not the failed export itself, it is
+        // that HasPendingRetries suspends the "page fully covered" shortcut, so
+        // every refresh pages the whole listing instead of one page.
+        string fullPage = "[" + string.Join(",", Enumerable.Range(0, 20).Select(i =>
+            $$"""{"id":"T-{{i}}","updated":"2026-07-19T12:00:00Z"}""")) + "]";
+        var previous = Enumerable.Range(0, 20).ToDictionary(
+            i => $"T-{i}",
+            _ => "2026-07-19T12:00:00.0000000+00:00",
+            StringComparer.Ordinal);
+        // T-0 already spent its budget at exactly this revision.
+        previous["T-0"] = AmpScanState.GaveUp("2026-07-19T12:00:00.0000000+00:00");
+
+        var runner = new ScriptedRunner(ScriptedReply.Ok(fullPage));
+        var source = new AmpThreadTokenSource(runner, () => "amp-test");
+
+        await DrainAsync(source, new ScannerCursor(source.Id, AmpScanState.Serialize(previous), null, null));
+
+        // One listing call, no exports: the shortcut is back.
+        Assert.Equal(1, runner.CallCount);
+    }
+
+    [Fact]
+    public async Task A_direct_retry_failure_alone_does_not_fail_the_whole_scan()
+    {
+        // The listed window is empty (everything is older than the cutoff) and
+        // the only work is a known-bad thread the listing no longer offers.
+        // That must stay a quiet no-op, not a provider-wide failure.
+        const string listing = """[{"id":"T-listed","updated":"2026-01-01T00:00:00Z"}]""";
+        var previous = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["T-listed"] = "2026-01-01T00:00:00.0000000+00:00",
+            ["T-gone"] = AmpScanState.RetryMarker,
+        };
+        var runner = new ScriptedRunner(
+            ScriptedReply.Ok(listing),
+            ScriptedReply.Failed("amp: Failed to export thread"));
+        var source = new AmpThreadTokenSource(runner, () => "amp-test");
+
+        List<TokenUsageEvent> emitted = await DrainAsync(
+            source,
+            new ScannerCursor(source.Id, AmpScanState.Serialize(previous), new DateTimeOffset(2026, 7, 19, 0, 0, 0, TimeSpan.Zero), null));
+
+        Assert.Empty(emitted);
+        Assert.Equal("T-gone", runner.Calls[^1][2]);
     }
 
     private static async Task<List<TokenUsageEvent>> DrainAsync(AmpThreadTokenSource source, ScannerCursor? cursor)

@@ -16,6 +16,24 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
     private const int MaxThreadsPerScan = 200;
 
     /// <summary>
+    /// Export attempts a thread gets at one revision before it is written off.
+    /// Some threads can never be parsed: Amp wrote `usage` without a `model`
+    /// before mid-2026, and this machine still has such a thread from June.
+    /// Retrying one of those forever would pin <c>retriesOutstanding</c> true,
+    /// which permanently suspends both listing shortcuts and puts every refresh
+    /// back on the full ten-page traversal those shortcuts exist to avoid.
+    /// </summary>
+    private const int MaxRetryAttempts = 3;
+
+    /// <summary>
+    /// Direct exports of pending threads that the listing no longer offers.
+    /// Unlike the listed path this one has no <see cref="MaxThreadsPerScan"/>
+    /// to fall back on, so it needs its own ceiling; the remainder keeps its
+    /// marker and is picked up by the next scan.
+    /// </summary>
+    private const int MaxDirectRetriesPerScan = 20;
+
+    /// <summary>
     /// A thread export is a full conversation transcript, and real ones reach
     /// several MB — one of this machine's is 6.25 MB. The default 4 MB stream
     /// cap flagged those as truncated, which used to abort the entire scan.
@@ -135,7 +153,12 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
 
         var allUsage = new List<AmpThreadUsage>();
         int exported = 0;
-        int failed = 0;
+        // Failures are counted per path. Only the listed path speaks to whether
+        // this scan learned anything: the direct path below re-attempts threads
+        // that were already known to be failing, so its failures must not be
+        // able to turn a quiet scan into a reported provider failure.
+        int listedFailures = 0;
+        int directFailures = 0;
         int unchanged = 0;
         var attemptedThreadIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (AmpThreadSummary thread in summaries
@@ -149,7 +172,14 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
             attemptedThreadIds.Add(thread.Id);
             if (previous.IsUnchanged(thread))
             {
-                current[thread.Id] = AmpScanState.Revision(thread);
+                // Preserve whatever proved this thread covered. For a real
+                // revision that is the same string either way; for a thread
+                // written off after spending its retry budget, overwriting it
+                // with the revision would quietly promote an export we could
+                // never read into a successful ingestion watermark.
+                current[thread.Id] = previous.TryGetRecorded(thread.Id, out string? covered) && covered is not null
+                    ? covered
+                    : AmpScanState.Revision(thread);
                 unchanged++;
                 continue;
             }
@@ -178,8 +208,8 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
                 // but a page ahead of it can still cut the listing short, and
                 // the thread would then never be offered again until Amp
                 // happened to touch it.
-                failed++;
-                current[thread.Id] = AmpScanState.RetryMarker;
+                listedFailures++;
+                current[thread.Id] = NextRetryValue(previous, thread.Id, AmpScanState.Revision(thread));
                 continue;
             }
             if (exportResult.OutputTruncated
@@ -190,10 +220,13 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
                     out IReadOnlyList<AmpThreadUsage> usage))
             {
                 // A later QuotaBoard parser may understand this output, and a
-                // truncated or temporarily malformed export may recover. Never
-                // turn unreadable data into a successful ingestion watermark.
-                failed++;
-                current[thread.Id] = AmpScanState.RetryMarker;
+                // truncated or temporarily malformed export may recover, so this
+                // is retried rather than recorded as a revision. It is still
+                // bounded: after MaxRetryAttempts the thread is written off with
+                // a marker that is distinct from a real revision, so it never
+                // reads as successfully ingested and a future parser can find it.
+                listedFailures++;
+                current[thread.Id] = NextRetryValue(previous, thread.Id, AmpScanState.Revision(thread));
                 continue;
             }
             allUsage.AddRange(usage);
@@ -207,7 +240,9 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
         // Without a listing revision, a successful retry is left unrecorded;
         // its stable event ids make replay safe, and a future thread update
         // brings it back into the normal overlap window.
-        foreach (string pendingThreadId in previous.PendingRetryThreadIds.Where(id => !attemptedThreadIds.Contains(id)))
+        foreach (string pendingThreadId in previous.PendingRetryThreadIds
+                     .Where(id => !attemptedThreadIds.Contains(id))
+                     .Take(MaxDirectRetriesPerScan))
         {
             cancellationToken.ThrowIfCancellationRequested();
             ProcessResult retryResult = await runner.RunAsync(
@@ -224,8 +259,21 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
                     null,
                     out IReadOnlyList<AmpThreadUsage> retryUsage))
             {
-                failed++;
-                current[pendingThreadId] = AmpScanState.RetryMarker;
+                directFailures++;
+                int attempts = previous.RetryAttempts(pendingThreadId, revision: null) + 1;
+                if (attempts >= MaxRetryAttempts)
+                {
+                    // Unlisted and still unexportable after a full budget: most
+                    // likely deleted server-side. There is no revision to write
+                    // off against, so drop it. If it ever returns to the listing
+                    // it is treated as new and exported like any other thread.
+                    current.Remove(pendingThreadId);
+                }
+                else
+                {
+                    current[pendingThreadId] =
+                        AmpScanState.Retry(attempts, previous.RetryRevisionOf(pendingThreadId));
+                }
                 continue;
             }
 
@@ -240,13 +288,17 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
         // safely preserve its retry progress.
         _position = AmpScanState.Serialize(current);
 
-        if (exported == 0 && unchanged == 0 && failed > 0)
+        if (exported == 0 && unchanged == 0 && listedFailures > 0)
         {
             // Every thread we actually attempted failed and none were already
             // covered: nothing was learned, which is a real failure worth
             // surfacing. A partial failure is not — that is the whole point of
-            // the per-thread handling above.
-            throw new TokenScanException($"Amp could not export any of {failed} thread(s).");
+            // the per-thread handling above. Direct-path failures are excluded
+            // deliberately: those threads were already known to be failing, so
+            // on a scan whose listed window happens to be empty they would
+            // otherwise report the whole provider as broken on every refresh.
+            throw new TokenScanException(
+                $"Amp could not export any of {listedFailures + directFailures} thread(s).");
         }
 
         foreach (AmpThreadUsage usage in allUsage.OrderBy(item => item.OccurredAt))
@@ -269,6 +321,19 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
                 ProjectIdentity.Unknown);
         }
     }
+
+    /// <summary>
+    /// Advances a thread's retry budget by one failed attempt, writing it off
+    /// once the budget is spent so that a thread which can never be exported
+    /// cannot keep the listing shortcuts suspended for good.
+    /// </summary>
+    private static string NextRetryValue(AmpScanState previous, string threadId, string revision)
+    {
+        int attempts = previous.RetryAttempts(threadId, revision) + 1;
+        return attempts >= MaxRetryAttempts
+            ? AmpScanState.GaveUp(revision)
+            : AmpScanState.Retry(attempts, revision);
+    }
 }
 
 /// <summary>
@@ -284,10 +349,55 @@ internal sealed class AmpScanState
     /// <summary>
     /// Recorded in place of a revision for a thread whose export failed for a
     /// reason that may not recur. It never compares equal to a real revision,
-    /// so the thread is always re-attempted, and its presence keeps the listing
-    /// paging far enough to reach it.
+    /// so the thread is re-attempted, and its presence keeps the listing paging
+    /// far enough to reach it. Written as <c>!retry:attempts:revision</c>; the
+    /// bare form is the legacy value and counts as one attempt already spent.
     /// </summary>
     public const string RetryMarker = "!retry";
+
+    /// <summary>
+    /// Recorded once a thread has spent its retry budget at one revision. It is
+    /// deliberately not a revision — an export we could not read must never
+    /// masquerade as successfully ingested, and a future parser can still find
+    /// these — but it does read as covered, so it stops costing an export every
+    /// scan and stops holding the listing shortcuts open. A new revision clears
+    /// it and the thread gets a fresh budget.
+    /// </summary>
+    private const string GaveUpPrefix = "!gaveup:";
+
+    public static string Retry(int attempts, string revision) =>
+        RetryMarker + ":" + attempts.ToString(CultureInfo.InvariantCulture) + ":" + revision;
+
+    public static string GaveUp(string revision) => GaveUpPrefix + revision;
+
+    /// <summary>
+    /// Splits a retry marker into the attempts already spent and the revision
+    /// they were spent at. The revision is an ISO-8601 stamp and contains its
+    /// own colons, so only the first two separators are significant.
+    /// </summary>
+    private static bool TryParseRetry(string value, out int attempts, out string revision)
+    {
+        attempts = 0;
+        revision = string.Empty;
+        if (!value.StartsWith(RetryMarker, StringComparison.Ordinal)) return false;
+        if (value.Length == RetryMarker.Length)
+        {
+            attempts = 1;
+            return true;
+        }
+        if (value[RetryMarker.Length] != ':') return false;
+
+        string rest = value[(RetryMarker.Length + 1)..];
+        int separator = rest.IndexOf(':', StringComparison.Ordinal);
+        string attemptsText = separator < 0 ? rest : rest[..separator];
+        revision = separator < 0 ? string.Empty : rest[(separator + 1)..];
+        if (!int.TryParse(attemptsText, NumberStyles.Integer, CultureInfo.InvariantCulture, out attempts)
+            || attempts < 1)
+        {
+            attempts = 1;
+        }
+        return true;
+    }
 
     private static readonly JsonSerializerOptions SerializerOptions =
         new JsonSerializerOptions(JsonSerializerDefaults.Web);
@@ -300,22 +410,56 @@ internal sealed class AmpScanState
     /// A thread with no <c>updated</c> stamp has no revision to compare, so it
     /// is never considered unchanged — correctness beats the saved subprocess.
     /// </summary>
-    public bool IsUnchanged(AmpThreadSummary thread) =>
-        thread.UpdatedAt.HasValue
-        && _threads.TryGetValue(thread.Id, out string? recorded)
-        && string.Equals(recorded, Revision(thread), StringComparison.Ordinal);
+    public bool IsUnchanged(AmpThreadSummary thread)
+    {
+        if (!thread.UpdatedAt.HasValue
+            || !_threads.TryGetValue(thread.Id, out string? recorded))
+        {
+            return false;
+        }
+        string revision = Revision(thread);
+        // A thread written off at this exact revision is covered in the sense
+        // that matters here: there is nothing further to try until Amp changes
+        // it, so it must not keep costing an export or hold the shortcuts open.
+        return string.Equals(recorded, revision, StringComparison.Ordinal)
+            || string.Equals(recorded, GaveUp(revision), StringComparison.Ordinal);
+    }
 
     /// <summary>True while some thread is recorded as owing a retry.</summary>
     public bool HasPendingRetries =>
-        _threads.Values.Any(value => string.Equals(value, RetryMarker, StringComparison.Ordinal));
+        _threads.Values.Any(value => value.StartsWith(RetryMarker, StringComparison.Ordinal));
 
     public IEnumerable<string> PendingRetryThreadIds =>
-        _threads.Where(pair => string.Equals(pair.Value, RetryMarker, StringComparison.Ordinal))
+        _threads.Where(pair => pair.Value.StartsWith(RetryMarker, StringComparison.Ordinal))
             .Select(pair => pair.Key);
 
     public bool IsPendingRetry(string threadId) =>
         _threads.TryGetValue(threadId, out string? recorded)
-        && string.Equals(recorded, RetryMarker, StringComparison.Ordinal);
+        && recorded.StartsWith(RetryMarker, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Attempts already spent on <paramref name="threadId"/>. A marker recorded
+    /// against a different revision has been superseded by new content, which
+    /// earns a fresh budget; pass <c>null</c> to accept whatever was recorded.
+    /// </summary>
+    public int RetryAttempts(string threadId, string? revision)
+    {
+        if (!_threads.TryGetValue(threadId, out string? recorded)
+            || !TryParseRetry(recorded, out int attempts, out string recordedRevision))
+        {
+            return 0;
+        }
+        return revision is not null
+            && !string.Equals(recordedRevision, revision, StringComparison.Ordinal)
+                ? 0
+                : attempts;
+    }
+
+    public string RetryRevisionOf(string threadId) =>
+        _threads.TryGetValue(threadId, out string? recorded)
+        && TryParseRetry(recorded, out _, out string revision)
+            ? revision
+            : string.Empty;
 
     public bool TryGetRecorded(string threadId, out string? revision) =>
         _threads.TryGetValue(threadId, out revision);
