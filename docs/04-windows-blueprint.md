@@ -364,7 +364,7 @@ Exit: all Codex acceptance cases in section 5 pass without live credentials in C
 - API-token provider template;
 - account management;
 - settings import/export without secrets;
-- updater and signed MSIX pipeline.
+- portable release automation with checksums, SBOMs, and provenance.
 
 ### Phase 3 — web providers
 
@@ -392,4 +392,4 @@ Exit: all Codex acceptance cases in section 5 pass without live credentials in C
 - The app works without a tray icon.
 - All pages are keyboard navigable and usable at 200% scaling/high contrast.
 - Web integrations are optional and isolated.
-- MSIX is signed; installer/update rollback is tested.
+- Portable x64 and ARM64 archives pass release-integrity and launch checks.

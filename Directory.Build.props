@@ -11,8 +11,12 @@
          a tag whose name disagrees with this, so the number in Windows'
          file-properties dialog always matches the release it came from. -->
     <Version>0.1.1</Version>
-    <!-- SignPath's release artifact policy identifies every project-owned PE
-         as part of the same QuotaBoard product. -->
     <Product>QuotaBoard</Product>
+    <!-- Audit all transitive dependencies and block known high or critical
+         vulnerabilities during restore. Lower severities remain visible. -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>high</NuGetAuditLevel>
+    <WarningsAsErrors>$(WarningsAsErrors);NU1903;NU1904</WarningsAsErrors>
   </PropertyGroup>
 </Project>

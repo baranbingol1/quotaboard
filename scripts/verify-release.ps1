@@ -4,11 +4,6 @@ param(
     [Parameter(Mandatory)]
     [string]$DistDir,
 
-    # When true (SignPath signing enabled), every project-owned binary must
-    # chain to a trusted root. Existing vendor signatures are always checked;
-    # unsigned vendor binaries are permitted and remain untouched.
-    [bool]$RequireTrustedSignature = $false,
-
     # GitHub repository (owner/repo) for `gh attestation verify`. When set,
     # each release ZIP is verified against its build-provenance attestation.
     [string]$Repository,
@@ -19,9 +14,7 @@ param(
 
     [string]$ExpectedSourceDigest,
 
-    [string]$ExpectedVersion,
-
-    [string]$ExpectedSignerCertificateSha256
+    [string]$ExpectedVersion
 )
 
 $ErrorActionPreference = 'Stop'
@@ -33,10 +26,8 @@ Post-release verification.
 Runs against assets re-downloaded from the published GitHub release, not the
 files left on the build agent, so upload corruption or tampering is caught.
 For every archive: the .sha256 sidecar must match, the full archive must pass
-publish-layout and architecture validation, every project-owned PE must carry
-an Authenticode signature, existing vendor signatures must remain valid, and
-(when -Repository is set) build-provenance
-attestation must verify.
+publish-layout and architecture validation, and (when -Repository is set) its
+build-provenance attestation must verify.
 
 SBOMs get the same treatment as archives, not a weaker structural one: an
 SPDX asset must exist for every ZIP, match its own .sha256 sidecar, verify
@@ -150,19 +141,12 @@ foreach ($zip in $zips) {
         if ($LASTEXITCODE -ne 0) {
             throw "$($zip.Name): publish validation failed (exit $LASTEXITCODE)"
         }
-        & (Join-Path $scriptDir 'verify-signatures.ps1') `
-            -RootPath $tempDir `
-            -RequireTrustedSignature $RequireTrustedSignature `
-            -ExpectedSignerCertificateSha256 $ExpectedSignerCertificateSha256
-        if ($LASTEXITCODE -ne 0) {
-            throw "$($zip.Name): signature verification failed (exit $LASTEXITCODE)"
-        }
     }
     finally {
         Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 
-    Write-Host "$($zip.Name): sha256 ok, $entryCount entries, signature ok"
+    Write-Host "$($zip.Name): sha256 ok, $entryCount entries, publish layout ok"
 
     Assert-Attestation -Asset $zip -Repo $Repository `
         -SignerWorkflow $ExpectedSignerWorkflow `

@@ -148,7 +148,7 @@ The codebase is a working tracer-bullet implementation and native UI, not a rele
 6. Add provider-specific fixture matrices for every documented 401/403, malformed, renamed, partial, reordered, and account-mismatch case.
 7. Run explicit real-account contract checks for all eight providers and redact the resulting fixtures.
 8. Add scanner backfill scheduling, locked/truncated-file stress tests, and measured large-history performance.
-9. Produce and sign MSIX/AppInstaller packages, configure the signed update feed, and test install/update/rollback on Windows 10 22H2 and current Windows 11.
+9. Produce x64 and ARM64 portable archives with checksums, SBOMs, and provenance, then test extracted launches on Windows 10 22H2 and current Windows 11.
 10. Execute the full accessibility matrix: Narrator, keyboard-only use, high contrast, 200% scaling, reduced motion, and localization.
 11. Validate ARM64 on physical or virtual ARM64 hardware.
 12. Measure the 500 ms cached-dashboard startup gate on the chosen reference machine.

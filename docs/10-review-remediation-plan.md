@@ -1,10 +1,10 @@
 # 10 — Review remediation plan
 
-Handoff plan for the three findings raised in the July 2026 review of
+Handoff plan for the two findings raised in the July 2026 review of
 `fix/quotaboard-review-findings`, after validation against the code, the local
 usage database, and the repository's GitHub configuration.
 
-All three findings are real. None is P1. The re-rating and the reasoning behind
+Both findings are real. Neither is P1. The re-rating and the reasoning behind
 each fix are recorded below so the engineer picking this up does not have to
 re-derive them.
 
@@ -15,12 +15,10 @@ re-derive them.
 | U1 | Chart overflow series share the Others brush | P1 → | **P2** | ~half day |
 | U2 | `ChartSeries5Brush` is a twin of `ChartSeries3Brush` in the XAML fallback | not reported | **P3** | ~15 min |
 | C1 | Cline session store races across processes | P1 → | **P2** | ~1–2 days |
-| R1 | Signed artifact is packaged without revalidation | P1 → | **P2, gated** | ~half day |
 | A1 | High-contrast chart ramp uses palette colors, not system colors | not reported | **investigate** | ~1 hr to triage |
 
-Suggested order: U2 → U1 → C1 → R1. U2 and U1 are contained UI work in one
-area; C1 needs a design decision; R1 is not urgent until SignPath is enabled but
-must land before that switch is flipped.
+Suggested order: U2 → U1 → C1. U2 and U1 are contained UI work in one area;
+C1 needs a design decision.
 
 ---
 
@@ -276,82 +274,6 @@ integration test; a unit test around the timeout-degrades-to-unlocked path does.
 
 ---
 
-## R1 — Signed artifact packaged without revalidation
-
-### Problem
-
-`.github/workflows/release.yml` validates the publish directory at lines
-119–126, then lets SignPath write into that same directory at lines 133–151, and
-then generates the SBOM, packages, and attests with no revalidation. Post-release
-`scripts/verify-release.ps1` extracts only `QuotaBoard.exe` (`:84-89`) and
-checks the signature only on that file, so nothing verifies the shipped DLLs,
-the file inventory, or the architecture after signing.
-
-Correction to the finding as originally written: the SignPath action extracts
-the returned artifact *over* the existing directory without clearing it, so
-files missing from the signed artifact leave the unsigned originals in place —
-they do not disappear. The real failure modes are stale unsigned DLLs shipping
-as though signed, and files replaced with wrong-architecture or wrong-content
-ones.
-
-### Status: latent, not shipping-broken
-
-`gh variable list` returns empty, so `SIGNPATH_ENABLED` is unset. Both shipped
-releases (v0.1.0, v0.1.1) went through the self-signed fallback
-(`scripts/sign-release.ps1`), which signs the exe **and** every DLL in place
-(`:49-51`). The SignPath branch has never executed.
-
-Treat this as a **blocker on enabling SignPath**, not as an urgent fix. It
-should land before the variable is set, not before the next release.
-
-### Fix
-
-1. Have SignPath write to a **clean** directory (e.g.
-   `...\release\win-<arch>-signed`) rather than over its own input, so the
-   returned inventory is observable.
-2. Add a post-sign step that:
-   - compares the signed directory's file inventory against the unsigned input
-     (same relative paths, no additions, no omissions) and fails on any diff;
-   - re-runs `scripts/validate-publish.ps1 -Architecture <arch>` against the
-     signed directory;
-   - verifies an Authenticode signature on every `.exe` and `.dll` intended to
-     be signed, failing on any unsigned or invalid one.
-3. Point the SBOM, package, and attestation steps at the signed directory.
-4. Extend `scripts/verify-release.ps1` to extract the full archive to a temp
-   directory rather than pulling out `QuotaBoard.exe` alone, and to run the same
-   required-file, architecture, and per-binary signature checks on the extracted
-   contents.
-
-Factor the per-binary signature check into a helper shared by the workflow step
-and `verify-release.ps1` so the two cannot drift. The `-RequireTrustedSignature`
-distinction must carry through: the self-signed fallback path has to keep
-passing with an untrusted root.
-
-### Files
-
-- `.github/workflows/release.yml`
-- `scripts/verify-release.ps1`
-- `scripts/validate-publish.ps1` (only if the inventory comparison lives there)
-- possibly a new `scripts/verify-signatures.ps1`
-
-### Acceptance
-
-- With `SIGNPATH_ENABLED` unset, the release workflow behaves as it does today
-  and still passes end to end.
-- A signed directory missing a file present in the unsigned input fails the build.
-- A signed directory containing an unsigned DLL fails the build.
-- `verify-release.ps1` fails a release whose archive contains an unsigned DLL.
-
-### Verification
-
-This cannot be validated by reading alone. Exercise it with a
-`workflow_dispatch` run on the fallback path, and — before enabling SignPath for
-real — a rehearsal against a SignPath test policy. Deliberately corrupting one
-DLL in a scratch branch is the cheapest way to prove the new checks actually fail
-the build.
-
----
-
 ## A1 — High-contrast chart ramp (investigate)
 
 `ThemeDictionaryBuilder.Build` sets the `HighContrast` theme dictionary from the
@@ -375,5 +297,3 @@ never the only channel") matters more here than anywhere else.
   server-side refresh-token rotation race untouched. See C1.
 - Do not extend the chart ramp past six slots to fix U1. Ten palettes would each
   need new twin-free hues in two modes. See U1.
-- Do not treat R1 as blocking the next release. It is dormant until
-  `SIGNPATH_ENABLED` is set. See R1.

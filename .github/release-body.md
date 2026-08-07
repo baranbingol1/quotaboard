@@ -10,11 +10,10 @@ telemetry.
 2. Extract it anywhere and run `QuotaBoard.exe`. There is no installer and no
    administrator rights are needed; nothing is written outside the folder you
    extracted to and `%LOCALAPPDATA%\QuotaBoard`.
-3. These builds are code-signed when repository signing is enabled; otherwise
-   they carry an untrusted CI test signature, so Windows SmartScreen may still
-   warn that the publisher is unknown: **More info → Run anyway**. Each
-   release also ships an SPDX SBOM and a build-provenance attestation, which
-   you can check with `gh attestation verify`.
+3. These builds are unsigned, so Windows SmartScreen may warn that the publisher
+   is unknown: **More info → Run anyway**. Download them only from this official
+   release. Each release also ships an SPDX SBOM and a build-provenance
+   attestation, which you can check with `gh attestation verify`.
 
 Verify a download against its `.sha256` file:
 
@@ -30,12 +29,10 @@ so there is no .NET to install.
 Delete the folder you extracted. To remove the local database, pricing cache and
 preferences as well, delete `%LOCALAPPDATA%\QuotaBoard`.
 
-## Code signing policy
+## Release integrity
 
-Free code signing provided by [SignPath.io](https://about.signpath.io/),
-certificate by [SignPath Foundation](https://signpath.org/).
-
-When SignPath signing is enabled, signed release binaries are built from this
-public repository using GitHub Actions. See the repository's
-[Code signing policy](https://github.com/baranbingol1/quotaboard#code-signing-policy)
-and [privacy policy](https://github.com/baranbingol1/quotaboard/blob/main/PRIVACY.md).
+Release archives and SPDX SBOMs are built from this public repository using
+GitHub Actions. Each asset has a SHA-256 sidecar and a GitHub build-provenance
+attestation. See the repository's [release integrity
+policy](https://github.com/baranbingol1/quotaboard#release-integrity) and
+[privacy policy](https://github.com/baranbingol1/quotaboard/blob/main/PRIVACY.md).

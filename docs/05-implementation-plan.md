@@ -1,13 +1,13 @@
 # AI Limits for Windows — Accepted Implementation Plan
 
 Status: **accepted and in implementation**  
-Last updated: 2026-07-13
+Last updated: 2026-08-07
 
 ## 1. Product boundary
 
-AI Limits is a local-first Windows desktop application built with .NET 10, C#, WinUI 3, the Windows App SDK, CommunityToolkit.Mvvm, and native XAML. WebView2 is restricted to provider authentication. Local data uses SQLite in WAL mode; app-owned secrets use Windows Credential Manager or current-user DPAPI. Releases are signed MSIX/AppInstaller packages. The minimum operating system is Windows 10 22H2 build 19045, with Windows 11 visual enhancements when available.
+AI Limits is a local-first Windows desktop application built with .NET 10, C#, WinUI 3, the Windows App SDK, CommunityToolkit.Mvvm, and native XAML. WebView2 is restricted to provider authentication. Local data uses SQLite in WAL mode; app-owned secrets use Windows Credential Manager or current-user DPAPI. Releases are unsigned, self-contained x64 and ARM64 ZIP archives with checksums, SBOMs, and GitHub provenance attestations. The minimum operating system is Windows 10 22H2 build 19045, with Windows 11 visual enhancements when available.
 
-There is no AI Limits cloud account, remote proxy, telemetry backend, browser-cookie import, generic pay-as-you-go API monitoring, or remotely executable provider-rule system. Provider code changes ship only through signed application updates. models.dev pricing is the only remotely refreshed application metadata.
+There is no AI Limits cloud account, remote proxy, telemetry backend, browser-cookie import, generic pay-as-you-go API monitoring, or remotely executable provider-rule system. Provider code changes ship only through public releases produced and attested by GitHub Actions. models.dev pricing is the only remotely refreshed application metadata.
 
 The solution is split into these layers:
 
@@ -89,7 +89,7 @@ Alerts are enabled by default and can be disabled in Settings, with suggested 80
 2. **Dynamic dashboard, Codex, and Claude:** complete visual system, real limits, exact scanners, pricing, model resolution, and multi-account isolation.
 3. **OpenCode:** unified Zen/Go limits, isolated sign-in, database discovery, exact token ingestion, and vendor/model resolution.
 4. **Amp, Droid, and Copilot:** ordered strategies, auth flows, dynamic meters, balances, AI-credit enrichment, and explicit coverage states.
-5. **Windows/release hardening:** tray, alerts, startup, power/session behavior, signed packaging/update feed, compatibility, accessibility, attribution, and release docs.
+5. **Windows/release hardening:** tray, alerts, startup, power/session behavior, portable packaging, provenance, compatibility, accessibility, attribution, and release docs.
 
 Public v1 is blocked until all eight providers pass their real-account limit-acquisition release checks.
 
@@ -107,8 +107,8 @@ Release gates are:
 - Dollar totals expose catalog time/hash and exclude unresolved models.
 - SQLite, logs, crash output, and exports contain no secret, prompt, or source content.
 - Cached dashboard render is under 500 ms on the reference machine; WebView2 is absent outside sign-in.
-- Signed packages pass Windows 10 22H2 and current Windows 11 smoke, accessibility, install, update, and rollback checks.
+- Release archives pass Windows 10 22H2 and current Windows 11 smoke, accessibility, extracted-launch, and provenance checks.
 
 ## 11. Locked decisions
 
-The product/namespace names are `AI Limits` and `AiLimits`. The main UI remains native WinUI 3. OpenCode Zen and Go are one provider. All eight providers and multiple accounts are required for public v1. Subscription access keys and official CLI credentials are allowed; generic API-account monitoring is not. Zen balance is an explicit exception. Token totals are exact-only. The headline dollar metric is today’s upstream API list-price equivalent. Provider adapters update only with signed releases. App-owned isolated WebView2 sessions replace external-browser cookie extraction.
+The product/namespace names are `AI Limits` and `AiLimits`. The main UI remains native WinUI 3. OpenCode Zen and Go are one provider. All eight providers and multiple accounts are required for public v1. Subscription access keys and official CLI credentials are allowed; generic API-account monitoring is not. Zen balance is an explicit exception. Token totals are exact-only. The headline dollar metric is today’s upstream API list-price equivalent. Provider adapters update only with published releases. App-owned isolated WebView2 sessions replace external-browser cookie extraction.

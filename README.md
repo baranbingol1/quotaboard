@@ -38,7 +38,7 @@ Diagnostics shows which source answered for each provider, how long it took, and
 2. Extract it anywhere and run `QuotaBoard.exe`. There is no installer, and no administrator rights are required.
 3. Select **Refresh**. QuotaBoard detects supported tools already signed in for the current Windows user.
 
-Releases are code-signed when repository signing is enabled; other builds carry an untrusted CI test signature, so Windows SmartScreen may still require **More info → Run anyway**. Each archive ships with a `.sha256` file you can check with `Get-FileHash`, and releases publish build-provenance attestations verifiable with `gh attestation verify`.
+QuotaBoard releases are unsigned, so Windows SmartScreen may require **More info → Run anyway**. Download them only from the official Releases page.
 
 Requires Windows 10 21H2 (build 19045) or newer. The runtime is self-contained, so there is no .NET to install.
 
@@ -61,14 +61,10 @@ Model pricing metadata is fetched at runtime from [models.dev](https://models.de
 QuotaBoard records the accepted catalog's timestamp and SHA-256 hash with every
 API-equivalent figure it displays.
 
-## Code signing policy
-
-Free code signing provided by [SignPath.io](https://about.signpath.io/),
-certificate by [SignPath Foundation](https://signpath.org/).
-
-- Committer and reviewer: Baran Bingöl ([@baranbingol1](https://github.com/baranbingol1))
-- Signing approver: Baran Bingöl ([@baranbingol1](https://github.com/baranbingol1))
+## Release integrity
 
 Official releases are built from this public repository using GitHub Actions.
-Each release signing request requires approval by the signing approver. See the
-[privacy policy](PRIVACY.md) for QuotaBoard's data and network practices.
+Each archive and SPDX SBOM has a SHA-256 sidecar and a GitHub build-provenance
+attestation. Verify an archive with `gh attestation verify <archive> --repo
+baranbingol1/quotaboard`. See the [privacy policy](PRIVACY.md) for QuotaBoard's
+data and network practices.
