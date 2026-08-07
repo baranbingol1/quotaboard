@@ -139,7 +139,7 @@ jobs:
           $expected = '625767b371b7fdd58f40f618b8a86da0247a33c89e419039c86b4edba1dad4b5'
           $actual = (Get-FileHash $tool -Algorithm SHA256).Hash.ToLower()
           if ($actual -ne $expected) { throw "sbom-tool sha256 mismatch: expected $expected, got $actual" }
-          & $tool generate -b $env:PUBLISH_DIR -bc . -pn QuotaBoard -pv "${{ steps.version.outputs.version }}" -nsb 'https://github.com/baranbingol1/quotaboard'
+          & $tool generate -b $env:PUBLISH_DIR -bc . -pn QuotaBoard -pv "${{ steps.version.outputs.version }}" -ps 'Baran Bingöl' -nsb 'https://github.com/baranbingol1/quotaboard'
           if ($LASTEXITCODE -ne 0) { throw "sbom-tool exited $LASTEXITCODE" }
           $manifest = Join-Path $env:PUBLISH_DIR '_manifest\spdx_2.2\manifest.spdx.json'
           if (-not (Test-Path $manifest)) { throw "SBOM was not generated at $manifest" }

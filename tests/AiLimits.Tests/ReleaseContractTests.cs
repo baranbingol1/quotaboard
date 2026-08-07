@@ -14,6 +14,7 @@ public sealed class ReleaseContractTests
         Assert.Contains("Validate publish output", workflow, StringComparison.Ordinal);
         Assert.Contains("PUBLISH_DIR=$env:RUNNER_TEMP", workflow, StringComparison.Ordinal);
         Assert.Contains("-OutputPath $env:PUBLISH_DIR", workflow, StringComparison.Ordinal);
+        Assert.Contains("-ps 'Baran Bingöl'", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("SignPath", workflow, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("sign-release.ps1", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("verify-signatures.ps1", releaseVerifier, StringComparison.Ordinal);
