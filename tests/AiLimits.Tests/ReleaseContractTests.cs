@@ -12,6 +12,7 @@ public sealed class ReleaseContractTests
         string releaseVerifier = File.ReadAllText(Path.Combine(root, "scripts", "verify-release.ps1"));
 
         Assert.Contains("Validate publish output", workflow, StringComparison.Ordinal);
+        Assert.Contains("PUBLISH_DIR=$env:RUNNER_TEMP", workflow, StringComparison.Ordinal);
         Assert.Contains("-OutputPath $env:PUBLISH_DIR", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("SignPath", workflow, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("sign-release.ps1", workflow, StringComparison.Ordinal);

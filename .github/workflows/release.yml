@@ -63,8 +63,6 @@ jobs:
     needs: tests
     runs-on: windows-latest
     timeout-minutes: 45
-    env:
-      PUBLISH_DIR: ${{ runner.temp }}\AiLimits\release\win-${{ matrix.arch }}
     # id-token + attestations are for the provenance attestation step.
     permissions:
       contents: read
@@ -88,6 +86,14 @@ jobs:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'global.json') }}
           restore-keys: nuget-${{ runner.os }}-
+
+      # runner.temp is unavailable while GitHub evaluates job-level env.
+      # Set the path after the runner starts so every later step can use it.
+      - name: Set publish directory
+        shell: pwsh
+        run: >-
+          "PUBLISH_DIR=$env:RUNNER_TEMP\AiLimits\release\win-${{ matrix.arch }}"
+          | Out-File $env:GITHUB_ENV -Append -Encoding utf8
 
       # A tag that disagrees with Directory.Build.props would ship binaries
       # whose file version contradicts their download name. Fail loudly here
