@@ -148,7 +148,11 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
         // unseen pending id as proof that it disappeared.
         foreach (string pendingThreadId in previous.PendingRetryThreadIds)
         {
-            current.TryAdd(pendingThreadId, AmpScanState.RetryMarker);
+            if (previous.TryGetRecorded(pendingThreadId, out string? retryMarker)
+                && retryMarker is not null)
+            {
+                current.TryAdd(pendingThreadId, retryMarker);
+            }
         }
 
         var allUsage = new List<AmpThreadUsage>();

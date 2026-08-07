@@ -553,6 +553,29 @@ public sealed class AmpProviderTests
         Assert.Equal("T-gone", runner.Calls[^1][2]);
     }
 
+    [Fact]
+    public async Task The_direct_retry_cap_preserves_unattempted_retry_state()
+    {
+        const string revision = "2026-06-09T00:48:32.0000000+00:00";
+        var previous = Enumerable.Range(0, 21).ToDictionary(
+            index => $"T-{index:D2}",
+            _ => AmpScanState.Retry(2, revision),
+            StringComparer.Ordinal);
+        var replies = new List<ScriptedReply> { ScriptedReply.Ok("[]") };
+        replies.AddRange(Enumerable.Repeat(ScriptedReply.Failed("amp: Failed to export thread"), 20));
+        var runner = new ScriptedRunner([.. replies]);
+        var source = new AmpThreadTokenSource(runner, () => "amp-test");
+
+        await DrainAsync(source, new ScannerCursor(source.Id, AmpScanState.Serialize(previous), null, null));
+
+        Assert.Equal(21, runner.CallCount);
+        Assert.DoesNotContain(runner.Calls, call => call is ["threads", "export", "T-20"]);
+        using JsonDocument position = JsonDocument.Parse(((IScanPositionSource)source).Position!);
+        Assert.Equal(
+            AmpScanState.Retry(2, revision),
+            position.RootElement.GetProperty("T-20").GetString());
+    }
+
     private static async Task<List<TokenUsageEvent>> DrainAsync(AmpThreadTokenSource source, ScannerCursor? cursor)
     {
         var account = new ProviderAccount(
