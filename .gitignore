@@ -42,6 +42,9 @@ GeneratedFiles/
 /.claude/
 /CLAUDE.md
 
+# Internal design notes. Keep them on disk; do not publish them.
+/docs/
+
 # OS metadata
 .DS_Store
 Thumbs.db
