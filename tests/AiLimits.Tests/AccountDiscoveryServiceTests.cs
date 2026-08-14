@@ -28,7 +28,7 @@ public sealed class AccountDiscoveryServiceTests
         await repository.UpsertAsync(saved, CancellationToken.None);
         AccountDiscoveryService service = Service(repository, new ThrowingAdapter("codex"));
 
-        IReadOnlyList<ProviderAccount> result = await service.DiscoverAsync(CancellationToken.None);
+        IReadOnlyList<ProviderAccount> result = (await service.DiscoverAsync(CancellationToken.None)).Accounts;
 
         ProviderAccount preserved = Assert.Single(result);
         Assert.True(preserved.IsConnected);
@@ -46,7 +46,7 @@ public sealed class AccountDiscoveryServiceTests
         );
         AccountDiscoveryService service = Service(repository, new ScriptedAdapter("codex"));
 
-        IReadOnlyList<ProviderAccount> result = await service.DiscoverAsync(CancellationToken.None);
+        IReadOnlyList<ProviderAccount> result = (await service.DiscoverAsync(CancellationToken.None)).Accounts;
 
         ProviderAccount disconnected = Assert.Single(result);
         Assert.False(disconnected.IsConnected);
@@ -71,7 +71,7 @@ public sealed class AccountDiscoveryServiceTests
             new ScriptedAdapter("claude")
         );
 
-        IReadOnlyList<ProviderAccount> result = await service.DiscoverAsync(CancellationToken.None);
+        IReadOnlyList<ProviderAccount> result = (await service.DiscoverAsync(CancellationToken.None)).Accounts;
 
         ProviderAccount codex = result.Single(account => account.Key.Provider.Value == "codex");
         ProviderAccount claude = result.Single(account => account.Key.Provider.Value == "claude");
@@ -99,8 +99,8 @@ public sealed class AccountDiscoveryServiceTests
             new ScriptedAdapter("codex", Account("codex", "user@example.com", revision: 0, connected: true))
         );
 
-        IReadOnlyList<ProviderAccount> first = await service.DiscoverAsync(CancellationToken.None);
-        IReadOnlyList<ProviderAccount> second = await service.DiscoverAsync(CancellationToken.None);
+        IReadOnlyList<ProviderAccount> first = (await service.DiscoverAsync(CancellationToken.None)).Accounts;
+        IReadOnlyList<ProviderAccount> second = (await service.DiscoverAsync(CancellationToken.None)).Accounts;
 
         ProviderAccount account = Assert.Single(second);
         Assert.Single(first);
@@ -122,7 +122,7 @@ public sealed class AccountDiscoveryServiceTests
         };
         AccountDiscoveryService service = Service(repository, new ScriptedAdapter("codex", changedAuth));
 
-        IReadOnlyList<ProviderAccount> result = await service.DiscoverAsync(CancellationToken.None);
+        IReadOnlyList<ProviderAccount> result = (await service.DiscoverAsync(CancellationToken.None)).Accounts;
 
         Assert.Equal(3, Assert.Single(result).ConfigurationRevision);
     }
@@ -141,10 +141,13 @@ public sealed class AccountDiscoveryServiceTests
             new ScriptedAdapter("claude", Account("claude", "b@example.com", revision: 0, connected: true))
         );
 
-        IReadOnlyList<ProviderAccount> result = await service.DiscoverAsync(CancellationToken.None);
+        AccountDiscoveryResult discovery = await service.DiscoverAsync(CancellationToken.None);
+        IReadOnlyList<ProviderAccount> result = discovery.Accounts;
 
         Assert.True(result.Single(account => account.Key.Provider.Value == "codex").IsConnected);
         Assert.True(result.Single(account => account.Key.Provider.Value == "claude").IsConnected);
+        Assert.Contains(new ProviderId("codex"), discovery.Failures.Keys);
+        Assert.DoesNotContain(new ProviderId("codex"), discovery.SuccessfulProviders);
     }
 
     [Fact]

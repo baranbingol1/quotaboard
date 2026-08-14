@@ -14,6 +14,7 @@
     <Platforms>x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <PublishProfile>win-$(Platform).pubxml</PublishProfile>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\AiLimits.Domain\AiLimits.Domain.csproj" />
@@ -24,12 +25,17 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="H.NotifyIcon.WinUI" />
     <PackageReference Include="Microsoft.WindowsAppSDK" />
+    <PackageReference Include="Velopack" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Assets\Fonts\**\*" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\QuotaBoard.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\QuotaBoard-Light.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\QuotaBoard-Tray-Glyph.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\THIRD-PARTY-NOTICES.txt" Link="THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AiLimits.Tests" />
   </ItemGroup>
   <Import Project="PublishLayout.targets" />
 </Project>

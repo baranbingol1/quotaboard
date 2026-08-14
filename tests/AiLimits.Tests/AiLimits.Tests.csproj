@@ -13,6 +13,7 @@
     <ProjectReference Include="..\..\src\AiLimits.Infrastructure\AiLimits.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\AiLimits.Platform.Windows\AiLimits.Platform.Windows.csproj" />
     <ProjectReference Include="..\..\src\AiLimits.Presentation.WinUI\AiLimits.Presentation.WinUI.csproj" />
+    <ProjectReference Include="..\..\src\AiLimits.App\AiLimits.App.csproj" />
     <PackageReference Include="coverlet.collector">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

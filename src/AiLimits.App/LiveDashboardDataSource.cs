@@ -107,6 +107,9 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
 
     private readonly AccountDiscoveryService _discovery;
 
+    private IReadOnlyDictionary<ProviderId, ProviderDiscoveryFailureKind> _discoveryFailures =
+        new Dictionary<ProviderId, ProviderDiscoveryFailureKind>();
+
     private readonly RefreshCoordinator _refresh;
 
     private readonly ModelsDevPricingCatalog _catalog;
@@ -221,7 +224,9 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             {
                 _lastRefreshHadTransientFailure = false;
                 progress?.Report(new RefreshProgress(0, 0, string.Empty, RefreshStage.DiscoveringAccounts));
-                accounts = await DiscoverAccountsAsync(cancellationToken).ConfigureAwait(false);
+                AccountDiscoveryResult discovery = await DiscoverAccountsAsync(cancellationToken).ConfigureAwait(false);
+                accounts = discovery.Accounts;
+                _discoveryFailures = discovery.Failures;
                 // The history scan and the limit fetch share nothing but this
                 // account list: one reads local logs off disk, the other calls
                 // provider APIs. Awaiting the scan first made every number on
@@ -360,7 +365,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         }
     }
 
-    private Task<IReadOnlyList<ProviderAccount>> DiscoverAccountsAsync(CancellationToken cancellationToken)
+    private Task<AccountDiscoveryResult> DiscoverAccountsAsync(CancellationToken cancellationToken)
     {
         return _discovery.DiscoverAsync(cancellationToken);
     }
@@ -1632,12 +1637,15 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             (string ActionLabel, string ActionKind, string ActionTarget) action = ConnectionAction(descriptor.Id.Value);
             if (array.Length == 0)
             {
+                bool retrying = _discoveryFailures.ContainsKey(descriptor.Id);
                 string accountLabel =
                     descriptor.Id.Value == "opencode" ? L("Data_NoLocalHistory")
                     : descriptor.Id.Value == "droid" ? L("Data_NoFactorySession")
                     : L("Data_NoLocalAccount");
                 string status =
-                    descriptor.Id.Value == "opencode" ? L("Data_HistoryNotDetected") : L("Data_NotConnected");
+                    retrying ? L("Data_DiscoveryRetrying")
+                    : descriptor.Id.Value == "opencode" ? L("Data_HistoryNotDetected")
+                    : L("Data_NotConnected");
                 list.Add(
                     new ProviderConnectionViewModel(
                         descriptor.DisplayName,
@@ -1650,7 +1658,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                         action.ActionKind,
                         action.ActionTarget,
                         descriptor.Id.Value,
-                        isConnected: false
+                        isConnected: retrying
                     )
                 );
                 continue;
@@ -1755,23 +1763,25 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
     private static MeterViewModel ToMeterViewModel(UsageMeter meter)
     {
         double valueOrDefault = meter.UsedPercent.GetValueOrDefault();
-        string usedLabel = !meter.Used.HasValue
-            ? F("Meter_PercentUsed", valueOrDefault)
+        string usedLabel =
+            !meter.UsedPercent.HasValue ? L("Meter_Unknown")
+            : !meter.Used.HasValue ? F("Meter_PercentUsed", valueOrDefault)
             : F("Meter_MeasureUsed", FormatMeasure(meter.Used.Value, meter.Unit));
         string remainingLabel =
-            meter.Limit.HasValue && meter.Used.HasValue
+            !meter.UsedPercent.HasValue ? L("Meter_Unknown")
+            : meter.Limit.HasValue && meter.Used.HasValue
                 ? F(
                     "Meter_MeasureRemaining",
                     FormatMeasure(Math.Max(0m, meter.Limit.Value - meter.Used.Value), meter.Unit)
                 )
-                : F("Meter_PercentRemaining", Math.Max(0.0, 100.0 - valueOrDefault));
+            : F("Meter_PercentRemaining", Math.Max(0.0, 100.0 - valueOrDefault));
         string resetLabel = !meter.ResetsAt.HasValue
             ? L("Meter_NoScheduledReset")
             : F("Meter_ResetsIn", Countdown(meter.ResetsAt.Value - DateTimeOffset.UtcNow));
         return new MeterViewModel(
             meter.Key.Value,
             RuntimeText.MeterDisplayName(meter.Key.Value, meter.DisplayName),
-            valueOrDefault,
+            meter.UsedPercent,
             usedLabel,
             remainingLabel,
             resetLabel,

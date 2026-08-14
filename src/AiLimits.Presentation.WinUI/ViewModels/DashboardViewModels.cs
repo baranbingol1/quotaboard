@@ -86,7 +86,7 @@ public sealed record ProviderCardViewModel(
 public sealed record MeterViewModel(
     string Key,
     string DisplayName,
-    double UsedPercent,
+    double? UsedPercent,
     string UsedLabel,
     string RemainingLabel,
     string ResetLabel,
@@ -101,11 +101,16 @@ public sealed record MeterViewModel(
 
     // Producers clamp upstream, but a NaN/Infinity that slips through must
     // degrade to "not applicable" instead of binding NaN to a ProgressBar.
-    private double SafePercent => double.IsFinite(UsedPercent) ? Math.Clamp(UsedPercent, 0, 100) : 0;
-    public bool IsZeroOrNotApplicable => SafePercent <= 0 || Status is MeterStatus.Unknown or MeterStatus.Unavailable;
+    private bool HasKnownPercent => UsedPercent.HasValue && double.IsFinite(UsedPercent.Value);
+    private double SafePercent => HasKnownPercent ? Math.Clamp(UsedPercent!.Value, 0, 100) : 0;
+    public bool IsZeroOrNotApplicable =>
+        !HasKnownPercent || SafePercent <= 0 || Status is MeterStatus.Unknown or MeterStatus.Unavailable;
     public double DisplayPercent =>
-        DashboardDisplayPreference.Current.ShowUsageAsRemaining ? Math.Max(0, 100 - SafePercent) : SafePercent;
-    public string PercentLabel => $"{DisplayPercent:0.#}%";
+        !HasKnownPercent ? 0
+        : DashboardDisplayPreference.Current.ShowUsageAsRemaining ? Math.Max(0, 100 - SafePercent)
+        : SafePercent;
+    public string PercentLabel =>
+        HasKnownPercent ? $"{DisplayPercent:0.#}%" : LocalizationService.GetString("Meter_Unknown");
     public string DisplayUsageLabel =>
         DashboardDisplayPreference.Current.ShowUsageAsRemaining ? RemainingLabel : UsedLabel;
     public string DisplayResetLabel =>
@@ -124,6 +129,8 @@ public sealed record MeterViewModel(
                 MeterStatus.Exhausted => LocalizationService.GetString("Meter_StatusExhausted"),
                 MeterStatus.Critical => LocalizationService.GetString("Meter_StatusCritical"),
                 MeterStatus.Approaching => LocalizationService.GetString("Meter_StatusWatch"),
+                MeterStatus.Unknown => LocalizationService.GetString("Meter_StatusUnknown"),
+                MeterStatus.Unavailable => LocalizationService.GetString("Meter_StatusUnavailable"),
                 _ => LocalizationService.GetString("Meter_StatusOnTrack"),
             };
     public Visibility NewVisibility => IsNew ? Visibility.Visible : Visibility.Collapsed;

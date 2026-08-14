@@ -48,6 +48,18 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
     /// <summary>Every observed model row (unpaged); used by the manual-pricing settings.</summary>
     public IReadOnlyList<ModelUsageRowViewModel> AllModelRows => _allModelRows;
     public ObservableCollection<ProviderConnectionViewModel> Connections { get; } = [];
+
+    [ObservableProperty]
+    public partial bool IsUsageEmpty { get; set; }
+
+    [ObservableProperty]
+    public partial bool ArePlanLimitsEmpty { get; set; }
+
+    [ObservableProperty]
+    public partial bool AreResetsEmpty { get; set; }
+
+    [ObservableProperty]
+    public partial bool HasNoSupportedTools { get; set; }
     public ObservableCollection<FetchAttemptViewModel> RecentAttempts { get; } = [];
     public ObservableCollection<ProjectUsageViewModel> ProjectUsage { get; } = [];
 
@@ -390,6 +402,10 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
         Replace(HeatmapCells, data.HeatmapCells);
         Replace(ResetCycles, data.ResetCycles);
         Replace(Connections, data.Connections);
+        IsUsageEmpty = data.ProviderUsage.Count == 0;
+        ArePlanLimitsEmpty = data.Providers.Count == 0;
+        AreResetsEmpty = data.ResetHorizon.Count == 0;
+        HasNoSupportedTools = data.Connections.All(connection => !connection.IsConnected);
         Replace(RecentAttempts, data.RecentAttempts);
         _usageHistory = data.UsageHistory;
         _usageModelSlices = data.UsageModelSlices;

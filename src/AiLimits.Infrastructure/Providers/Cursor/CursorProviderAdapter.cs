@@ -62,10 +62,15 @@ public sealed class CursorCredentialSource
             _logger.LogWarning(ex, "Cursor app is holding the database (SQLITE_BUSY/LOCKED after retry).");
             throw new IOException("Cursor app is holding the database; please close it and try again.", ex);
         }
-        catch (Exception error) when (error is SqliteException or IOException or UnauthorizedAccessException)
+        catch (IOException error)
+        {
+            _logger.LogWarning(error, "Cursor credential store is temporarily unavailable.");
+            throw;
+        }
+        catch (Exception error) when (error is SqliteException or UnauthorizedAccessException)
         {
             _logger.LogWarning(error, "Cursor credential store could not be read.");
-            return null;
+            throw new IOException("Cursor credential store is temporarily unavailable.", error);
         }
     }
 
@@ -218,28 +223,20 @@ public sealed class CursorProviderAdapter : IProviderAdapter
 
     public async Task<IReadOnlyList<ProviderAccount>> DiscoverAccountsAsync(CancellationToken cancellationToken)
     {
-        try
-        {
-            CursorCredential? credential = await credentialSource.ReadAsync(cancellationToken).ConfigureAwait(false);
-            return credential is null
-                ? []
-                :
-                [
-                    new ProviderAccount(
-                        new AccountKey(Descriptor.Id, credential.Subject),
-                        "Cursor",
-                        null,
-                        "Cursor app session",
-                        1,
-                        IsConnected: true
-                    ),
-                ];
-        }
-        catch (IOException)
-        {
-            // Database is locked by the Cursor app; no accounts can be discovered.
-            return [];
-        }
+        CursorCredential? credential = await credentialSource.ReadAsync(cancellationToken).ConfigureAwait(false);
+        return credential is null
+            ? []
+            :
+            [
+                new ProviderAccount(
+                    new AccountKey(Descriptor.Id, credential.Subject),
+                    "Cursor",
+                    null,
+                    "Cursor app session",
+                    1,
+                    IsConnected: true
+                ),
+            ];
     }
 
     public IReadOnlyList<ILimitFetchStrategy> CreateLimitStrategies(ProviderAccount account) =>

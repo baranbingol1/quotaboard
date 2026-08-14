@@ -229,7 +229,7 @@ public sealed class CursorProviderTests
     }
 
     [Fact]
-    public async Task LockedDatabaseDoesNotCrashDiscovery()
+    public async Task LockedDatabaseFailsDiscoveryInsteadOfReturningAuthoritativeEmpty()
     {
         string token = Jwt("auth0|user-123", Now.AddHours(1));
         using var database = TestDatabase.Create("cursorAuth/accessToken", token);
@@ -245,9 +245,7 @@ public sealed class CursorProviderTests
 
         var adapter = new CursorProviderAdapter(new HttpClient(), new FixedClock(), database.Path);
 
-        // Discovery must not throw; it returns an empty list when the DB is inaccessible.
-        var accounts = await adapter.DiscoverAccountsAsync(default);
-        Assert.Empty(accounts);
+        await Assert.ThrowsAsync<IOException>(() => adapter.DiscoverAccountsAsync(default));
     }
 
     [Fact]

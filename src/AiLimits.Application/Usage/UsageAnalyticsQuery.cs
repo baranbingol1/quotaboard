@@ -125,6 +125,13 @@ public sealed record UsageModelTrend(
     DateOnly? LastUsed
 );
 
+public enum UsageEmptyReason
+{
+    None,
+    NoHistory,
+    NoMatches,
+}
+
 public sealed record UsageAnalyticsResult(
     DateOnly From,
     DateOnly Through,
@@ -132,6 +139,7 @@ public sealed record UsageAnalyticsResult(
     decimal? ApiEquivalentCostUsd,
     long PricedTokens,
     int MatchingRecordCount,
+    UsageEmptyReason EmptyReason,
     UsageComparison? Comparison,
     UsageFacetSet Facets,
     IReadOnlyList<UsageChartBucket> Chart,
@@ -182,6 +190,9 @@ public static class UsageAnalyticsQueryEngine
             totalCost,
             pricedTokens,
             current.Length,
+            current.Length > 0 ? UsageEmptyReason.None
+                : records.Count == 0 ? UsageEmptyReason.NoHistory
+                : UsageEmptyReason.NoMatches,
             normalized.ComparePreviousPeriod ? BuildComparison(records, normalized, current) : null,
             BuildFacets(records, normalized),
             chart.Buckets,

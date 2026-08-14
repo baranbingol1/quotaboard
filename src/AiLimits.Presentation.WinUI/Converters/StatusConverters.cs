@@ -15,6 +15,7 @@ public sealed class StatusBrushConverter : IValueConverter
         var key =
             value is MeterStatus.Critical or MeterStatus.Exhausted ? "CriticalBrush"
             : value is MeterStatus.Approaching ? "WarningBrush"
+            : value is MeterStatus.Unknown or MeterStatus.Unavailable ? "TextQuietBrush"
             : "HealthyBrush";
         return ThemeService.ResolveThemeResource(key) ?? new SolidColorBrush(Colors.Gray);
     }

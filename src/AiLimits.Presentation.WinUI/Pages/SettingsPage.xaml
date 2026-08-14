@@ -20,6 +20,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <StackPanel>
@@ -84,7 +85,7 @@
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="200"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock x:Uid="Settings_StartWithWindowsLabel" Text="Start with Windows" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                            <TextBlock x:Uid="Settings_StartWithWindowsDescription" Text="Launch minimized to the tray when you sign in" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                            <TextBlock x:Uid="Settings_StartWithWindowsDescription" Text="Launch QuotaBoard when you sign in. It starts in the tray when tray monitoring is on." FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"/>
                         </StackPanel>
                         <ToggleSwitch x:Uid="Settings_StartToggle" x:Name="StartWithWindowsToggle" Grid.Column="1" Toggled="OnStartWithWindowsToggled" OffContent="Off" OnContent="On"/>
                     </Grid>
@@ -283,6 +284,39 @@
                         </StackPanel>
                         <ToggleSwitch x:Uid="Settings_BlurEmailsToggle" x:Name="BlurEmailsToggle" Grid.Column="1" Toggled="OnBlurEmailsToggled" OffContent="Off" OnContent="On"/>
                     </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="9" Style="{StaticResource SurfaceBorderStyle}">
+                <StackPanel Spacing="18">
+                    <TextBlock x:Uid="Settings_AboutUpdates" Text="About &amp; updates" Style="{StaticResource SectionTitleTextStyle}" />
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Name="UpdateVersionText" FontWeight="SemiBold" />
+                        <TextBlock x:Uid="Settings_UpdateSource" Text="Updates come from the official GitHub release."
+                                   Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <TextBlock x:Name="UpdateStatusText" Text="{x:Bind UpdateViewModel.StatusMessage, Mode=OneWay}"
+                               Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"
+                               AutomationProperties.LiveSetting="Polite" />
+                    <Grid Height="8">
+                        <ProgressBar Maximum="100" Value="{x:Bind UpdateViewModel.DownloadPercentage, Mode=OneWay}"
+                                     IsIndeterminate="{x:Bind UpdateViewModel.IsChecking, Mode=OneWay}"
+                                     Visibility="{x:Bind UpdateViewModel.IsBusy, Mode=OneWay, Converter={StaticResource BooleanVisibility}}"
+                                     HorizontalAlignment="Stretch" VerticalAlignment="Center" />
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Uid="Settings_UpdateCheck" Content="Check for updates" Click="OnCheckForUpdates"
+                                Visibility="{x:Bind UpdateViewModel.ShowCheckAction, Mode=OneWay, Converter={StaticResource BooleanVisibility}}" />
+                        <Button x:Uid="Settings_UpdateDownload" Content="Download update" Click="OnDownloadUpdate"
+                                Visibility="{x:Bind UpdateViewModel.ShowDownloadAction, Mode=OneWay, Converter={StaticResource BooleanVisibility}}" />
+                        <Button x:Uid="Settings_UpdateRestart" Content="Restart QuotaBoard" Click="OnRestartForUpdate"
+                                Visibility="{x:Bind UpdateViewModel.ShowRestartAction, Mode=OneWay, Converter={StaticResource BooleanVisibility}}" />
+                        <HyperlinkButton x:Uid="Settings_UpdateNotes" Content="View release notes" Click="OnViewReleaseNotes"
+                                         Visibility="{x:Bind UpdateViewModel.HasReleaseNotes, Mode=OneWay, Converter={StaticResource BooleanVisibility}}" />
+                    </StackPanel>
+                    <InfoBar x:Uid="Settings_UpdateFailure" IsOpen="{x:Bind UpdateViewModel.HasFailure, Mode=OneWay}"
+                             Severity="Warning" IsClosable="False"
+                             Message="Couldn't check for updates. Your current version is unchanged." />
                 </StackPanel>
             </Border>
         </Grid>

@@ -18,10 +18,16 @@ public sealed class QualityGatesContractTests
         Assert.Contains("dotnet csharpier check src tests", ci, StringComparison.Ordinal);
         Assert.Contains("invoke-quality-gates.ps1", ci, StringComparison.Ordinal);
         Assert.Contains("Assert-Coverage.ps1", ci, StringComparison.Ordinal);
-        Assert.Contains("Report-TestDurations.ps1", ci, StringComparison.Ordinal);
+        Assert.Contains("Assert-TestDurations.ps1", ci, StringComparison.Ordinal);
         Assert.Contains("AiLimits.IntegrationTests", ci, StringComparison.Ordinal);
         Assert.Contains("coverlet.runsettings", ci, StringComparison.Ordinal);
         Assert.Contains("AiLimits.IntegrationTests", release, StringComparison.Ordinal);
+        Assert.Contains("dotnet csharpier check src tests", release, StringComparison.Ordinal);
+        Assert.Contains("invoke-quality-gates.ps1 -SkipFormat", release, StringComparison.Ordinal);
+        Assert.Contains("Assert-Coverage.ps1", release, StringComparison.Ordinal);
+        Assert.Contains("Assert-TestDurations.ps1", release, StringComparison.Ordinal);
+        Assert.Contains("needs: [quality, tests, audit]", ci, StringComparison.Ordinal);
+        Assert.Contains("needs: [quality, tests]", release, StringComparison.Ordinal);
         Assert.True(File.Exists(Path.Combine(root, "AGENTS.md")));
         Assert.True(File.Exists(Path.Combine(root, ".editorconfig")));
         Assert.True(File.Exists(Path.Combine(root, ".csharpierrc.json")));
@@ -33,6 +39,20 @@ public sealed class QualityGatesContractTests
         Assert.True(File.Exists(Path.Combine(root, "scripts", "quality", "Find-TechDebt.ps1")));
         Assert.True(File.Exists(Path.Combine(root, "scripts", "quality", "Find-UnusedPackages.ps1")));
         Assert.True(File.Exists(Path.Combine(root, "tests", "coverlet.runsettings")));
+    }
+
+    [Fact]
+    public void ComplexityConfigurationUsesTheFortyPointPolicy()
+    {
+        string root = FindRepositoryRoot();
+        string metrics = File.ReadAllText(Path.Combine(root, "CodeMetricsConfig.txt"));
+        string editorConfig = File.ReadAllText(Path.Combine(root, ".editorconfig"));
+        string script = File.ReadAllText(Path.Combine(root, "scripts", "quality", "Measure-Complexity.ps1"));
+
+        Assert.Contains("CA1502: 40", metrics, StringComparison.Ordinal);
+        Assert.Contains("dotnet_diagnostic.CA1502.severity = error", editorConfig, StringComparison.Ordinal);
+        Assert.DoesNotContain("dotnet_code_quality.CA1502.threshold", editorConfig, StringComparison.Ordinal);
+        Assert.Contains("[int]$Threshold = 40", script, StringComparison.Ordinal);
     }
 
     [Fact]

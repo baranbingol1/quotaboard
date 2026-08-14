@@ -9,8 +9,8 @@
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisMode>Recommended</AnalysisMode>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <!-- CA1502 is the compiler-side complexity gate. The script
-         scripts/quality/Measure-Complexity.ps1 uses the same ceiling. -->
+    <!-- Roslyn and the PowerShell estimator are independent complexity gates
+         that enforce the same numeric ceiling with different calculations. -->
     <CodeAnalysisTreatWarningsAsErrors>false</CodeAnalysisTreatWarningsAsErrors>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <!-- One version for every assembly. The release workflow refuses to build
@@ -28,6 +28,9 @@
          builds stay quiet; CI turns it on via EnableReferenceTrimmer=true. -->
     <EnableReferenceTrimmer Condition="'$(EnableReferenceTrimmer)' == ''">false</EnableReferenceTrimmer>
   </PropertyGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)CodeMetricsConfig.txt" />
+  </ItemGroup>
   <ItemGroup>
     <!-- Build/test SDK packages are consumed by MSBuild, not C# usings. -->
     <PackageReference Update="coverlet.collector" TreatAsUsed="true" />

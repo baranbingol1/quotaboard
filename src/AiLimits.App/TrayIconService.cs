@@ -22,16 +22,25 @@ internal sealed class TrayIconService : IDisposable
 {
     private readonly Window _window;
     private readonly LiveDashboardViewModel _dashboard;
+    private readonly Action _noteUserInteraction;
+    private readonly Func<Task> _requestQuit;
     private TaskbarIcon? _icon;
     private nint _iconHandle;
     private MeterStatus? _displayedStatus;
     private bool _quitting;
     private bool _hidden;
 
-    public TrayIconService(Window window, LiveDashboardViewModel dashboard)
+    public TrayIconService(
+        Window window,
+        LiveDashboardViewModel dashboard,
+        Action noteUserInteraction,
+        Func<Task> requestQuit
+    )
     {
         _window = window;
         _dashboard = dashboard;
+        _noteUserInteraction = noteUserInteraction;
+        _requestQuit = requestQuit;
         _window.AppWindow.Closing += OnWindowClosing;
         _window.Activated += OnWindowActivated;
         _dashboard.Providers.CollectionChanged += OnDashboardChanged;
@@ -43,18 +52,27 @@ internal sealed class TrayIconService : IDisposable
         }
     }
 
-    public void StartMinimized()
+    public bool StartMinimized()
     {
         if (!TrayMonitorPreference.Enabled)
         {
-            return;
+            return false;
         }
         if (!EnsureIconCreated())
         {
-            return;
+            return false;
         }
-        H.NotifyIcon.WindowExtensions.Hide(_window);
-        _hidden = true;
+        try
+        {
+            H.NotifyIcon.WindowExtensions.Hide(_window);
+            _hidden = !_window.AppWindow.IsVisible;
+            return _hidden;
+        }
+        catch
+        {
+            _hidden = false;
+            return false;
+        }
     }
 
     private void CreateIcon()
@@ -267,6 +285,9 @@ internal sealed class TrayIconService : IDisposable
     [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
     private static extern bool DestroyIcon(nint handle);
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(nint windowHandle);
+
     private void ReleaseIconHandle()
     {
         if (_iconHandle != 0)
@@ -312,11 +333,13 @@ internal sealed class TrayIconService : IDisposable
         }
     }
 
-    private void OpenWindow()
+    internal void OpenWindow()
     {
         H.NotifyIcon.WindowExtensions.Show(_window);
         _window.Activate();
+        _ = SetForegroundWindow(WinRT.Interop.WindowNative.GetWindowHandle(_window));
         _hidden = false;
+        _noteUserInteraction();
     }
 
     private void Refresh()
@@ -329,9 +352,10 @@ internal sealed class TrayIconService : IDisposable
 
     private void Quit()
     {
-        _quitting = true;
-        _window.Close();
+        _ = _requestQuit();
     }
+
+    public void MarkQuitting() => _quitting = true;
 
     private void OnPreferenceChanged(bool enabled)
     {

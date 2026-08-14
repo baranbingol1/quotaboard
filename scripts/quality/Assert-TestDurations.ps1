@@ -4,7 +4,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [string]$TrxPath,
+    [string]$ResultsDirectory,
     [int]$Slowest = 15,
     [double]$MaxSeconds = 30
 )
@@ -12,9 +12,12 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-if (-not (Test-Path -LiteralPath $TrxPath)) {
-    throw "TRX file not found: $TrxPath"
+if (-not (Test-Path -LiteralPath $ResultsDirectory)) {
+    throw "Test results directory not found: $ResultsDirectory"
 }
+$trxFiles = @(Get-ChildItem -LiteralPath $ResultsDirectory -Recurse -Filter unit.trx)
+if ($trxFiles.Count -ne 1) { throw "Expected exactly one unit.trx under $ResultsDirectory; found $($trxFiles.Count)" }
+$TrxPath = $trxFiles[0].FullName
 
 [xml]$trx = Get-Content -LiteralPath $TrxPath
 $ns = New-Object System.Xml.XmlNamespaceManager($trx.NameTable)
@@ -23,11 +26,14 @@ $ns.AddNamespace('t', 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010')
 $results = @()
 foreach ($node in $trx.SelectNodes('//t:UnitTestResult', $ns)) {
     $duration = [TimeSpan]::Zero
-    if ($node.duration) {
-        $duration = [TimeSpan]::Parse($node.duration)
+    $durationText = $node.GetAttribute('duration')
+    $startTime = $node.GetAttribute('startTime')
+    $endTime = $node.GetAttribute('endTime')
+    if ($durationText) {
+        $duration = [TimeSpan]::Parse($durationText)
     }
-    elseif ($node.startTime -and $node.endTime) {
-        $duration = [DateTimeOffset]::Parse($node.endTime) - [DateTimeOffset]::Parse($node.startTime)
+    elseif ($startTime -and $endTime) {
+        $duration = [DateTimeOffset]::Parse($endTime) - [DateTimeOffset]::Parse($startTime)
     }
 
     $results += [pscustomobject]@{

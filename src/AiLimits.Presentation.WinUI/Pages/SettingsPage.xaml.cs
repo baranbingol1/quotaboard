@@ -1,16 +1,18 @@
 ﻿// SPDX-License-Identifier: Apache-2.0
 using AiLimits.Application.Pricing;
-using AiLimits.Presentation.WinUI.ViewModels;
 using AiLimits.Presentation.WinUI.Localization;
+using AiLimits.Presentation.WinUI.ViewModels;
 using Microsoft.Windows.AppLifecycle;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.System;
 
 namespace AiLimits.Presentation.WinUI.Pages;
 
 public sealed partial class SettingsPage : Page
 {
     private readonly LiveDashboardViewModel? _viewModel;
+    private readonly UpdateViewModel? _updateViewModel;
     private readonly IStartupRegistrationService? _startupRegistration;
     private bool _initializing = true;
 
@@ -28,9 +30,16 @@ public sealed partial class SettingsPage : Page
     /// <summary>Bindable view model for x:Bind; null only in design-time construction.</summary>
     public LiveDashboardViewModel? ViewModel => _viewModel;
 
-    public SettingsPage(LiveDashboardViewModel? viewModel = null, IStartupRegistrationService? startupRegistration = null)
+    public UpdateViewModel? UpdateViewModel => _updateViewModel;
+
+    public SettingsPage(
+        LiveDashboardViewModel? viewModel = null,
+        UpdateViewModel? updateViewModel = null,
+        IStartupRegistrationService? startupRegistration = null
+    )
     {
         _viewModel = viewModel;
+        _updateViewModel = updateViewModel;
         _startupRegistration = startupRegistration;
         InitializeComponent();
         ThemePreference themePreference = ThemeService.LoadPreference();
@@ -68,6 +77,11 @@ public sealed partial class SettingsPage : Page
         QuotaAlertsToggle.IsOn = QuotaAlertPreference.LoadEnabled();
         BlurEmailsToggle.IsOn = EmailPrivacyPreference.Enabled;
         LanguageRestartInfo.Message = LocalizationService.GetString("Language_RestartRequired");
+        UpdateVersionText.Text = string.Format(
+            System.Globalization.CultureInfo.CurrentCulture,
+            LocalizationService.GetString("Update_Version"),
+            updateViewModel?.CurrentVersion ?? "-"
+        );
         _initializing = false;
         Loaded += async (_, _) =>
         {
@@ -80,6 +94,38 @@ public sealed partial class SettingsPage : Page
                 await _viewModel.LoadModelCatalogStatusAsync();
             }
         };
+    }
+
+    private void OnCheckForUpdates(object sender, RoutedEventArgs args)
+    {
+        if (_updateViewModel?.CheckCommand.CanExecute(null) == true)
+        {
+            _updateViewModel.CheckCommand.Execute(null);
+        }
+    }
+
+    private void OnDownloadUpdate(object sender, RoutedEventArgs args)
+    {
+        if (_updateViewModel?.DownloadCommand.CanExecute(null) == true)
+        {
+            _updateViewModel.DownloadCommand.Execute(null);
+        }
+    }
+
+    private void OnRestartForUpdate(object sender, RoutedEventArgs args)
+    {
+        if (_updateViewModel?.RestartCommand.CanExecute(null) == true)
+        {
+            _updateViewModel.RestartCommand.Execute(null);
+        }
+    }
+
+    private async void OnViewReleaseNotes(object sender, RoutedEventArgs args)
+    {
+        if (_updateViewModel?.ReleaseNotesUrl is { } releaseNotesUrl)
+        {
+            await Launcher.LaunchUriAsync(releaseNotesUrl);
+        }
     }
 
     private void RebuildModelPricingRows()

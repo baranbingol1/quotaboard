@@ -36,13 +36,29 @@ Diagnostics shows which source answered for each provider, how long it took, and
 
 1. Download `QuotaBoard-<version>-win-x64.zip`, or `win-arm64` for Snapdragon and other ARM machines, from [Releases](https://github.com/baranbingol1/quotaboard/releases).
 2. Extract it anywhere and run `QuotaBoard.exe`. There is no installer, and no administrator rights are required.
-3. Select **Refresh**. QuotaBoard detects supported tools already signed in for the current Windows user.
+3. QuotaBoard refreshes automatically on first launch and detects supported tools for the current Windows user.
+
+If a tool is missing, open **Connections** to review its detection and sign-in state. Sign in through the provider's own app or CLI; QuotaBoard reads that existing local session rather than collecting provider credentials.
 
 QuotaBoard releases are unsigned, so Windows SmartScreen may require **More info → Run anyway**. Download them only from the official Releases page.
 
-Requires Windows 10 21H2 (build 19045) or newer. The runtime is self-contained, so there is no .NET to install.
+Requires Windows 10 22H2 (build 19045) or newer. The runtime is self-contained, so there is no .NET to install.
 
 QuotaBoard stores its local database, pricing cache, and preferences in `%LOCALAPPDATA%\QuotaBoard`. Uninstalling preserves this data; delete that folder to remove it.
+
+### Portable updates
+
+The first Velopack-based release needs one manual move from older raw ZIP builds.
+Download the correct x64 or ARM64 ZIP. Extract it into a new, writable folder.
+Do not extract it over a running older copy. Your data stays in
+`%LOCALAPPDATA%\QuotaBoard`.
+
+From that release onward, use **Settings → About & updates**. QuotaBoard checks
+only when you select **Check for updates**. Download and restart are separate
+actions. Moving the portable folder can require you to enable startup again.
+
+The portable ZIP is about 96 MB on x64 and 92 MB on ARM64. It includes the
+Velopack launcher and the self-contained application runtime.
 
 ## Contributing 🛠️
 

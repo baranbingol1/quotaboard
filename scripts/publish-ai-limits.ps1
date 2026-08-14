@@ -18,6 +18,8 @@ param(
     # -AllowExternalOutputPath, and some locations are always refused.
     [string]$OutputPath,
 
+    [string]$PackageOutputPath,
+
     [switch]$AllowExternalOutputPath
 )
 
@@ -93,3 +95,60 @@ if (-not (Test-Path -LiteralPath $executable)) {
 }
 
 Write-Host "Self-contained AI Limits build: $executable"
+
+& "$PSScriptRoot\validate-publish.ps1" -Architecture $Architecture -OutputPath $resolvedOutput
+if ($LASTEXITCODE -ne 0) {
+    throw 'Raw publish validation failed.'
+}
+
+if ($PackageOutputPath) {
+    $resolvedPackageOutput = [System.IO.Path]::GetFullPath($PackageOutputPath)
+    & "$PSScriptRoot\test-publish-output-path.ps1" `
+        -ResolvedOutput $resolvedPackageOutput `
+        -RepositoryRoot $repositoryRoot `
+        -AllowExternalOutputPath:$AllowExternalOutputPath
+    if (Test-Path -LiteralPath $resolvedPackageOutput) {
+        Remove-Item -LiteralPath $resolvedPackageOutput -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $resolvedPackageOutput -Force | Out-Null
+
+    [xml]$buildProps = Get-Content -Raw (Join-Path $repositoryRoot 'Directory.Build.props')
+    $version = [string]$buildProps.Project.PropertyGroup.Version
+    $channel = "win-$Architecture"
+    & $dotnet.Source vpk pack `
+        --packId QuotaBoard `
+        --packVersion $version `
+        --packDir $resolvedOutput `
+        --mainExe QuotaBoard.exe `
+        --packTitle QuotaBoard `
+        --packAuthors baranbingol1 `
+        --icon (Join-Path $repositoryRoot 'src\AiLimits.App\Assets\QuotaBoard.ico') `
+        --runtime $runtimeIdentifier `
+        --channel $channel `
+        --outputDir $resolvedPackageOutput `
+        --noInst true `
+        --delta None
+    if ($LASTEXITCODE -ne 0) {
+        throw "Velopack packaging failed with exit code $LASTEXITCODE."
+    }
+
+    [array]$portableFiles = Get-ChildItem -LiteralPath $resolvedPackageOutput -Filter '*Portable.zip'
+    [array]$fullPackages = Get-ChildItem -LiteralPath $resolvedPackageOutput -Filter '*-full.nupkg'
+    if ($portableFiles.Count -ne 1 -or $fullPackages.Count -ne 1) {
+        throw 'Velopack did not create exactly one portable ZIP and one full package.'
+    }
+    $portable = $portableFiles[0]
+    $fullPackage = $fullPackages[0]
+    $portableName = "QuotaBoard-$version-$channel.zip"
+    $packageName = "QuotaBoard-$version-$channel-full.nupkg"
+    Move-Item -LiteralPath $portable.FullName -Destination (Join-Path $resolvedPackageOutput $portableName) -Force
+    Move-Item -LiteralPath $fullPackage.FullName -Destination (Join-Path $resolvedPackageOutput $packageName) -Force
+
+    & "$PSScriptRoot\validate-portable-package.ps1" `
+        -Architecture $Architecture `
+        -ArchivePath (Join-Path $resolvedPackageOutput $portableName) `
+        -Version $version
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Portable package validation failed.'
+    }
+}

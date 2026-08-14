@@ -188,7 +188,7 @@
   <data name="Settings_LanguageLabel.Text" xml:space="preserve"><value>Dil</value></data>
   <data name="Settings_LanguageDescription.Text" xml:space="preserve"><value>Windows dilini izleyin veya görüntüleme dilini geçersiz kılın</value></data>
   <data name="Settings_StartWithWindowsLabel.Text" xml:space="preserve"><value>Windows ile başlat</value></data>
-  <data name="Settings_StartWithWindowsDescription.Text" xml:space="preserve"><value>Oturum açtığınızda sistem tepsisine küçültülmüş olarak başlat</value></data>
+  <data name="Settings_StartWithWindowsDescription.Text" xml:space="preserve"><value>Oturum açtığınızda QuotaBoard'u başlatır. Sistem tepsisi izleme açıksa sistem tepsisinde başlar.</value></data>
   <data name="Settings_StartToggle.OffContent" xml:space="preserve"><value>Kapalı</value></data>
   <data name="Settings_StartToggle.OnContent" xml:space="preserve"><value>Açık</value></data>
   <data name="Settings_TrayLabel.Text" xml:space="preserve"><value>Sistem tepsisi izleyicisini çalışır tut</value></data>
@@ -258,7 +258,7 @@
   <data name="Usage_GrainWeek.Content" xml:space="preserve"><value>Hafta</value></data>
   <data name="Usage_GrainMonth.Content" xml:space="preserve"><value>Ay</value></data>
   <data name="Usage_CompareLabel.Text" xml:space="preserve"><value>Karşılaştır</value></data>
-  <data name="Usage_ComparePrevious.Content" xml:space="preserve"><value>Önceki</value></data>
+  <data name="Usage_ComparePrevious.Content" xml:space="preserve"><value>Önceki dönem</value></data>
   <data name="Usage_CompareOff.Content" xml:space="preserve"><value>Kapalı</value></data>
   <data name="Usage_ProviderEyebrow.Text" xml:space="preserve"><value>SAĞLAYICI</value></data>
   <data name="Usage_HarnessEyebrow.Text" xml:space="preserve"><value>ARAÇ</value></data>
@@ -591,4 +591,37 @@
   <data name="Settings_ModelCatalogDescription.Text" xml:space="preserve"><value>Token fiyatları models.dev'den gelir. Günde iki kez kendiliğinden yenilenir; hemen istiyorsanız buradan yenileyin.</value></data>
   <data name="Settings_ModelCatalogRefresh.Content" xml:space="preserve"><value>Şimdi yenile</value></data>
   <data name="Settings_ModelCatalogSource.Text" xml:space="preserve"><value>models.dev/api.json</value></data>
+  <data name="Data_DiscoveryRetrying" xml:space="preserve"><value>Yeniden deneniyor</value></data>
+  <data name="Overview_UsageEmptyTitle.Text" xml:space="preserve"><value>Henüz kullanım bulunamadı</value></data>
+  <data name="Overview_UsageEmptyDetail.Text" xml:space="preserve"><value>QuotaBoard desteklenen ve oturum açılmış bir araç bulup yerel geçmişini okuduğunda kullanım görünür.</value></data>
+  <data name="Overview_OpenConnections.Content" xml:space="preserve"><value>Bağlantıları aç</value></data>
+  <data name="Overview_LimitsEmpty.Text" xml:space="preserve"><value>Henüz doğrulanmış plan limiti yok. Limitleri denetlemek için desteklenen bir sağlayıcı bağlayın.</value></data>
+  <data name="Overview_ResetsEmpty.Text" xml:space="preserve"><value>Henüz bilinen yaklaşan sıfırlama yok.</value></data>
+  <data name="Usage_ChartNoHistory" xml:space="preserve"><value>Henüz kullanım geçmişi kaydedilmedi.</value></data>
+  <data name="Usage_MatchingNoHistory" xml:space="preserve"><value>Henüz kullanım geçmişi yok</value></data>
+  <data name="Usage_MatchingNoHistoryDetail" xml:space="preserve"><value>Desteklenen bir araç yerel etkinlik kaydettikten sonra kullanım görünür.</value></data>
+  <data name="Usage_ModelMixNoHistory" xml:space="preserve"><value>Henüz model geçmişi kaydedilmedi.</value></data>
+  <data name="Meter_Unknown" xml:space="preserve"><value>-</value></data>
+  <data name="Meter_StatusUnknown" xml:space="preserve"><value>BİLİNMİYOR</value></data>
+  <data name="Meter_StatusUnavailable" xml:space="preserve"><value>KULLANILAMIYOR</value></data>
+  <data name="Settings_AboutUpdates.Text" xml:space="preserve"><value>Hakkında ve güncellemeler</value></data>
+  <data name="Settings_UpdateSource.Text" xml:space="preserve"><value>Güncellemeler resmi GitHub sürümünden gelir.</value></data>
+  <data name="Settings_UpdateCheck.Content" xml:space="preserve"><value>Güncellemeleri denetle</value></data>
+  <data name="Settings_UpdateCheck.AutomationProperties.Name" xml:space="preserve"><value>QuotaBoard güncellemelerini denetle</value></data>
+  <data name="Settings_UpdateDownload.Content" xml:space="preserve"><value>Güncellemeyi indir</value></data>
+  <data name="Settings_UpdateDownload.AutomationProperties.Name" xml:space="preserve"><value>Kullanılabilir QuotaBoard güncellemesini indir</value></data>
+  <data name="Settings_UpdateRestart.Content" xml:space="preserve"><value>QuotaBoard'u yeniden başlat</value></data>
+  <data name="Settings_UpdateRestart.AutomationProperties.Name" xml:space="preserve"><value>Güncellemeyi uygulamak için QuotaBoard'u yeniden başlat</value></data>
+  <data name="Settings_UpdateNotes.Content" xml:space="preserve"><value>Sürüm notlarını görüntüle</value></data>
+  <data name="Settings_UpdateNotes.AutomationProperties.Name" xml:space="preserve"><value>Güncelleme sürüm notlarını görüntüle</value></data>
+  <data name="Settings_UpdateFailure.Message" xml:space="preserve"><value>Güncellemeler denetlenemedi. Geçerli sürümünüz değişmedi.</value></data>
+  <data name="Update_Version" xml:space="preserve"><value>QuotaBoard {0}</value></data>
+  <data name="Update_Idle" xml:space="preserve"><value>Hazır olduğunuzda kararlı bir güncellemeyi denetleyin.</value></data>
+  <data name="Update_Checking" xml:space="preserve"><value>Güncellemeler denetleniyor...</value></data>
+  <data name="Update_Current" xml:space="preserve"><value>QuotaBoard güncel.</value></data>
+  <data name="Update_Available" xml:space="preserve"><value>QuotaBoard {0} kullanılabilir.</value></data>
+  <data name="Update_Downloading" xml:space="preserve"><value>Güncelleme indiriliyor... %{0}</value></data>
+  <data name="Update_Ready" xml:space="preserve"><value>Güncelleme hazır. Tamamlamak için QuotaBoard'u yeniden başlatın.</value></data>
+  <data name="Update_Failure" xml:space="preserve"><value>Güncellemeler denetlenemedi. Geçerli sürümünüz değişmedi.</value></data>
+  <data name="Update_Development" xml:space="preserve"><value>Güncelleme denetimleri paketlenmiş sürümlerde kullanılabilir.</value></data>
 </root>

@@ -16,6 +16,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  quality:
+    name: Quality gates
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Set up .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+      - name: Restore local tools
+        run: dotnet tool restore
+      - name: CSharpier
+        run: dotnet csharpier check src tests
+      - name: Large files, complexity, debt, duplicates
+        shell: pwsh
+        run: ./scripts/invoke-quality-gates.ps1 -SkipFormat
+
   # Tags do not trigger ci.yml (it matches branches: [main] only), so without
   # this job a tag on an untested or red commit would still ship.
   tests:
@@ -36,6 +54,9 @@ jobs:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'global.json') }}
           restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore local tools
+        run: dotnet tool restore
 
       - name: Restore
         run: >
@@ -59,22 +80,34 @@ jobs:
           dotnet test tests/AiLimits.IntegrationTests/AiLimits.IntegrationTests.csproj
           --configuration Release
           --no-restore
+          --collect:"XPlat Code Coverage"
           --logger "trx;LogFileName=integration.trx"
           --results-directory TestResults/integration
           --blame-hang-timeout 5m
           --blame-hang-dump-type none
+          --settings tests/coverlet.runsettings
+
+      - name: Coverage threshold
+        shell: pwsh
+        run: ./scripts/quality/Assert-Coverage.ps1 -ResultsDirectory TestResults/unit,TestResults/integration -Minimum 40
+
+      - name: Test duration assertion
+        shell: pwsh
+        run: ./scripts/quality/Assert-TestDurations.ps1 -ResultsDirectory TestResults/unit -MaxSeconds 30
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
         with:
           name: test-results
-          path: TestResults/**/*.trx
+          path: |
+            TestResults/**/*.trx
+            TestResults/**/coverage.cobertura.xml
           if-no-files-found: warn
 
   build:
     name: Build (${{ matrix.arch }})
-    needs: tests
+    needs: [quality, tests]
     runs-on: windows-latest
     timeout-minutes: 45
     # id-token + attestations are for the provenance attestation step.
@@ -101,12 +134,17 @@ jobs:
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'global.json') }}
           restore-keys: nuget-${{ runner.os }}-
 
+      - name: Restore local tools
+        run: dotnet tool restore
+
       # runner.temp is unavailable while GitHub evaluates job-level env.
       # Set the path after the runner starts so every later step can use it.
       - name: Set publish directory
         shell: pwsh
         run: >-
           "PUBLISH_DIR=$env:RUNNER_TEMP\AiLimits\release\win-${{ matrix.arch }}"
+          | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "PACKAGE_DIR=$env:RUNNER_TEMP\AiLimits\packages\win-${{ matrix.arch }}"
           | Out-File $env:GITHUB_ENV -Append -Encoding utf8
 
       # A tag that disagrees with Directory.Build.props would ship binaries
@@ -135,6 +173,7 @@ jobs:
           -Architecture ${{ matrix.arch }}
           -Configuration Release
           -OutputPath $env:PUBLISH_DIR
+          -PackageOutputPath $env:PACKAGE_DIR
 
       - name: Validate publish output
         shell: pwsh
@@ -153,9 +192,13 @@ jobs:
           $expected = '625767b371b7fdd58f40f618b8a86da0247a33c89e419039c86b4edba1dad4b5'
           $actual = (Get-FileHash $tool -Algorithm SHA256).Hash.ToLower()
           if ($actual -ne $expected) { throw "sbom-tool sha256 mismatch: expected $expected, got $actual" }
-          & $tool generate -b $env:PUBLISH_DIR -bc . -pn QuotaBoard -pv "${{ steps.version.outputs.version }}" -ps 'Baran Bingöl' -nsb 'https://github.com/baranbingol1/quotaboard'
+          $portable = Join-Path $env:PACKAGE_DIR "QuotaBoard-${{ steps.version.outputs.version }}-win-${{ matrix.arch }}.zip"
+          $portableRoot = Join-Path $env:RUNNER_TEMP "portable-${{ matrix.arch }}"
+          Expand-Archive -LiteralPath $portable -DestinationPath $portableRoot -Force
+          $realApp = Join-Path $portableRoot 'current'
+          & $tool generate -b $realApp -bc . -pn QuotaBoard -pv "${{ steps.version.outputs.version }}" -ps 'Baran Bingöl' -nsb 'https://github.com/baranbingol1/quotaboard'
           if ($LASTEXITCODE -ne 0) { throw "sbom-tool exited $LASTEXITCODE" }
-          $manifest = Join-Path $env:PUBLISH_DIR '_manifest\spdx_2.2\manifest.spdx.json'
+          $manifest = Join-Path $realApp '_manifest\spdx_2.2\manifest.spdx.json'
           if (-not (Test-Path $manifest)) { throw "SBOM was not generated at $manifest" }
           # Ship the SBOM as its own release asset, not inside the zip: it
           # describes the zip's contents and should be verifiable separately.
@@ -167,19 +210,22 @@ jobs:
           Move-Item $manifest "dist\$sbomName"
           $sbomHash = (Get-FileHash "dist\$sbomName" -Algorithm SHA256).Hash.ToLower()
           "$sbomHash  $sbomName" | Out-File "dist\$sbomName.sha256" -Encoding ascii
-          Remove-Item (Join-Path $env:PUBLISH_DIR '_manifest') -Recurse -Force
+          Remove-Item (Join-Path $realApp '_manifest') -Recurse -Force
 
-      - name: Package
+      - name: Stage package assets and checksums
         shell: pwsh
         run: |
-          $name = "QuotaBoard-${{ steps.version.outputs.version }}-win-${{ matrix.arch }}"
           New-Item -ItemType Directory -Force dist | Out-Null
-          # Compress the folder's contents, not the folder: the archive should
-          # unpack into whatever directory the user chose, not a nested one.
-          Compress-Archive -Path "$env:PUBLISH_DIR\*" -DestinationPath "dist\$name.zip" -CompressionLevel Optimal
-          $hash = (Get-FileHash "dist\$name.zip" -Algorithm SHA256).Hash.ToLower()
-          "$hash  $name.zip" | Out-File "dist\$name.zip.sha256" -Encoding ascii
-          Write-Host "$name.zip  $hash"
+          $names = @(
+            "QuotaBoard-${{ steps.version.outputs.version }}-win-${{ matrix.arch }}.zip",
+            "QuotaBoard-${{ steps.version.outputs.version }}-win-${{ matrix.arch }}-full.nupkg",
+            "releases.win-${{ matrix.arch }}.json"
+          )
+          foreach ($name in $names) {
+            Copy-Item (Join-Path $env:PACKAGE_DIR $name) (Join-Path dist $name)
+            $hash = (Get-FileHash "dist\$name" -Algorithm SHA256).Hash.ToLower()
+            "$hash  $name" | Out-File "dist\$name.sha256" -Encoding ascii
+          }
 
       # The SBOM is a subject too, not just the archive: attesting only the zip
       # would leave the SBOM as the one asset with no cryptographic tie to the
@@ -189,6 +235,8 @@ jobs:
         with:
           subject-path: |
             dist/*.zip
+            dist/*.nupkg
+            dist/releases.*.json
             dist/*.spdx.json
 
       - name: Upload package
@@ -206,9 +254,99 @@ jobs:
           path: "**/*.binlog"
           if-no-files-found: ignore
 
+  rehearsal:
+    name: Verify rehearsal artifacts
+    needs: build
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      attestations: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Download packages
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          pattern: package-*
+          merge-multiple: true
+          path: dist
+
+      - name: Verify inventory, hashes, provenance, and package metadata
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [xml]$props = Get-Content -Raw Directory.Build.props
+          $version = [string]$props.Project.PropertyGroup.Version
+          ./scripts/verify-release.ps1 `
+            -DistDir dist `
+            -Repository $env:GITHUB_REPOSITORY `
+            -ExpectedSignerWorkflow "$env:GITHUB_REPOSITORY/.github/workflows/release.yml" `
+            -ExpectedSourceRef $env:GITHUB_REF `
+            -ExpectedSourceDigest $env:GITHUB_SHA `
+            -ExpectedVersion $version
+
+  native-package:
+    name: Native package (${{ matrix.arch }})
+    needs: build
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+          - arch: arm64
+            runner: windows-11-arm
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Download package
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: package-${{ matrix.arch }}
+          path: dist
+
+      - name: Validate and launch extracted package
+        shell: pwsh
+        run: |
+          [xml]$props = Get-Content -Raw Directory.Build.props
+          $version = [string]$props.Project.PropertyGroup.Version
+          $archive = Join-Path dist "QuotaBoard-$version-win-${{ matrix.arch }}.zip"
+          ./scripts/validate-portable-package.ps1 `
+            -Architecture ${{ matrix.arch }} `
+            -ArchivePath $archive `
+            -Version $version
+
+          $root = Join-Path $env:RUNNER_TEMP 'QuotaBoard native smoke test'
+          Expand-Archive -LiteralPath $archive -DestinationPath $root -Force
+          $appRoot = Join-Path $root 'current'
+          Start-Process -FilePath (Join-Path $appRoot 'QuotaBoard.exe') -WorkingDirectory $appRoot | Out-Null
+          try {
+            $deadline = (Get-Date).AddSeconds(30)
+            $application = $null
+            do {
+              Start-Sleep -Milliseconds 500
+              $application = Get-Process QuotaBoard -ErrorAction SilentlyContinue |
+                Where-Object { $_.Path -and $_.Path.StartsWith($appRoot, [StringComparison]::OrdinalIgnoreCase) } |
+                Select-Object -First 1
+            } while ($null -eq $application -and (Get-Date) -lt $deadline)
+            if ($null -eq $application) { throw 'The native application did not stay running.' }
+            Start-Sleep -Seconds 5
+            if ($application.HasExited) { throw "The native application exited with code $($application.ExitCode)." }
+          }
+          finally {
+            Get-Process QuotaBoard -ErrorAction SilentlyContinue |
+              Where-Object { $_.Path -and $_.Path.StartsWith($appRoot, [StringComparison]::OrdinalIgnoreCase) } |
+              Stop-Process -Force -ErrorAction SilentlyContinue
+          }
+
   release:
     name: Publish release
-    needs: build
+    needs: [build, native-package]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 10

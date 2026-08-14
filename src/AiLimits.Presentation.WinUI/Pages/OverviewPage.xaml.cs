@@ -7,14 +7,21 @@ namespace AiLimits.Presentation.WinUI.Pages;
 
 public sealed partial class OverviewPage : Page
 {
-    public OverviewPage(LiveDashboardViewModel viewModel)
+    private readonly Action _openConnections;
+
+    public OverviewPage(LiveDashboardViewModel viewModel, Action openConnections)
     {
         ViewModel = viewModel;
+        _openConnections = openConnections;
         InitializeComponent();
     }
     public LiveDashboardViewModel ViewModel { get; }
 
     public Visibility CountToVisibility(int count) => count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility When(bool value) => value ? Visibility.Visible : Visibility.Collapsed;
+
+    private void OnOpenConnectionsClicked(object sender, RoutedEventArgs args) => _openConnections();
 
     private void OnGroupByProviderClicked(object sender, RoutedEventArgs e)
     {

@@ -86,71 +86,13 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
         AmpScanState previous = AmpScanState.Parse(cursor?.Position);
         var current = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        // Page through the listing (newest-updated first). Earlier builds
-        // fetched only the first 20 threads, permanently skipping history for
-        // accounts with more.
-        var summaries = new List<AmpThreadSummary>();
-        var seenThreadIds = new HashSet<string>(StringComparer.Ordinal);
-        bool retriesOutstanding = previous.HasPendingRetries;
-        for (int offset = 0; summaries.Count < MaxThreadsPerScan; offset += PageSize)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            ProcessResult listResult = await runner
-                .RunAsync(
-                    executable,
-                    [
-                        "threads",
-                        "list",
-                        "--include-archived",
-                        "--limit",
-                        PageSize.ToString(CultureInfo.InvariantCulture),
-                        "--offset",
-                        offset.ToString(CultureInfo.InvariantCulture),
-                        "--json",
-                    ],
-                    TimeSpan.FromSeconds(20),
-                    cancellationToken
-                )
-                .ConfigureAwait(false);
-            if (listResult.OutputTruncated)
-                throw new TokenScanException("Amp thread listing exceeded the capture limit and was truncated.");
-            if (
-                listResult.ExitCode != 0
-                || !AmpThreadParser.TryParseThreadList(
-                    listResult.StandardOutput,
-                    out IReadOnlyList<AmpThreadSummary> page
-                )
+        List<AmpThreadSummary> summaries = await ListThreadSummariesAsync(
+                executable,
+                cutoff,
+                previous,
+                cancellationToken
             )
-                throw new TokenScanException("Amp thread listing failed.");
-            if (page.Count == 0)
-            {
-                break;
-            }
-
-            // New threads created mid-scan shift offset pages; ids dedupe the
-            // re-served entries.
-            summaries.AddRange(page.Where(thread => seenThreadIds.Add(thread.Id)));
-            if (page.Count < PageSize)
-            {
-                break;
-            }
-            // Once an entire page is older than the rescan cutoff, deeper pages
-            // cannot contain activity the cursor has not already covered.
-            if (
-                !retriesOutstanding
-                && cutoff.HasValue
-                && page.All(thread => thread.UpdatedAt.HasValue && thread.UpdatedAt < cutoff)
-            )
-                break;
-            // Likewise once an entire page is already at its recorded revision:
-            // the listing is ordered newest-updated first, so everything deeper
-            // is older still and equally covered. This is what keeps a steady
-            // state to a single page instead of six. It is suspended while any
-            // thread still owes a retry, because that thread may sit on a page
-            // this shortcut would never reach.
-            if (!retriesOutstanding && page.All(previous.IsUnchanged))
-                break;
-        }
+            .ConfigureAwait(false);
 
         // Carry forward the recorded revision of every thread still in the
         // listing, not just the ones inside the cutoff window. Dropping the
@@ -364,6 +306,61 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
                 ProjectIdentity.Unknown
             );
         }
+    }
+
+    private async Task<List<AmpThreadSummary>> ListThreadSummariesAsync(
+        string executable,
+        DateTimeOffset? cutoff,
+        AmpScanState previous,
+        CancellationToken cancellationToken
+    )
+    {
+        var summaries = new List<AmpThreadSummary>();
+        var seenThreadIds = new HashSet<string>(StringComparer.Ordinal);
+        bool retriesOutstanding = previous.HasPendingRetries;
+        for (int offset = 0; summaries.Count < MaxThreadsPerScan; offset += PageSize)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ProcessResult result = await runner
+                .RunAsync(
+                    executable,
+                    [
+                        "threads",
+                        "list",
+                        "--include-archived",
+                        "--limit",
+                        PageSize.ToString(CultureInfo.InvariantCulture),
+                        "--offset",
+                        offset.ToString(CultureInfo.InvariantCulture),
+                        "--json",
+                    ],
+                    TimeSpan.FromSeconds(20),
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
+            if (result.OutputTruncated)
+                throw new TokenScanException("Amp thread listing exceeded the capture limit and was truncated.");
+            if (
+                result.ExitCode != 0
+                || !AmpThreadParser.TryParseThreadList(result.StandardOutput, out IReadOnlyList<AmpThreadSummary> page)
+            )
+                throw new TokenScanException("Amp thread listing failed.");
+            if (page.Count == 0)
+                break;
+
+            summaries.AddRange(page.Where(thread => seenThreadIds.Add(thread.Id)));
+            if (page.Count < PageSize)
+                break;
+            if (
+                !retriesOutstanding
+                && cutoff.HasValue
+                && page.All(thread => thread.UpdatedAt.HasValue && thread.UpdatedAt < cutoff)
+            )
+                break;
+            if (!retriesOutstanding && page.All(previous.IsUnchanged))
+                break;
+        }
+        return summaries;
     }
 
     /// <summary>

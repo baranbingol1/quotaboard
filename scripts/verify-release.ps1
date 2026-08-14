@@ -97,6 +97,10 @@ $expectedAssets = @(
         $baseName = "QuotaBoard-$ExpectedVersion-win-$architecture"
         "$baseName.zip"
         "$baseName.zip.sha256"
+        "$baseName-full.nupkg"
+        "$baseName-full.nupkg.sha256"
+        "releases.win-$architecture.json"
+        "releases.win-$architecture.json.sha256"
         "$baseName.sbom.spdx.json"
         "$baseName.sbom.spdx.json.sha256"
     }
@@ -122,36 +126,46 @@ foreach ($zip in $zips) {
         throw "$($zip.Name): cannot infer architecture; expected a -win-x64.zip or -win-arm64.zip suffix"
     }
     $architecture = $Matches[1].ToLowerInvariant()
-    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "QuotaBoard-verify-$([guid]::NewGuid())"
-    try {
-        New-Item -ItemType Directory -Path $tempDir | Out-Null
-        $archive = [System.IO.Compression.ZipFile]::OpenRead($zip.FullName)
-        try {
-            if ($archive.Entries.Count -eq 0) {
-                throw "$($zip.Name) contains no files"
-            }
-            $entryCount = $archive.Entries.Count
-            [System.IO.Compression.ZipFileExtensions]::ExtractToDirectory($archive, $tempDir)
-        }
-        finally {
-            $archive.Dispose()
-        }
-
-        & (Join-Path $scriptDir 'validate-publish.ps1') -Architecture $architecture -OutputPath $tempDir
-        if ($LASTEXITCODE -ne 0) {
-            throw "$($zip.Name): publish validation failed (exit $LASTEXITCODE)"
-        }
-    }
-    finally {
-        Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+    & (Join-Path $scriptDir 'validate-portable-package.ps1') `
+        -Architecture $architecture -ArchivePath $zip.FullName -Version $ExpectedVersion
+    if (-not $?) {
+        throw "$($zip.Name): portable package validation failed"
     }
 
-    Write-Host "$($zip.Name): sha256 ok, $entryCount entries, publish layout ok"
+    Write-Host "$($zip.Name): sha256 and portable layout ok"
 
     Assert-Attestation -Asset $zip -Repo $Repository `
         -SignerWorkflow $ExpectedSignerWorkflow `
         -SourceRef $ExpectedSourceRef `
         -SourceDigest $ExpectedSourceDigest
+}
+
+foreach ($architecture in 'x64', 'arm64') {
+    $package = Get-Item -LiteralPath (Join-Path $resolvedDistDir "QuotaBoard-$ExpectedVersion-win-$architecture-full.nupkg")
+    $index = Get-Item -LiteralPath (Join-Path $resolvedDistDir "releases.win-$architecture.json")
+    Assert-Sha256Sidecar -Asset $package
+    Assert-Sha256Sidecar -Asset $index
+
+    $indexDocument = Get-Content -Raw -LiteralPath $index.FullName | ConvertFrom-Json -ErrorAction Stop
+    $assets = @($indexDocument.Assets)
+    if ($assets.Count -ne 1) {
+        throw "$($index.Name) must contain exactly one full package."
+    }
+    $expectedPackageName = $package.Name
+    if ($assets[0].FileName -ne $expectedPackageName -or $assets[0].Version -ne $ExpectedVersion -or $assets[0].Type -ne 'Full') {
+        throw "$($index.Name) does not identify $expectedPackageName version $ExpectedVersion as a full package."
+    }
+    $packageHash = (Get-FileHash -LiteralPath $package.FullName -Algorithm SHA256).Hash
+    if ($assets[0].SHA256 -ne $packageHash) {
+        throw "$($index.Name) package hash does not match $expectedPackageName."
+    }
+
+    foreach ($asset in $package, $index) {
+        Assert-Attestation -Asset $asset -Repo $Repository `
+            -SignerWorkflow $ExpectedSignerWorkflow `
+            -SourceRef $ExpectedSourceRef `
+            -SourceDigest $ExpectedSourceDigest
+    }
 }
 
 # --- SBOM validation -------------------------------------------------------

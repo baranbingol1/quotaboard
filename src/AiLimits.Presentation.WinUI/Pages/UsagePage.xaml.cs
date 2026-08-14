@@ -325,6 +325,7 @@ public sealed partial class UsagePage : Page
         WindowLabelText.Text = RangeLabel(result.From, result.Through).ToUpper(CultureInfo.CurrentCulture);
         ComparisonText.Text = ComparisonLabel(result.Comparison);
         EmptyStateText.Visibility = result.MatchingRecordCount == 0 ? Visibility.Visible : Visibility.Collapsed;
+        EmptyStateText.Text = EmptyText(result.EmptyReason, "Usage_ChartNoHistory", "Usage_ChartEmpty.Text");
         ChartScrollViewer.Visibility = result.MatchingRecordCount == 0 ? Visibility.Collapsed : Visibility.Visible;
 
         double coverage = result.TotalTokens == 0 ? 0 : 100.0 * result.PricedTokens / result.TotalTokens;
@@ -356,10 +357,10 @@ public sealed partial class UsagePage : Page
         UsageComposition composition = result.Composition;
 
         MatchingRecordsText.Text = result.MatchingRecordCount == 0
-            ? L("Usage_MatchingNone")
+            ? EmptyText(result.EmptyReason, "Usage_MatchingNoHistory", "Usage_MatchingNone")
             : F("Usage_MatchingRows", result.MatchingRecordCount);
         MatchingRecordsDetailText.Text = result.MatchingRecordCount == 0
-            ? L("Usage_MatchingNoneDetail")
+            ? EmptyText(result.EmptyReason, "Usage_MatchingNoHistoryDetail", "Usage_MatchingNoneDetail")
             : string.Join(" · ", new[]
             {
                 Plural(composition.Providers, "Usage_PluralProvider", "Usage_PluralProviders"),
@@ -436,12 +437,15 @@ public sealed partial class UsagePage : Page
         }).ToArray();
 
         ModelMixSubtitleText.Text = _allModelMixRows.Length == 0
-            ? L("Usage_ModelMixEmpty.Text")
+            ? EmptyText(result.EmptyReason, "Usage_ModelMixNoHistory", "Usage_ModelMixEmpty.Text")
             : F(_allModelMixRows.Length == 1 ? "Usage_ModelMixSubtitleOne" : "Usage_ModelMixSubtitleMany", _allModelMixRows.Length);
         ModelMixWindowText.Text = RangeLabel(result.From, result.Through).ToUpper(CultureInfo.CurrentCulture);
         ModelMixEmptyText.Visibility = _allModelMixRows.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         RenderModelMixPage();
     }
+
+    private static string EmptyText(UsageEmptyReason reason, string noHistoryKey, string noMatchesKey) =>
+        L(reason == UsageEmptyReason.NoHistory ? noHistoryKey : noMatchesKey);
 
     private void RenderModelMixPage()
     {

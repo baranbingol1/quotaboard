@@ -2,10 +2,11 @@
 # points (if / else if / for / foreach / while / case / catch / && / || /
 # ?? / ternary) plus one for the method itself. Class, record, and
 # interface declarations are ignored. CI fails the build when any method
-# exceeds the threshold so new hotspots cannot land unnoticed.
+# exceeds the threshold so new hotspots cannot land unnoticed. This estimator
+# is independent from Roslyn CA1502 but shares its numeric policy.
 [CmdletBinding()]
 param(
-    [int]$Threshold = 80,
+    [int]$Threshold = 40,
     [string[]]$Path = @('src')
 )
 

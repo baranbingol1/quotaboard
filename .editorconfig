@@ -1,5 +1,5 @@
 # QuotaBoard editorconfig — formatting and naming are enforced by
-# `dotnet format` in CI and by the pre-commit quality gates.
+# CSharpier in CI and by the pre-commit quality gates.
 root = true
 
 [*]
@@ -55,11 +55,9 @@ dotnet_diagnostic.CA1802.severity = warning
 dotnet_diagnostic.CA1812.severity = warning
 
 # --- Complexity ---
-# CA1502 is "Avoid excessive complexity". The threshold is the cyclomatic
-# ceiling for a single method; CI also runs scripts/quality/Measure-Complexity.ps1.
-dotnet_diagnostic.CA1502.severity = warning
-dotnet_code_quality.CA1502.threshold = 40
-dotnet_code_quality.CA1505.threshold = 60
+# Roslyn reads its ceiling from CodeMetricsConfig.txt. The PowerShell estimator
+# is an independent gate that uses the same numeric policy.
+dotnet_diagnostic.CA1502.severity = error
 dotnet_diagnostic.CA1505.severity = warning
 
 # --- Naming conventions ---

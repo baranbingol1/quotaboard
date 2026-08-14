@@ -6,6 +6,24 @@ namespace AiLimits.Tests;
 public sealed class UsageAnalyticsQueryTests
 {
     [Fact]
+    public void Empty_ledger_reports_no_history()
+    {
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run([], Query());
+
+        Assert.Equal(UsageEmptyReason.NoHistory, result.EmptyReason);
+    }
+
+    [Fact]
+    public void Existing_history_outside_query_reports_no_matches()
+    {
+        UsageAnalyticsRecord record = Row(-1);
+
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run([record], Query());
+
+        Assert.Equal(UsageEmptyReason.NoMatches, result.EmptyReason);
+    }
+
+    [Fact]
     public void ChartGeometry_distributes_every_bucket_across_the_available_width()
     {
         UsageChartGeometry geometry = UsageChartLayout.Calculate(availableWidth: 1_200, itemCount: 30, gap: 3);

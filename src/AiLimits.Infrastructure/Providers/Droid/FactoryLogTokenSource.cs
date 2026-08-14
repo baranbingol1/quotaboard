@@ -121,47 +121,63 @@ public sealed class FactoryLogTokenSource(string factoryHome) : ITokenUsageSourc
         var marker = line.IndexOf(LogMarker, StringComparison.Ordinal);
         if (marker < 0)
             return false;
-        var jsonStart = line.IndexOf('{', marker + LogMarker.Length);
+        var jsonStart = FindJsonStart(line, marker + LogMarker.Length);
         if (jsonStart < 0 || !TryReadTimestamp(line, out var occurredAt))
             return false;
 
         try
         {
             using var document = JsonDocument.Parse(line[jsonStart..]);
-            var root = document.RootElement;
-            if (
-                root.ValueKind != JsonValueKind.Object
-                || !root.TryGetProperty("tags", out var tags)
-                || tags.ValueKind != JsonValueKind.Object
-            )
-            {
-                return false;
-            }
+            return TryParseUsage(document.RootElement, occurredAt, out usage);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
 
-            var sessionId = ReadString(tags, "sessionId");
-            if (string.IsNullOrWhiteSpace(sessionId))
-                return false;
+    private static int FindJsonStart(string line, int startIndex) => line.IndexOf((char)123, startIndex);
 
-            var input = ReadLong(root, "inputTokens");
-            var cacheRead = ReadLong(root, "cacheReadInputTokens");
-            var output = ReadLong(root, "outputTokens");
-            var reasoning = ReadLong(root, "reasoningTokens");
-            if (input == 0 && cacheRead == 0 && output == 0 && reasoning == 0)
-                return false;
+    private static bool TryParseUsage(JsonElement root, DateTimeOffset occurredAt, out FactoryLogUsage usage)
+    {
+        usage = default;
+        if (
+            root.ValueKind != JsonValueKind.Object
+            || !root.TryGetProperty("tags", out var tags)
+            || tags.ValueKind != JsonValueKind.Object
+        )
+            return false;
 
-            var model = ReadString(tags, "modelId") ?? ReadString(root, "modelId") ?? "unknown";
-            // Anthropic and OpenAI count thinking/reasoning inside outputTokens
-            // (verified against real droid logs: reasoning almost never exceeds
-            // output for those vendors, while MiniMax reports the lanes
-            // disjointly). Subtract so the pricing engine's separate reasoning
-            // lane does not bill those tokens twice, mirroring the Codex source.
-            if (reasoning > 0 && ModelVendorClassifier.GetPricingProviderId("droid", model) is "anthropic" or "openai")
-            {
-                output = Math.Max(0, output - reasoning);
-            }
-            var traceId = ReadString(tags, "traceId");
-            var spanId = ReadString(tags, "spanId");
-            usage = new FactoryLogUsage(
+        var sessionId = ReadString(tags, "sessionId");
+        if (string.IsNullOrWhiteSpace(sessionId))
+            return false;
+
+        var input = ReadLong(root, "inputTokens");
+        var cacheRead = ReadLong(root, "cacheReadInputTokens");
+        var output = ReadLong(root, "outputTokens");
+        var reasoning = ReadLong(root, "reasoningTokens");
+        if (input == 0 && cacheRead == 0 && output == 0 && reasoning == 0)
+            return false;
+
+        var model = ReadString(tags, "modelId") ?? ReadString(root, "modelId") ?? "unknown";
+        // Anthropic and OpenAI include reasoning inside outputTokens. Keep the
+        // pricing engine's separate reasoning lane from billing those twice.
+        if (reasoning > 0 && ModelVendorClassifier.GetPricingProviderId("droid", model) is "anthropic" or "openai")
+            output = Math.Max(0, output - reasoning);
+
+        var traceId = ReadString(tags, "traceId");
+        var spanId = ReadString(tags, "spanId");
+        usage = new FactoryLogUsage(
+            occurredAt,
+            sessionId,
+            model,
+            input,
+            output,
+            cacheRead,
+            reasoning,
+            CreateSourceEventId(
+                traceId,
+                spanId,
                 occurredAt,
                 sessionId,
                 model,
@@ -169,26 +185,11 @@ public sealed class FactoryLogTokenSource(string factoryHome) : ITokenUsageSourc
                 output,
                 cacheRead,
                 reasoning,
-                CreateSourceEventId(
-                    traceId,
-                    spanId,
-                    occurredAt,
-                    sessionId,
-                    model,
-                    input,
-                    output,
-                    cacheRead,
-                    reasoning,
-                    ReadLong(root, "count"),
-                    ReadLong(root, "contextCount")
-                )
-            );
-            return true;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
+                ReadLong(root, "count"),
+                ReadLong(root, "contextCount")
+            )
+        );
+        return true;
     }
 
     private async Task<IReadOnlyDictionary<string, string>> ReadSessionDirectoriesAsync(

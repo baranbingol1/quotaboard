@@ -11,12 +11,18 @@ namespace AiLimits.Presentation.WinUI.Shell;
 public sealed partial class ShellPage : Page
 {
     private readonly LiveDashboardViewModel _viewModel;
+    private readonly UpdateViewModel? _updateViewModel;
     private readonly IStartupRegistrationService? _startupRegistration;
     private readonly Dictionary<Type, Page> _pages = [];
 
-    public ShellPage(LiveDashboardViewModel viewModel, IStartupRegistrationService? startupRegistration = null)
+    public ShellPage(
+        LiveDashboardViewModel viewModel,
+        UpdateViewModel? updateViewModel = null,
+        IStartupRegistrationService? startupRegistration = null
+    )
     {
         _viewModel = viewModel;
+        _updateViewModel = updateViewModel;
         _startupRegistration = startupRegistration;
         InitializeComponent();
         Navigation.SelectedItem = Navigation.MenuItems[0];
@@ -69,11 +75,11 @@ public sealed partial class ShellPage : Page
     {
         if (!_pages.TryGetValue(pageType, out var page))
         {
-            page = pageType == typeof(OverviewPage) ? new OverviewPage(_viewModel)
+            page = pageType == typeof(OverviewPage) ? new OverviewPage(_viewModel, () => Navigate(typeof(ProvidersPage)))
                 : pageType == typeof(UsagePage) ? new UsagePage(_viewModel)
                 : pageType == typeof(ProvidersPage) ? new ProvidersPage(_viewModel)
                 : pageType == typeof(DiagnosticsPage) ? new DiagnosticsPage(_viewModel)
-                : new SettingsPage(_viewModel, _startupRegistration);
+                : new SettingsPage(_viewModel, _updateViewModel, _startupRegistration);
             _pages[pageType] = page;
         }
         if (ContentFrame.Content != page) ContentFrame.Content = page;

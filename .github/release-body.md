@@ -21,13 +21,20 @@ Verify a download against its `.sha256` file:
 Get-FileHash .\QuotaBoard-0.1.1-win-x64.zip -Algorithm SHA256
 ```
 
-Requires Windows 10 21H2 (build 19045) or newer. The runtime is self-contained,
+Requires Windows 10 22H2 (build 19045) or newer. The runtime is self-contained,
 so there is no .NET to install.
 
 ## Uninstall
 
 Delete the folder you extracted. To remove the local database, pricing cache and
 preferences as well, delete `%LOCALAPPDATA%\QuotaBoard`.
+
+## Moving from an older ZIP
+
+Older raw-ZIP users must download this release manually. Extract it into a clean,
+writable folder. Do not extract it over a running old folder. Existing data in
+`%LOCALAPPDATA%\QuotaBoard` remains unchanged. In-app updates work from this
+release onward. Moving the portable folder can require re-enabling startup.
 
 ## Release integrity
 

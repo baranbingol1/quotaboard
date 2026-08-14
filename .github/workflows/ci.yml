@@ -91,15 +91,11 @@ jobs:
 
       - name: Coverage threshold
         shell: pwsh
-        run: ./scripts/quality/Assert-Coverage.ps1 -ResultsDirectory TestResults/unit -Minimum 40
+        run: ./scripts/quality/Assert-Coverage.ps1 -ResultsDirectory TestResults/unit,TestResults/integration -Minimum 40
 
-      - name: Test duration report
-        if: always()
+      - name: Test duration assertion
         shell: pwsh
-        run: >
-          ./scripts/quality/Report-TestDurations.ps1
-          -TrxPath (Get-ChildItem TestResults/unit -Recurse -Filter unit.trx | Select-Object -First 1).FullName
-          -MaxSeconds 30
+        run: ./scripts/quality/Assert-TestDurations.ps1 -ResultsDirectory TestResults/unit -MaxSeconds 30
 
       - name: Upload test results
         if: always()
@@ -113,6 +109,7 @@ jobs:
 
   publish:
     name: Publish (${{ matrix.arch }})
+    needs: [quality, tests, audit]
     runs-on: windows-latest
     timeout-minutes: 35
     strategy:

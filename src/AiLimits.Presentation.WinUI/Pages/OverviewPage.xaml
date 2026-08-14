@@ -176,6 +176,15 @@
                         </DataTemplate>
                     </ItemsRepeater.ItemTemplate>
                 </ItemsRepeater>
+                <Border Style="{StaticResource SurfaceBorderStyle}" Padding="24"
+                        Visibility="{x:Bind When(ViewModel.IsUsageEmpty), Mode=OneWay}">
+                    <StackPanel Spacing="10">
+                        <TextBlock x:Uid="Overview_UsageEmptyTitle" Style="{StaticResource SectionTitleTextStyle}" />
+                        <TextBlock x:Uid="Overview_UsageEmptyDetail" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                        <Button x:Uid="Overview_OpenConnections" Click="OnOpenConnectionsClicked" HorizontalAlignment="Left"
+                                Visibility="{x:Bind When(ViewModel.HasNoSupportedTools), Mode=OneWay}" />
+                    </StackPanel>
+                </Border>
             </StackPanel>
 
             <StackPanel Grid.Row="3" Spacing="12">
@@ -202,6 +211,8 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                <TextBlock x:Uid="Overview_LimitsEmpty" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"
+                           Visibility="{x:Bind When(ViewModel.ArePlanLimitsEmpty), Mode=OneWay}" />
             </StackPanel>
 
             <StackPanel Grid.Row="4" Spacing="12">
@@ -211,6 +222,8 @@
                                Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
                 </StackPanel>
                 <controls:ResetHorizon DataContext="{x:Bind ViewModel.ResetHorizon, Mode=OneWay}" />
+                <TextBlock x:Uid="Overview_ResetsEmpty" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"
+                           Visibility="{x:Bind When(ViewModel.AreResetsEmpty), Mode=OneWay}" />
             </StackPanel>
 
             <Expander Grid.Row="5" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"

@@ -158,7 +158,7 @@ internal sealed class CopilotQuotaStrategy(HttpClient httpClient, IClock clock) 
             double? num6 = num5;
             if (num6.HasValue)
             {
-                num6 = Math.Max(0.0, num6.Value);
+                num6 = Math.Clamp(num6.Value, 0.0, 100.0);
                 string text = ReadString(item.Value, "quota_id") ?? item.Name;
                 MeterStatus status = (
                     (num6 >= 100.0)

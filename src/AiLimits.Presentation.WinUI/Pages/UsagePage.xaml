@@ -91,7 +91,7 @@
              case is handled by keeping the side columns small enough that all
              three fit at ~870px. -->
         <Grid Grid.Row="1" Padding="20,18,20,28" ColumnSpacing="14">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="210"/><ColumnDefinition Width="*" MinWidth="300"/><ColumnDefinition Width="270"/></Grid.ColumnDefinitions>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="260"/><ColumnDefinition Width="*" MinWidth="300"/><ColumnDefinition Width="270"/></Grid.ColumnDefinitions>
 
             <Border Style="{StaticResource QueryPanelStyle}" Padding="15">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -130,7 +130,7 @@
                         <StackPanel Spacing="5">
                             <TextBlock x:Uid="Usage_CompareLabel" Text="Compare" FontSize="11" Foreground="{ThemeResource TextSecondaryBrush}" />
                             <ComboBox x:Name="ComparePicker" SelectedIndex="0" HorizontalAlignment="Stretch" SelectionChanged="OnQueryControlChanged">
-                                <ComboBoxItem x:Uid="Usage_ComparePrevious" Content="Previous" Tag="previous"/>
+                                <ComboBoxItem x:Uid="Usage_ComparePrevious" Content="Previous period" Tag="previous"/>
                                 <ComboBoxItem x:Uid="Usage_CompareOff" Content="Off" Tag="none"/>
                             </ComboBox>
                         </StackPanel>

@@ -188,7 +188,7 @@
   <data name="Settings_LanguageLabel.Text" xml:space="preserve"><value>Language</value></data>
   <data name="Settings_LanguageDescription.Text" xml:space="preserve"><value>Follow Windows or override the display language</value></data>
   <data name="Settings_StartWithWindowsLabel.Text" xml:space="preserve"><value>Start with Windows</value></data>
-  <data name="Settings_StartWithWindowsDescription.Text" xml:space="preserve"><value>Launch minimized to the tray when you sign in</value></data>
+  <data name="Settings_StartWithWindowsDescription.Text" xml:space="preserve"><value>Launch QuotaBoard when you sign in. It starts in the tray when tray monitoring is on.</value></data>
   <data name="Settings_StartToggle.OffContent" xml:space="preserve"><value>Off</value></data>
   <data name="Settings_StartToggle.OnContent" xml:space="preserve"><value>On</value></data>
   <data name="Settings_TrayLabel.Text" xml:space="preserve"><value>Keep tray monitor running</value></data>
@@ -258,7 +258,7 @@
   <data name="Usage_GrainWeek.Content" xml:space="preserve"><value>Week</value></data>
   <data name="Usage_GrainMonth.Content" xml:space="preserve"><value>Month</value></data>
   <data name="Usage_CompareLabel.Text" xml:space="preserve"><value>Compare</value></data>
-  <data name="Usage_ComparePrevious.Content" xml:space="preserve"><value>Previous</value></data>
+  <data name="Usage_ComparePrevious.Content" xml:space="preserve"><value>Previous period</value></data>
   <data name="Usage_CompareOff.Content" xml:space="preserve"><value>Off</value></data>
   <data name="Usage_ProviderEyebrow.Text" xml:space="preserve"><value>PROVIDER</value></data>
   <data name="Usage_HarnessEyebrow.Text" xml:space="preserve"><value>HARNESS</value></data>
@@ -591,4 +591,37 @@
   <data name="Settings_ModelCatalogDescription.Text" xml:space="preserve"><value>Token prices come from models.dev. It refreshes twice a day on its own; refresh here if you want it now.</value></data>
   <data name="Settings_ModelCatalogRefresh.Content" xml:space="preserve"><value>Refresh now</value></data>
   <data name="Settings_ModelCatalogSource.Text" xml:space="preserve"><value>models.dev/api.json</value></data>
+  <data name="Data_DiscoveryRetrying" xml:space="preserve"><value>Retrying</value></data>
+  <data name="Overview_UsageEmptyTitle.Text" xml:space="preserve"><value>No usage found yet</value></data>
+  <data name="Overview_UsageEmptyDetail.Text" xml:space="preserve"><value>Usage appears after QuotaBoard finds a supported signed-in tool and reads its local history.</value></data>
+  <data name="Overview_OpenConnections.Content" xml:space="preserve"><value>Open Connections</value></data>
+  <data name="Overview_LimitsEmpty.Text" xml:space="preserve"><value>No verified plan limits are available yet. Connect a supported provider to check its limits.</value></data>
+  <data name="Overview_ResetsEmpty.Text" xml:space="preserve"><value>No upcoming resets are known yet.</value></data>
+  <data name="Usage_ChartNoHistory" xml:space="preserve"><value>No usage history has been recorded yet.</value></data>
+  <data name="Usage_MatchingNoHistory" xml:space="preserve"><value>No usage history yet</value></data>
+  <data name="Usage_MatchingNoHistoryDetail" xml:space="preserve"><value>Usage appears after a supported tool records local activity.</value></data>
+  <data name="Usage_ModelMixNoHistory" xml:space="preserve"><value>No model history has been recorded yet.</value></data>
+  <data name="Meter_Unknown" xml:space="preserve"><value>-</value></data>
+  <data name="Meter_StatusUnknown" xml:space="preserve"><value>UNKNOWN</value></data>
+  <data name="Meter_StatusUnavailable" xml:space="preserve"><value>UNAVAILABLE</value></data>
+  <data name="Settings_AboutUpdates.Text" xml:space="preserve"><value>About &amp; updates</value></data>
+  <data name="Settings_UpdateSource.Text" xml:space="preserve"><value>Updates come from the official GitHub release.</value></data>
+  <data name="Settings_UpdateCheck.Content" xml:space="preserve"><value>Check for updates</value></data>
+  <data name="Settings_UpdateCheck.AutomationProperties.Name" xml:space="preserve"><value>Check for QuotaBoard updates</value></data>
+  <data name="Settings_UpdateDownload.Content" xml:space="preserve"><value>Download update</value></data>
+  <data name="Settings_UpdateDownload.AutomationProperties.Name" xml:space="preserve"><value>Download the available QuotaBoard update</value></data>
+  <data name="Settings_UpdateRestart.Content" xml:space="preserve"><value>Restart QuotaBoard</value></data>
+  <data name="Settings_UpdateRestart.AutomationProperties.Name" xml:space="preserve"><value>Restart QuotaBoard to apply the update</value></data>
+  <data name="Settings_UpdateNotes.Content" xml:space="preserve"><value>View release notes</value></data>
+  <data name="Settings_UpdateNotes.AutomationProperties.Name" xml:space="preserve"><value>View update release notes</value></data>
+  <data name="Settings_UpdateFailure.Message" xml:space="preserve"><value>Couldn't check for updates. Your current version is unchanged.</value></data>
+  <data name="Update_Version" xml:space="preserve"><value>QuotaBoard {0}</value></data>
+  <data name="Update_Idle" xml:space="preserve"><value>Check for a stable update when you are ready.</value></data>
+  <data name="Update_Checking" xml:space="preserve"><value>Checking for updates...</value></data>
+  <data name="Update_Current" xml:space="preserve"><value>QuotaBoard is up to date.</value></data>
+  <data name="Update_Available" xml:space="preserve"><value>QuotaBoard {0} is available.</value></data>
+  <data name="Update_Downloading" xml:space="preserve"><value>Downloading update... {0}%</value></data>
+  <data name="Update_Ready" xml:space="preserve"><value>The update is ready. Restart QuotaBoard to finish.</value></data>
+  <data name="Update_Failure" xml:space="preserve"><value>Couldn't check for updates. Your current version is unchanged.</value></data>
+  <data name="Update_Development" xml:space="preserve"><value>Update checks are available in packaged releases.</value></data>
 </root>

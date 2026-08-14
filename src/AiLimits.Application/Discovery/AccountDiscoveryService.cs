@@ -10,6 +10,17 @@ using Microsoft.Extensions.Logging;
 
 namespace AiLimits.Application.Discovery;
 
+public enum ProviderDiscoveryFailureKind
+{
+    Unavailable,
+}
+
+public sealed record AccountDiscoveryResult(
+    IReadOnlyList<ProviderAccount> Accounts,
+    IReadOnlySet<ProviderId> SuccessfulProviders,
+    IReadOnlyDictionary<ProviderId, ProviderDiscoveryFailureKind> Failures
+);
+
 /// <summary>
 /// Runs account discovery across all provider adapters and reconciles the
 /// results with saved accounts. A provider whose discovery throws is treated
@@ -37,7 +48,7 @@ public sealed class AccountDiscoveryService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<IReadOnlyList<ProviderAccount>> DiscoverAsync(CancellationToken cancellationToken)
+    public async Task<AccountDiscoveryResult> DiscoverAsync(CancellationToken cancellationToken)
     {
         IReadOnlyList<ProviderAccount> existing = await _accounts.ListAsync(cancellationToken).ConfigureAwait(false);
         Dictionary<AccountKey, ProviderAccount> existingByKey = existing.ToDictionary(
@@ -45,6 +56,7 @@ public sealed class AccountDiscoveryService
         );
         HashSet<AccountKey> discoveredKeys = new HashSet<AccountKey>();
         HashSet<ProviderId> succeededProviders = new HashSet<ProviderId>();
+        Dictionary<ProviderId, ProviderDiscoveryFailureKind> failures = new();
         foreach (IProviderAdapter adapter in _adapters)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -64,6 +76,7 @@ public sealed class AccountDiscoveryService
                     "Account discovery failed for provider {Provider}; saved accounts are preserved.",
                     adapter.Descriptor.Id.Value
                 );
+                failures[adapter.Descriptor.Id] = ProviderDiscoveryFailureKind.Unavailable;
                 continue;
             }
             succeededProviders.Add(adapter.Descriptor.Id);
@@ -94,7 +107,8 @@ public sealed class AccountDiscoveryService
                 )
                 .ConfigureAwait(false);
         }
-        return await _accounts.ListAsync(cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<ProviderAccount> reconciled = await _accounts.ListAsync(cancellationToken).ConfigureAwait(false);
+        return new AccountDiscoveryResult(reconciled, succeededProviders, failures);
     }
 
     private static ProviderAccount MergeAccount(ProviderAccount? existing, ProviderAccount discovered)

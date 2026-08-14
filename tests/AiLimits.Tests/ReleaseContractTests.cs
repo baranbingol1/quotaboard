@@ -14,6 +14,16 @@ public sealed class ReleaseContractTests
         Assert.Contains("Validate publish output", workflow, StringComparison.Ordinal);
         Assert.Contains("PUBLISH_DIR=$env:RUNNER_TEMP", workflow, StringComparison.Ordinal);
         Assert.Contains("-OutputPath $env:PUBLISH_DIR", workflow, StringComparison.Ordinal);
+        Assert.Contains("-PackageOutputPath $env:PACKAGE_DIR", workflow, StringComparison.Ordinal);
+        Assert.Contains("dist/*.nupkg", workflow, StringComparison.Ordinal);
+        Assert.Contains("dist/releases.*.json", workflow, StringComparison.Ordinal);
+        Assert.Contains("windows-11-arm", workflow, StringComparison.Ordinal);
+        Assert.Contains("needs: [build, native-package]", workflow, StringComparison.Ordinal);
+        Assert.Contains("Verify rehearsal artifacts", workflow, StringComparison.Ordinal);
+        Assert.Contains("$appRoot = Join-Path $root 'current'", workflow, StringComparison.Ordinal);
+        Assert.Contains("validate-portable-package.ps1", releaseVerifier, StringComparison.Ordinal);
+        Assert.Contains("$baseName-full.nupkg", releaseVerifier, StringComparison.Ordinal);
+        Assert.Contains("releases.win-$architecture.json", releaseVerifier, StringComparison.Ordinal);
         Assert.Contains("-ps 'Baran Bingöl'", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("SignPath", workflow, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("sign-release.ps1", workflow, StringComparison.Ordinal);

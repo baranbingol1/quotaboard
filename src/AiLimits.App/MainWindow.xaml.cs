@@ -13,7 +13,11 @@ namespace AiLimits.App;
 
 public sealed partial class MainWindow : Window
 {
-    public MainWindow(LiveDashboardViewModel viewModel, IStartupRegistrationService startupRegistration)
+    public MainWindow(
+        LiveDashboardViewModel viewModel,
+        UpdateViewModel updateViewModel,
+        IStartupRegistrationService startupRegistration
+    )
     {
         InitializeComponent();
         ThemeService.Applied += StyleTitleBar;
@@ -21,7 +25,7 @@ public sealed partial class MainWindow : Window
         Root.ActualThemeChanged += (_, _) => ThemeService.NotifySystemThemeChanged();
         Closed += (_, _) => ThemeService.Applied -= StyleTitleBar;
         ThemeService.Apply(Root, ThemeService.LoadPreference(), persist: false);
-        Root.Children.Add(new ShellPage(viewModel, startupRegistration));
+        Root.Children.Add(new ShellPage(viewModel, updateViewModel, startupRegistration));
         Title = "QuotaBoard";
         try
         {
