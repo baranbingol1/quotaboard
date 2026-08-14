@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 using System.Text.Json;
+using AiLimits.App;
 using AiLimits.Domain;
 using AiLimits.Infrastructure.Providers.Copilot;
+using AiLimits.Presentation.WinUI.Localization;
 using AiLimits.Presentation.WinUI.ViewModels;
 using Xunit;
 
@@ -37,6 +39,31 @@ public sealed class Phase2MeterRegressionTests
         );
 
         Assert.Equal(expectedUsed, meter.UsedPercent);
+    }
+
+    [Fact]
+    public void Inactive_factory_window_starts_on_next_use()
+    {
+        var meter = new UsageMeter(
+            new MeterKey("droid:five-hour"),
+            "5-hour limit",
+            MeterScope.Account,
+            MeterUnit.Percent,
+            null,
+            null,
+            0,
+            null,
+            null,
+            null,
+            MeterStatus.Healthy,
+            new MeterProvenance("droid.factory-cli-oauth", "$.limits.standard.fiveHour", DateTimeOffset.UtcNow, true)
+        );
+
+        MeterViewModel factory = LiveDashboardDataSource.ToMeterViewModel("droid", meter);
+        MeterViewModel other = LiveDashboardDataSource.ToMeterViewModel("other", meter);
+
+        Assert.Equal(LocalizationService.GetString("Meter_StartsOnNextUse"), factory.ResetLabel);
+        Assert.Equal(LocalizationService.GetString("Meter_NoScheduledReset"), other.ResetLabel);
     }
 
     private sealed class TestClock : AiLimits.Application.Abstractions.IClock

@@ -459,6 +459,7 @@
   <data name="Meter_PercentRemaining" xml:space="preserve"><value>{0:0.#}% remaining</value></data>
   <data name="Meter_MeasureRemaining" xml:space="preserve"><value>{0} remaining</value></data>
   <data name="Meter_NoScheduledReset" xml:space="preserve"><value>No scheduled reset</value></data>
+  <data name="Meter_StartsOnNextUse" xml:space="preserve"><value>Starts on next use</value></data>
   <data name="Meter_ResetsIn" xml:space="preserve"><value>Resets {0}</value></data>
   <data name="Meter_ResetsAt" xml:space="preserve"><value>Resets {0:g}</value></data>
   <data name="Meter_PaceExhaustNow" xml:space="preserve"><value>On pace to exhaust now</value></data>

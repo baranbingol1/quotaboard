@@ -459,6 +459,7 @@
   <data name="Meter_PercentRemaining" xml:space="preserve"><value>%{0:0.#} kaldı</value></data>
   <data name="Meter_MeasureRemaining" xml:space="preserve"><value>{0} kaldı</value></data>
   <data name="Meter_NoScheduledReset" xml:space="preserve"><value>Planlanmış sıfırlama yok</value></data>
+  <data name="Meter_StartsOnNextUse" xml:space="preserve"><value>Sonraki kullanımda başlar</value></data>
   <data name="Meter_ResetsIn" xml:space="preserve"><value>{0} sıfırlanır</value></data>
   <data name="Meter_ResetsAt" xml:space="preserve"><value>{0:g} tarihinde sıfırlanır</value></data>
   <data name="Meter_PaceExhaustNow" xml:space="preserve"><value>Bu hızla şimdi tükenecek</value></data>

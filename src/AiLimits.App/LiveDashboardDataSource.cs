@@ -1586,7 +1586,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                 MeterViewModel[] allMeters =
                     value
                         ?.Meters.OrderBy(meter => meter, MeterDisplayOrderComparer.Instance)
-                        .Select(ToMeterViewModel)
+                        .Select(meter => ToMeterViewModel(adapter.Descriptor.Id.Value, meter))
                         .ToArray() ?? Array.Empty<MeterViewModel>();
                 BalanceMetric balanceMetric = value?.Balances.FirstOrDefault();
                 ProviderServiceStatus? serviceStatus = _providerStatuses.Get(adapter.Descriptor.Id.Value);
@@ -1760,7 +1760,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         };
     }
 
-    private static MeterViewModel ToMeterViewModel(UsageMeter meter)
+    internal static MeterViewModel ToMeterViewModel(string providerId, UsageMeter meter)
     {
         double valueOrDefault = meter.UsedPercent.GetValueOrDefault();
         string usedLabel =
@@ -1775,8 +1775,13 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                     FormatMeasure(Math.Max(0m, meter.Limit.Value - meter.Used.Value), meter.Unit)
                 )
             : F("Meter_PercentRemaining", Math.Max(0.0, 100.0 - valueOrDefault));
+        bool startsOnNextUse =
+            string.Equals(providerId, "droid", StringComparison.Ordinal)
+            && meter.UsedPercent is 0.0
+            && meter.Status == MeterStatus.Healthy
+            && meter.Provenance.SourcePath.StartsWith("$.limits.", StringComparison.Ordinal);
         string resetLabel = !meter.ResetsAt.HasValue
-            ? L("Meter_NoScheduledReset")
+            ? L(startsOnNextUse ? "Meter_StartsOnNextUse" : "Meter_NoScheduledReset")
             : F("Meter_ResetsIn", Countdown(meter.ResetsAt.Value - DateTimeOffset.UtcNow));
         return new MeterViewModel(
             meter.Key.Value,
