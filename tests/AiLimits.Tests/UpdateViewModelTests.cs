@@ -107,6 +107,28 @@ public sealed class UpdateViewModelTests
     }
 
     [Fact]
+    public async Task State_changes_notify_derived_properties()
+    {
+        var service = new FakeUpdateService
+        {
+            CheckResult = new ApplicationUpdateCheckResult(Update),
+            DownloadFailure = ApplicationUpdateFailureKind.IntegrityFailure,
+        };
+        using var viewModel = new UpdateViewModel(service);
+        var changes = new List<(string? Property, ApplicationUpdateState State)>();
+        viewModel.PropertyChanged += (_, args) => changes.Add((args.PropertyName, viewModel.State));
+
+        await viewModel.CheckCommand.ExecuteAsync(null);
+        await viewModel.DownloadCommand.ExecuteAsync(null);
+
+        Assert.Contains((nameof(UpdateViewModel.IsChecking), ApplicationUpdateState.Checking), changes);
+        Assert.Contains((nameof(UpdateViewModel.IsChecking), ApplicationUpdateState.Available), changes);
+        Assert.Contains((nameof(UpdateViewModel.IsDownloading), ApplicationUpdateState.Downloading), changes);
+        Assert.Contains((nameof(UpdateViewModel.IsDownloading), ApplicationUpdateState.Failed), changes);
+        Assert.Contains((nameof(UpdateViewModel.HasFailure), ApplicationUpdateState.Failed), changes);
+    }
+
+    [Fact]
     public async Task Duplicate_check_is_blocked()
     {
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

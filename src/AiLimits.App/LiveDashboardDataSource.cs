@@ -1634,35 +1634,12 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             ProviderAccount[] array = accounts
                 .Where((ProviderAccount providerAccount) => providerAccount.Key.Provider == descriptor.Id)
                 .ToArray();
-            (string ActionLabel, string ActionKind, string ActionTarget) action = ConnectionAction(descriptor.Id.Value);
             if (array.Length == 0)
             {
-                bool retrying = _discoveryFailures.ContainsKey(descriptor.Id);
-                string accountLabel =
-                    descriptor.Id.Value == "opencode" ? L("Data_NoLocalHistory")
-                    : descriptor.Id.Value == "droid" ? L("Data_NoFactorySession")
-                    : L("Data_NoLocalAccount");
-                string status =
-                    retrying ? L("Data_DiscoveryRetrying")
-                    : descriptor.Id.Value == "opencode" ? L("Data_HistoryNotDetected")
-                    : L("Data_NotConnected");
-                list.Add(
-                    new ProviderConnectionViewModel(
-                        descriptor.DisplayName,
-                        accountLabel,
-                        LocalizedCapabilities(descriptor.Id.Value),
-                        status,
-                        LocalizedCoverage(descriptor.Id.Value),
-                        descriptor.AccentColor,
-                        action.ActionLabel,
-                        action.ActionKind,
-                        action.ActionTarget,
-                        descriptor.Id.Value,
-                        isConnected: retrying
-                    )
-                );
+                list.Add(BuildMissingConnection(descriptor, _discoveryFailures.ContainsKey(descriptor.Id)));
                 continue;
             }
+            (string ActionLabel, string ActionKind, string ActionTarget) action = ConnectionAction(descriptor.Id.Value);
             ProviderAccount[] array2 = array;
             foreach (ProviderAccount account in array2)
             {
@@ -1718,6 +1695,35 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             }
         }
         return list;
+    }
+
+    internal static ProviderConnectionViewModel BuildMissingConnection(
+        ProviderDescriptor descriptor,
+        bool discoveryFailed
+    )
+    {
+        (string ActionLabel, string ActionKind, string ActionTarget) action = ConnectionAction(descriptor.Id.Value);
+        string accountLabel =
+            descriptor.Id.Value == "opencode" ? L("Data_NoLocalHistory")
+            : descriptor.Id.Value == "droid" ? L("Data_NoFactorySession")
+            : L("Data_NoLocalAccount");
+        string status =
+            discoveryFailed ? L("Data_DiscoveryRetrying")
+            : descriptor.Id.Value == "opencode" ? L("Data_HistoryNotDetected")
+            : L("Data_NotConnected");
+        return new ProviderConnectionViewModel(
+            descriptor.DisplayName,
+            accountLabel,
+            LocalizedCapabilities(descriptor.Id.Value),
+            status,
+            LocalizedCoverage(descriptor.Id.Value),
+            descriptor.AccentColor,
+            action.ActionLabel,
+            action.ActionKind,
+            action.ActionTarget,
+            descriptor.Id.Value,
+            isConnected: false
+        );
     }
 
     private static string AccountLabel(ProviderAccount account, ProviderSnapshot? snapshot)

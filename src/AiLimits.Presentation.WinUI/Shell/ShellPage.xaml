@@ -24,7 +24,7 @@
             <NavigationViewItem x:Uid="Shell_Usage" Tag="usage">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="AllApps" /></NavigationViewItem.Icon>
             </NavigationViewItem>
-            <NavigationViewItem x:Uid="Shell_Connections" Tag="providers">
+            <NavigationViewItem x:Uid="Shell_Connections" x:Name="ConnectionsNavigationItem" Tag="providers">
                 <NavigationViewItem.Icon><SymbolIcon Symbol="People" /></NavigationViewItem.Icon>
             </NavigationViewItem>
         </NavigationView.MenuItems>

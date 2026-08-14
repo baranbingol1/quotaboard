@@ -176,7 +176,10 @@ public sealed partial class UpdateViewModel : ObservableObject, IDisposable
     {
         State = state;
         StatusMessage = GetStatusMessage(state);
+        OnPropertyChanged(nameof(IsChecking));
+        OnPropertyChanged(nameof(IsDownloading));
         OnPropertyChanged(nameof(IsBusy));
+        OnPropertyChanged(nameof(HasFailure));
         OnPropertyChanged(nameof(ShowCheckAction));
         OnPropertyChanged(nameof(ShowDownloadAction));
         OnPropertyChanged(nameof(ShowRestartAction));

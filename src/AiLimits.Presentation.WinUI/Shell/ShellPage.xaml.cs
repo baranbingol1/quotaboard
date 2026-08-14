@@ -75,13 +75,15 @@ public sealed partial class ShellPage : Page
     {
         if (!_pages.TryGetValue(pageType, out var page))
         {
-            page = pageType == typeof(OverviewPage) ? new OverviewPage(_viewModel, () => Navigate(typeof(ProvidersPage)))
+            page = pageType == typeof(OverviewPage) ? new OverviewPage(_viewModel, OpenConnections)
                 : pageType == typeof(UsagePage) ? new UsagePage(_viewModel)
                 : pageType == typeof(ProvidersPage) ? new ProvidersPage(_viewModel)
                 : pageType == typeof(DiagnosticsPage) ? new DiagnosticsPage(_viewModel)
                 : new SettingsPage(_viewModel, _updateViewModel, _startupRegistration);
             _pages[pageType] = page;
         }
-        if (ContentFrame.Content != page) ContentFrame.Content = page;
+        if (!ReferenceEquals(ContentFrame.Content, page)) ContentFrame.Content = page;
     }
+
+    private void OpenConnections() => Navigation.SelectedItem = ConnectionsNavigationItem;
 }
