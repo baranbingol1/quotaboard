@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-using System.Text.Json;
 using System.Text;
+using System.Text.Json;
 
 namespace AiLimits.Infrastructure.Providers.Droid;
 
@@ -61,7 +61,9 @@ public sealed class FactoryCredentialReader
                 byte[] array = new byte[4];
                 ThrowIfFailed(BCryptGetProperty(algorithm, "ObjectLength", array, array.Length, out var _, 0u));
                 byte[] array2 = new byte[BitConverter.ToInt32(array)];
-                ThrowIfFailed(BCryptGenerateSymmetricKey(algorithm, out key2, array2, array2.Length, key, key.Length, 0u));
+                ThrowIfFailed(
+                    BCryptGenerateSymmetricKey(algorithm, out key2, array2, array2.Length, key, key.Length, 0u)
+                );
                 gCHandle = GCHandle.Alloc(nonce, GCHandleType.Pinned);
                 gCHandle2 = GCHandle.Alloc(tag, GCHandleType.Pinned);
                 AuthenticatedCipherModeInfo paddingInfo = new AuthenticatedCipherModeInfo
@@ -71,10 +73,23 @@ public sealed class FactoryCredentialReader
                     Nonce = gCHandle.AddrOfPinnedObject(),
                     NonceSize = nonce.Length,
                     Tag = gCHandle2.AddrOfPinnedObject(),
-                    TagSize = tag.Length
+                    TagSize = tag.Length,
                 };
                 byte[] array3 = new byte[ciphertext.Length];
-                ThrowIfFailed(BCryptDecrypt(key2, ciphertext, ciphertext.Length, ref paddingInfo, IntPtr.Zero, 0, array3, array3.Length, out var resultSize2, 0u));
+                ThrowIfFailed(
+                    BCryptDecrypt(
+                        key2,
+                        ciphertext,
+                        ciphertext.Length,
+                        ref paddingInfo,
+                        IntPtr.Zero,
+                        0,
+                        array3,
+                        array3.Length,
+                        out var resultSize2,
+                        0u
+                    )
+                );
                 return array3.AsSpan(0, resultSize2).ToArray();
             }
             finally
@@ -108,19 +123,56 @@ public sealed class FactoryCredentialReader
         }
 
         [DllImport("bcrypt.dll", CharSet = CharSet.Unicode)]
-        private static extern int BCryptOpenAlgorithmProvider(out nint algorithm, string algorithmId, string? implementation, uint flags);
+        private static extern int BCryptOpenAlgorithmProvider(
+            out nint algorithm,
+            string algorithmId,
+            string? implementation,
+            uint flags
+        );
 
         [DllImport("bcrypt.dll", CharSet = CharSet.Unicode)]
-        private static extern int BCryptSetProperty(nint handle, string property, byte[] input, int inputSize, uint flags);
+        private static extern int BCryptSetProperty(
+            nint handle,
+            string property,
+            byte[] input,
+            int inputSize,
+            uint flags
+        );
 
         [DllImport("bcrypt.dll", CharSet = CharSet.Unicode)]
-        private static extern int BCryptGetProperty(nint handle, string property, byte[] output, int outputSize, out int resultSize, uint flags);
+        private static extern int BCryptGetProperty(
+            nint handle,
+            string property,
+            byte[] output,
+            int outputSize,
+            out int resultSize,
+            uint flags
+        );
 
         [DllImport("bcrypt.dll")]
-        private static extern int BCryptGenerateSymmetricKey(nint algorithm, out nint key, byte[] keyObject, int keyObjectSize, byte[] secret, int secretSize, uint flags);
+        private static extern int BCryptGenerateSymmetricKey(
+            nint algorithm,
+            out nint key,
+            byte[] keyObject,
+            int keyObjectSize,
+            byte[] secret,
+            int secretSize,
+            uint flags
+        );
 
         [DllImport("bcrypt.dll")]
-        private static extern int BCryptDecrypt(nint key, byte[] input, int inputSize, ref AuthenticatedCipherModeInfo paddingInfo, nint initializationVector, int initializationVectorSize, byte[] output, int outputSize, out int resultSize, uint flags);
+        private static extern int BCryptDecrypt(
+            nint key,
+            byte[] input,
+            int inputSize,
+            ref AuthenticatedCipherModeInfo paddingInfo,
+            nint initializationVector,
+            int initializationVectorSize,
+            byte[] output,
+            int outputSize,
+            out int resultSize,
+            uint flags
+        );
 
         [DllImport("bcrypt.dll")]
         private static extern int BCryptDestroyKey(nint key);
@@ -133,7 +185,8 @@ public sealed class FactoryCredentialReader
 
     public FactoryCredentialReader(string? factoryHome = null)
     {
-        _factoryHome = factoryHome ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".factory");
+        _factoryHome =
+            factoryHome ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".factory");
     }
 
     public async Task<FactoryCredential?> ReadAsync(CancellationToken cancellationToken)
@@ -173,13 +226,26 @@ public sealed class FactoryCredentialReader
                 accessToken,
                 ReadString(root, "refresh_token"),
                 ReadString(root, "active_organization_id") ?? ReadString(root, "organization_id"),
-                ReadDisplayEmail(accessToken));
+                ReadDisplayEmail(accessToken)
+            );
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
-        catch (Exception ex2) when (((ex2 is IOException || ex2 is UnauthorizedAccessException || ex2 is FormatException || ex2 is JsonException || ex2 is CryptographicException) ? 1 : 0) != 0)
+        catch (Exception ex2)
+            when ((
+                    (
+                        ex2 is IOException
+                        || ex2 is UnauthorizedAccessException
+                        || ex2 is FormatException
+                        || ex2 is JsonException
+                        || ex2 is CryptographicException
+                    )
+                        ? 1
+                        : 0
+                ) != 0
+            )
         {
             return null;
         }
@@ -199,7 +265,9 @@ public sealed class FactoryCredentialReader
     private static string? ReadString(JsonElement element, string propertyName)
     {
         JsonElement value;
-        return (element.TryGetProperty(propertyName, out value) && value.ValueKind == JsonValueKind.String) ? value.GetString() : null;
+        return (element.TryGetProperty(propertyName, out value) && value.ValueKind == JsonValueKind.String)
+            ? value.GetString()
+            : null;
     }
 
     // The encrypted Factory credential is already trusted as the local CLI's
@@ -218,9 +286,7 @@ public sealed class FactoryCredentialReader
             payload = payload.PadRight(payload.Length + ((4 - payload.Length % 4) % 4), '=');
             using JsonDocument document = JsonDocument.Parse(Convert.FromBase64String(payload));
             string? email = ReadString(document.RootElement, "email")?.Trim();
-            return !string.IsNullOrWhiteSpace(email) && email.Length <= 320 && email.Contains('@')
-                ? email
-                : null;
+            return !string.IsNullOrWhiteSpace(email) && email.Length <= 320 && email.Contains('@') ? email : null;
         }
         catch (Exception ex) when (ex is FormatException or JsonException)
         {
@@ -229,4 +295,9 @@ public sealed class FactoryCredentialReader
     }
 }
 
-public sealed record FactoryCredential(string AccessToken, string? RefreshToken, string? OrganizationId, string? Email = null);
+public sealed record FactoryCredential(
+    string AccessToken,
+    string? RefreshToken,
+    string? OrganizationId,
+    string? Email = null
+);

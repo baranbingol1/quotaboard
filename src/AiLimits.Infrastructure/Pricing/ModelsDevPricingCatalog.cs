@@ -1,18 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
+using System.Net;
+using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Text.Json;
 using AiLimits.Application.Abstractions;
 using AiLimits.Application.Pricing;
 using AiLimits.Domain;
 using AiLimits.Infrastructure.Providers.Common;
-using System.Net.Http.Headers;
-using System.Net;
-using System.Security.Cryptography;
-using System.Text.Json;
 
 namespace AiLimits.Infrastructure.Pricing;
 
 public sealed class ModelsDevPricingCatalog : IPricingCatalog, IDisposable
 {
-    private sealed record CatalogMetadata(string Hash, DateTimeOffset FetchedAt, string? ETag, DateTimeOffset? LastModified);
+    private sealed record CatalogMetadata(
+        string Hash,
+        DateTimeOffset FetchedAt,
+        string? ETag,
+        DateTimeOffset? LastModified
+    );
 
     private sealed record CachedCatalog(PricingCatalogSnapshot Snapshot, CatalogMetadata Metadata);
 
@@ -100,8 +105,10 @@ public sealed class ModelsDevPricingCatalog : IPricingCatalog, IDisposable
                 {
                     return new PricingCatalogRefresh(PricingCatalogOutcome.NotDue, cached.Snapshot);
                 }
-                if (_lastAttemptAt is { } attempted
-                    && _clock.UtcNow - attempted < PricingCatalogSchedule.MinimumRetryGap)
+                if (
+                    _lastAttemptAt is { } attempted
+                    && _clock.UtcNow - attempted < PricingCatalogSchedule.MinimumRetryGap
+                )
                 {
                     return new PricingCatalogRefresh(PricingCatalogOutcome.NotDue, cached.Snapshot, _lastError);
                 }
@@ -134,7 +141,11 @@ public sealed class ModelsDevPricingCatalog : IPricingCatalog, IDisposable
                     _lastError = null;
                     return new PricingCatalogRefresh(
                         PricingCatalogOutcome.Unchanged,
-                        cached.Snapshot with { FetchedAt = revalidated.FetchedAt });
+                        cached.Snapshot with
+                        {
+                            FetchedAt = revalidated.FetchedAt,
+                        }
+                    );
                 }
 
                 response.EnsureSuccessStatusCode();
@@ -151,13 +162,15 @@ public sealed class ModelsDevPricingCatalog : IPricingCatalog, IDisposable
                     Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
                     _clock.UtcNow,
                     response.Headers.ETag?.ToString(),
-                    response.Content.Headers.LastModified ?? response.Headers.Date);
+                    response.Content.Headers.LastModified ?? response.Headers.Date
+                );
                 await AtomicWriteAsync(_bodyPath, bytes, cancellationToken).ConfigureAwait(false);
                 await WriteMetadataAsync(metadata, cancellationToken).ConfigureAwait(false);
                 _lastError = null;
                 return new PricingCatalogRefresh(
                     PricingCatalogOutcome.Updated,
-                    new PricingCatalogSnapshot(metadata.Hash, metadata.FetchedAt, metadata.ETag, index));
+                    new PricingCatalogSnapshot(metadata.Hash, metadata.FetchedAt, metadata.ETag, index)
+                );
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -183,18 +196,21 @@ public sealed class ModelsDevPricingCatalog : IPricingCatalog, IDisposable
         return new PricingCatalogRefresh(PricingCatalogOutcome.Failed, cached?.Snapshot, error);
     }
 
-    private static string Describe(Exception ex) => ex switch
-    {
-        HttpRequestException { StatusCode: { } status } => $"models.dev returned HTTP {(int)status}",
-        HttpRequestException => "Could not reach models.dev",
-        TaskCanceledException => "models.dev timed out",
-        InvalidDataException => $"Catalog rejected: {ex.Message}",
-        JsonException => "Catalog was not valid JSON",
-        IOException => $"Could not write the catalog cache: {ex.Message}",
-        _ => ex.Message
-    };
+    private static string Describe(Exception ex) =>
+        ex switch
+        {
+            HttpRequestException { StatusCode: { } status } => $"models.dev returned HTTP {(int)status}",
+            HttpRequestException => "Could not reach models.dev",
+            TaskCanceledException => "models.dev timed out",
+            InvalidDataException => $"Catalog rejected: {ex.Message}",
+            JsonException => "Catalog was not valid JSON",
+            IOException => $"Could not write the catalog cache: {ex.Message}",
+            _ => ex.Message,
+        };
 
-    public static IReadOnlyDictionary<(string Provider, string Model), ModelPrice> ParseAndValidate(ReadOnlySpan<byte> body)
+    public static IReadOnlyDictionary<(string Provider, string Model), ModelPrice> ParseAndValidate(
+        ReadOnlySpan<byte> body
+    )
     {
         using JsonDocument jsonDocument = JsonDocument.Parse(body.ToArray());
         if (jsonDocument.RootElement.ValueKind != JsonValueKind.Object)
@@ -219,19 +235,41 @@ public sealed class ModelsDevPricingCatalog : IPricingCatalog, IDisposable
                     decimal? reasoningPerMillion = ReadRate(value2, "reasoning");
                     decimal? longContextInputPerMillion = null;
                     decimal? longContextOutputPerMillion = null;
-                    if (value2.TryGetProperty("context_over_200k", out var value3) && value3.ValueKind == JsonValueKind.Object)
+                    if (
+                        value2.TryGetProperty("context_over_200k", out var value3)
+                        && value3.ValueKind == JsonValueKind.Object
+                    )
                     {
                         longContextInputPerMillion = ReadRate(value3, "input");
                         longContextOutputPerMillion = ReadRate(value3, "output");
                     }
-                    if (inputPerMillion.HasValue || outputPerMillion.HasValue || cacheReadPerMillion.HasValue || cacheWritePerMillion.HasValue || reasoningPerMillion.HasValue)
+                    if (
+                        inputPerMillion.HasValue
+                        || outputPerMillion.HasValue
+                        || cacheReadPerMillion.HasValue
+                        || cacheWritePerMillion.HasValue
+                        || reasoningPerMillion.HasValue
+                    )
                     {
                         string text = item.Name.Trim().ToLowerInvariant();
                         string text2 = item2.Name.Trim();
                         // Index keys are lowercase on both sides: models.dev mixes
                         // casings per host ("MiniMax-M3" vs "minimax-m3") and local
                         // telemetry always reports lowercase ids.
-                        dictionary[(text, text2.ToLowerInvariant())] = new ModelPrice(text, text2, inputPerMillion, outputPerMillion, cacheReadPerMillion, cacheWritePerMillion, reasoningPerMillion, longContextInputPerMillion, longContextOutputPerMillion, (!longContextInputPerMillion.HasValue && !longContextOutputPerMillion.HasValue) ? null : 200000L);
+                        dictionary[(text, text2.ToLowerInvariant())] = new ModelPrice(
+                            text,
+                            text2,
+                            inputPerMillion,
+                            outputPerMillion,
+                            cacheReadPerMillion,
+                            cacheWritePerMillion,
+                            reasoningPerMillion,
+                            longContextInputPerMillion,
+                            longContextOutputPerMillion,
+                            (!longContextInputPerMillion.HasValue && !longContextOutputPerMillion.HasValue)
+                                ? null
+                                : 200000L
+                        );
                     }
                 }
             }
@@ -267,8 +305,12 @@ public sealed class ModelsDevPricingCatalog : IPricingCatalog, IDisposable
         // revalidation rewrites only the metadata (a fresh FetchedAt over an
         // unchanged body), and keying on the body alone would serve the stale
         // fetch time for the rest of the process lifetime.
-        (DateTime, long, DateTime, long) stamp =
-            (body.LastWriteTimeUtc, body.Length, metadataFile.LastWriteTimeUtc, metadataFile.Length);
+        (DateTime, long, DateTime, long) stamp = (
+            body.LastWriteTimeUtc,
+            body.Length,
+            metadataFile.LastWriteTimeUtc,
+            metadataFile.Length
+        );
         await _loadGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -295,12 +337,25 @@ public sealed class ModelsDevPricingCatalog : IPricingCatalog, IDisposable
         try
         {
             byte[] bytes = await File.ReadAllBytesAsync(_bodyPath, cancellationToken).ConfigureAwait(false);
-            CatalogMetadata metadata = JsonSerializer.Deserialize<CatalogMetadata>(await File.ReadAllTextAsync(_metadataPath, cancellationToken).ConfigureAwait(false), JsonOptions);
-            if (metadata is null || !string.Equals(Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(), metadata.Hash, StringComparison.Ordinal))
+            CatalogMetadata metadata = JsonSerializer.Deserialize<CatalogMetadata>(
+                await File.ReadAllTextAsync(_metadataPath, cancellationToken).ConfigureAwait(false),
+                JsonOptions
+            );
+            if (
+                metadata is null
+                || !string.Equals(
+                    Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
+                    metadata.Hash,
+                    StringComparison.Ordinal
+                )
+            )
             {
                 return null;
             }
-            return new CachedCatalog(new PricingCatalogSnapshot(metadata.Hash, metadata.FetchedAt, metadata.ETag, ParseAndValidate(bytes)), metadata);
+            return new CachedCatalog(
+                new PricingCatalogSnapshot(metadata.Hash, metadata.FetchedAt, metadata.ETag, ParseAndValidate(bytes)),
+                metadata
+            );
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -314,7 +369,11 @@ public sealed class ModelsDevPricingCatalog : IPricingCatalog, IDisposable
 
     private Task WriteMetadataAsync(CatalogMetadata metadata, CancellationToken cancellationToken)
     {
-        return AtomicWriteAsync(_metadataPath, JsonSerializer.SerializeToUtf8Bytes(metadata, JsonOptions), cancellationToken);
+        return AtomicWriteAsync(
+            _metadataPath,
+            JsonSerializer.SerializeToUtf8Bytes(metadata, JsonOptions),
+            cancellationToken
+        );
     }
 
     private static async Task AtomicWriteAsync(string path, byte[] bytes, CancellationToken cancellationToken)
@@ -326,7 +385,11 @@ public sealed class ModelsDevPricingCatalog : IPricingCatalog, IDisposable
 
     private static decimal? ReadRate(JsonElement parent, string name)
     {
-        if (!parent.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Number || !value.TryGetDecimal(out var value2))
+        if (
+            !parent.TryGetProperty(name, out var value)
+            || value.ValueKind != JsonValueKind.Number
+            || !value.TryGetDecimal(out var value2)
+        )
         {
             return null;
         }

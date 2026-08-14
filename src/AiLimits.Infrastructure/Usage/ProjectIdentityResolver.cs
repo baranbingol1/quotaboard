@@ -12,20 +12,22 @@ namespace AiLimits.Infrastructure.Usage;
 /// </summary>
 public sealed class ProjectIdentityResolver
 {
-    private readonly ConcurrentDictionary<string, ProjectIdentity> _cache =
-        new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, ProjectIdentity> _cache = new(StringComparer.OrdinalIgnoreCase);
 
     public ProjectIdentity Resolve(string? workingDirectory)
     {
-        if (string.IsNullOrWhiteSpace(workingDirectory)) return ProjectIdentity.Unknown;
+        if (string.IsNullOrWhiteSpace(workingDirectory))
+            return ProjectIdentity.Unknown;
 
         try
         {
-            if (!Path.IsPathFullyQualified(workingDirectory)) return ProjectIdentity.Unknown;
+            if (!Path.IsPathFullyQualified(workingDirectory))
+                return ProjectIdentity.Unknown;
             var normalized = NormalizePath(workingDirectory);
             return _cache.GetOrAdd(normalized, ResolveNormalized);
         }
-        catch (Exception exception) when (exception is ArgumentException or IOException or NotSupportedException or UnauthorizedAccessException)
+        catch (Exception exception)
+            when (exception is ArgumentException or IOException or NotSupportedException or UnauthorizedAccessException)
         {
             return ProjectIdentity.Unknown;
         }
@@ -37,8 +39,7 @@ public sealed class ProjectIdentityResolver
             .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar)
             .Normalize(NormalizationForm.FormC);
         var root = Path.GetPathRoot(normalized) ?? string.Empty;
-        while (normalized.Length > root.Length &&
-               normalized.EndsWith(Path.DirectorySeparatorChar))
+        while (normalized.Length > root.Length && normalized.EndsWith(Path.DirectorySeparatorChar))
         {
             normalized = normalized[..^1];
         }
@@ -62,7 +63,8 @@ public sealed class ProjectIdentityResolver
                 var root = NormalizePath(directory.FullName);
                 return (root, root);
             }
-            if (!File.Exists(marker)) continue;
+            if (!File.Exists(marker))
+                continue;
 
             var worktreeRoot = NormalizePath(directory.FullName);
             var gitDirectory = ReadGitDirectory(marker, directory.FullName);
@@ -80,11 +82,13 @@ public sealed class ProjectIdentityResolver
         {
             var marker = File.ReadLines(markerPath).FirstOrDefault();
             const string prefix = "gitdir:";
-            if (marker is null || !marker.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return null;
+            if (marker is null || !marker.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return null;
             var path = marker[prefix.Length..].Trim();
             return NormalizePath(Path.IsPathFullyQualified(path) ? path : Path.Combine(worktreeRoot, path));
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
             return null;
         }
@@ -95,18 +99,23 @@ public sealed class ProjectIdentityResolver
         try
         {
             var commonDirectoryFile = Path.Combine(gitDirectory, "commondir");
-            if (!File.Exists(commonDirectoryFile)) return null;
+            if (!File.Exists(commonDirectoryFile))
+                return null;
             var commonDirectory = File.ReadLines(commonDirectoryFile).FirstOrDefault()?.Trim();
-            if (string.IsNullOrWhiteSpace(commonDirectory)) return null;
-            var resolved = NormalizePath(Path.IsPathFullyQualified(commonDirectory)
-                ? commonDirectory
-                : Path.Combine(gitDirectory, commonDirectory));
+            if (string.IsNullOrWhiteSpace(commonDirectory))
+                return null;
+            var resolved = NormalizePath(
+                Path.IsPathFullyQualified(commonDirectory)
+                    ? commonDirectory
+                    : Path.Combine(gitDirectory, commonDirectory)
+            );
             var info = new DirectoryInfo(resolved);
             return string.Equals(info.Name, ".git", StringComparison.OrdinalIgnoreCase) && info.Parent is not null
                 ? NormalizePath(info.Parent.FullName)
                 : null;
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
             return null;
         }
@@ -117,10 +126,7 @@ public sealed class ProjectIdentityResolver
         // Windows paths are case-insensitive. Unicode normalization plus an
         // invariant fold ensures Turkish casing and composed/decomposed forms
         // produce one stable key while preserving the original path for UI.
-        var keyPath = projectPath
-            .Replace('\\', '/')
-            .Normalize(NormalizationForm.FormC)
-            .ToUpperInvariant();
+        var keyPath = projectPath.Replace('\\', '/').Normalize(NormalizationForm.FormC).ToUpperInvariant();
         return "project:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(keyPath))).ToLowerInvariant();
     }
 }

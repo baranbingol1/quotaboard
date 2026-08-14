@@ -12,7 +12,9 @@ public static class ProviderVisibilityPreference
 {
     private static readonly string PreferencePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard", "provider-visibility.json");
+        "QuotaBoard",
+        "provider-visibility.json"
+    );
 
     public static ProviderVisibilitySet Load()
     {
@@ -34,8 +36,6 @@ public static class ProviderVisibilityPreference
         {
             PreferenceFile.WriteAtomic(PreferencePath, Load().WithVisibility(providerId, visible).Serialize());
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 }

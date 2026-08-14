@@ -15,12 +15,16 @@ internal sealed class WindowsStartupRegistration : IStartupRegistrationService
         {
             try
             {
-                using RegistryKey currentUser = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, RegistryView.Registry64);
+                using RegistryKey currentUser = RegistryKey.OpenBaseKey(
+                    RegistryHive.CurrentUser,
+                    RegistryView.Registry64
+                );
                 using RegistryKey? key = currentUser.OpenSubKey(RunKeyPath, writable: false);
                 string? value = key?.GetValue(ValueName) as string;
                 return string.Equals(value?.Trim(), BuildCommand(), StringComparison.OrdinalIgnoreCase);
             }
-            catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+            catch (Exception ex)
+                when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
             {
                 return false;
             }
@@ -43,7 +47,8 @@ internal sealed class WindowsStartupRegistration : IStartupRegistrationService
             }
             return IsStartupEnabled == enabled;
         }
-        catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+        catch (Exception ex)
+            when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
         {
             return false;
         }
@@ -51,8 +56,7 @@ internal sealed class WindowsStartupRegistration : IStartupRegistrationService
 
     internal static string BuildCommand()
     {
-        string executable = Environment.ProcessPath
-            ?? Path.Combine(AppContext.BaseDirectory, "QuotaBoard.exe");
+        string executable = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "QuotaBoard.exe");
         return $"{(char)34}{Path.GetFullPath(executable)}{(char)34} --minimized";
     }
 }

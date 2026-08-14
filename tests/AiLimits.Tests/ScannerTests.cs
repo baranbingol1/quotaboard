@@ -19,35 +19,38 @@ public sealed class ScannerTests
         var projectPath = Directory.CreateDirectory(Path.Combine(temp.Path, "İşler", "Yapay Zekâ")).FullName;
         var sessions = Directory.CreateDirectory(Path.Combine(temp.Path, "sessions"));
         var file = Path.Combine(sessions.FullName, "project.jsonl");
-        await File.WriteAllLinesAsync(file,
-        [
-            JsonSerializer.Serialize(new
-            {
-                timestamp = "2026-07-13T10:00:00Z",
-                payload = new { cwd = projectPath }
-            }),
-            JsonSerializer.Serialize(new
-            {
-                timestamp = "2026-07-13T10:01:00Z",
-                payload = new
-                {
-                    model = "gpt-5",
-                    info = new
+        await File.WriteAllLinesAsync(
+            file,
+            [
+                JsonSerializer.Serialize(
+                    new { timestamp = "2026-07-13T10:00:00Z", payload = new { cwd = projectPath } }
+                ),
+                JsonSerializer.Serialize(
+                    new
                     {
-                        total_token_usage = new
+                        timestamp = "2026-07-13T10:01:00Z",
+                        payload = new
                         {
-                            input_tokens = 100,
-                            output_tokens = 50,
-                            cached_input_tokens = 20,
-                            reasoning_output_tokens = 10
-                        }
+                            model = "gpt-5",
+                            info = new
+                            {
+                                total_token_usage = new
+                                {
+                                    input_tokens = 100,
+                                    output_tokens = 50,
+                                    cached_input_tokens = 20,
+                                    reasoning_output_tokens = 10,
+                                },
+                            },
+                        },
                     }
-                }
-            })
-        ]);
+                ),
+            ]
+        );
 
-        var usage = Assert.Single(await CollectAsync(
-            new CodexSessionTokenSource(temp.Path).ReadAsync(Account("codex"), null, default)));
+        var usage = Assert.Single(
+            await CollectAsync(new CodexSessionTokenSource(temp.Path).ReadAsync(Account("codex"), null, default))
+        );
 
         Assert.False(usage.Project.IsUnknown);
         Assert.Equal(projectPath, usage.Project.ProjectPath);
@@ -60,11 +63,13 @@ public sealed class ScannerTests
         using var temp = new TemporaryDirectory();
         var sessions = Directory.CreateDirectory(System.IO.Path.Combine(temp.Path, "sessions"));
         var file = System.IO.Path.Combine(sessions.FullName, "one.jsonl");
-        await File.WriteAllLinesAsync(file,
-        [
-            "{\"timestamp\":\"2026-07-13T10:00:00Z\",\"payload\":{\"model\":\"gpt-5\",\"info\":{\"total_token_usage\":{\"input_tokens\":100,\"output_tokens\":50,\"cached_input_tokens\":20,\"reasoning_output_tokens\":10}}}}",
-            "{\"timestamp\":\"2026-07-13T10:01:00Z\",\"payload\":{\"info\":{\"total_token_usage\":{\"input_tokens\":160,\"output_tokens\":80,\"cached_input_tokens\":30,\"reasoning_output_tokens\":15}}}}"
-        ]);
+        await File.WriteAllLinesAsync(
+            file,
+            [
+                "{\"timestamp\":\"2026-07-13T10:00:00Z\",\"payload\":{\"model\":\"gpt-5\",\"info\":{\"total_token_usage\":{\"input_tokens\":100,\"output_tokens\":50,\"cached_input_tokens\":20,\"reasoning_output_tokens\":10}}}}",
+                "{\"timestamp\":\"2026-07-13T10:01:00Z\",\"payload\":{\"info\":{\"total_token_usage\":{\"input_tokens\":160,\"output_tokens\":80,\"cached_input_tokens\":30,\"reasoning_output_tokens\":15}}}}",
+            ]
+        );
         var account = Account("codex");
         var events = await CollectAsync(new CodexSessionTokenSource(temp.Path).ReadAsync(account, null, default));
         Assert.Equal(2, events.Count);
@@ -80,12 +85,16 @@ public sealed class ScannerTests
         using var temp = new TemporaryDirectory();
         var project = Directory.CreateDirectory(System.IO.Path.Combine(temp.Path, "projects", "demo"));
         var file = System.IO.Path.Combine(project.FullName, "chat.jsonl");
-        await File.WriteAllLinesAsync(file,
-        [
-            "{\"timestamp\":\"2026-07-13T10:00:00Z\",\"message\":{\"id\":\"m1\",\"model\":\"claude-sonnet-4\",\"usage\":{\"input_tokens\":100,\"output_tokens\":20,\"cache_read_input_tokens\":10}}}",
-            "{\"timestamp\":\"2026-07-13T10:00:02Z\",\"message\":{\"id\":\"m1\",\"model\":\"claude-sonnet-4\",\"usage\":{\"input_tokens\":100,\"output_tokens\":50,\"cache_read_input_tokens\":10}}}"
-        ]);
-        var events = await CollectAsync(new ClaudeJsonlTokenSource(temp.Path).ReadAsync(Account("claude"), null, default));
+        await File.WriteAllLinesAsync(
+            file,
+            [
+                "{\"timestamp\":\"2026-07-13T10:00:00Z\",\"message\":{\"id\":\"m1\",\"model\":\"claude-sonnet-4\",\"usage\":{\"input_tokens\":100,\"output_tokens\":20,\"cache_read_input_tokens\":10}}}",
+                "{\"timestamp\":\"2026-07-13T10:00:02Z\",\"message\":{\"id\":\"m1\",\"model\":\"claude-sonnet-4\",\"usage\":{\"input_tokens\":100,\"output_tokens\":50,\"cache_read_input_tokens\":10}}}",
+            ]
+        );
+        var events = await CollectAsync(
+            new ClaudeJsonlTokenSource(temp.Path).ReadAsync(Account("claude"), null, default)
+        );
         Assert.Equal(2, events.Count);
         Assert.Equal(100, events.Sum(item => item.InputTokens));
         Assert.Equal(50, events.Sum(item => item.OutputTokens));
@@ -96,31 +105,40 @@ public sealed class ScannerTests
     public async Task ClaudeCarriesWorkingDirectoryAcrossProjectJsonlRecords()
     {
         using var temp = new TemporaryDirectory();
-        var workingDirectory = Directory.CreateDirectory(Path.Combine(temp.Path, "projects-on-disk", "çalışma")).FullName;
+        var workingDirectory = Directory
+            .CreateDirectory(Path.Combine(temp.Path, "projects-on-disk", "çalışma"))
+            .FullName;
         var project = Directory.CreateDirectory(Path.Combine(temp.Path, "projects", "encoded-project"));
         var file = Path.Combine(project.FullName, "chat.jsonl");
-        await File.WriteAllLinesAsync(file,
-        [
-            JsonSerializer.Serialize(new
-            {
-                timestamp = "2026-07-13T10:00:00Z",
-                cwd = workingDirectory,
-                type = "user"
-            }),
-            JsonSerializer.Serialize(new
-            {
-                timestamp = "2026-07-13T10:00:02Z",
-                message = new
-                {
-                    id = "m1",
-                    model = "claude-sonnet-4",
-                    usage = new { input_tokens = 100, output_tokens = 50 }
-                }
-            })
-        ]);
+        await File.WriteAllLinesAsync(
+            file,
+            [
+                JsonSerializer.Serialize(
+                    new
+                    {
+                        timestamp = "2026-07-13T10:00:00Z",
+                        cwd = workingDirectory,
+                        type = "user",
+                    }
+                ),
+                JsonSerializer.Serialize(
+                    new
+                    {
+                        timestamp = "2026-07-13T10:00:02Z",
+                        message = new
+                        {
+                            id = "m1",
+                            model = "claude-sonnet-4",
+                            usage = new { input_tokens = 100, output_tokens = 50 },
+                        },
+                    }
+                ),
+            ]
+        );
 
-        var usage = Assert.Single(await CollectAsync(
-            new ClaudeJsonlTokenSource(temp.Path).ReadAsync(Account("claude"), null, default)));
+        var usage = Assert.Single(
+            await CollectAsync(new ClaudeJsonlTokenSource(temp.Path).ReadAsync(Account("claude"), null, default))
+        );
 
         Assert.Equal(workingDirectory, usage.Project.ProjectPath);
     }
@@ -143,7 +161,9 @@ public sealed class ScannerTests
         }
 
         var discovery = new OpenCodePathDiscovery(new FakeProcessRunner(path));
-        var events = await CollectAsync(new OpenCodeDatabaseTokenSource(discovery).ReadAsync(Account("opencode"), null, default));
+        var events = await CollectAsync(
+            new OpenCodeDatabaseTokenSource(discovery).ReadAsync(Account("opencode"), null, default)
+        );
         var usage = Assert.Single(events);
         Assert.Equal(120, usage.InputTokens);
         Assert.Equal(40, usage.OutputTokens);
@@ -176,8 +196,9 @@ public sealed class ScannerTests
         }
 
         var discovery = new OpenCodePathDiscovery(new FakeProcessRunner(path));
-        var usage = Assert.Single(await CollectAsync(
-            new OpenCodeDatabaseTokenSource(discovery).ReadAsync(Account("opencode"), null, default)));
+        var usage = Assert.Single(
+            await CollectAsync(new OpenCodeDatabaseTokenSource(discovery).ReadAsync(Account("opencode"), null, default))
+        );
 
         Assert.Equal(projectPath, usage.Project.ProjectPath);
     }
@@ -196,8 +217,7 @@ public sealed class ScannerTests
         var source = new FailureCheckpointSource("safe-retry-state");
         DateTimeOffset committed = DateTimeOffset.Parse("2026-08-02T12:00:00Z");
 
-        ScannerCursor cursor = ScanFailureCheckpoint.ResolveCursor(
-            source, source.Id, "starting-state", committed);
+        ScannerCursor cursor = ScanFailureCheckpoint.ResolveCursor(source, source.Id, "starting-state", committed);
 
         Assert.Equal("safe-retry-state", cursor.Position);
         Assert.Equal(committed, cursor.LastObservedAt);
@@ -210,39 +230,44 @@ public sealed class ScannerTests
         var source = new OrdinaryPositionSource("advanced-uncommitted-state");
         DateTimeOffset committed = DateTimeOffset.Parse("2026-08-02T12:00:00Z");
 
-        ScannerCursor cursor = ScanFailureCheckpoint.ResolveCursor(
-            source, source.Id, "starting-state", committed);
+        ScannerCursor cursor = ScanFailureCheckpoint.ResolveCursor(source, source.Id, "starting-state", committed);
 
         Assert.Equal("starting-state", cursor.Position);
         Assert.Equal(committed, cursor.LastObservedAt);
         Assert.Null(cursor.Fingerprint);
     }
 
-
-    private static ProviderAccount Account(string provider) => new(
-        new AccountKey(new ProviderId(provider), "one"), "one", null, "fixture", 1, true);
+    private static ProviderAccount Account(string provider) =>
+        new(new AccountKey(new ProviderId(provider), "one"), "one", null, "fixture", 1, true);
 
     private static async Task<List<T>> CollectAsync<T>(IAsyncEnumerable<T> source)
     {
         var items = new List<T>();
-        await foreach (var item in source) items.Add(item);
+        await foreach (var item in source)
+            items.Add(item);
         return items;
     }
 
     private sealed class FakeProcessRunner(string path) : IProcessRunner
     {
-        public Task<ProcessResult> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken) =>
-            Task.FromResult(new ProcessResult(0, path, string.Empty, TimeSpan.Zero));
+        public Task<ProcessResult> RunAsync(
+            string executable,
+            IReadOnlyList<string> arguments,
+            TimeSpan timeout,
+            CancellationToken cancellationToken
+        ) => Task.FromResult(new ProcessResult(0, path, string.Empty, TimeSpan.Zero));
     }
 
     private sealed class FailureCheckpointSource(string checkpoint) : ITokenUsageSource, IScanFailureCheckpointSource
     {
         public string Id => "failure-checkpoint";
         public string? FailureCheckpoint => checkpoint;
+
         public async IAsyncEnumerable<TokenUsageEvent> ReadAsync(
             ProviderAccount account,
             ScannerCursor? cursor,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken
+        )
         {
             await Task.Yield();
             if (cancellationToken.IsCancellationRequested)
@@ -257,10 +282,12 @@ public sealed class ScannerTests
     {
         public string Id => "ordinary";
         public string? Position => position;
+
         public async IAsyncEnumerable<TokenUsageEvent> ReadAsync(
             ProviderAccount account,
             ScannerCursor? cursor,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken
+        )
         {
             await Task.Yield();
             yield break;
@@ -274,11 +301,14 @@ public sealed class ScannerTests
             Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AiLimits.Tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(Path);
         }
+
         public string Path { get; }
+
         public void Dispose()
         {
             SqliteConnection.ClearAllPools();
-            if (Directory.Exists(Path)) Directory.Delete(Path, true);
+            if (Directory.Exists(Path))
+                Directory.Delete(Path, true);
         }
     }
 }

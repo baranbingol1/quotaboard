@@ -17,6 +17,7 @@ public sealed class SqliteRetention(SqliteDatabase database)
     // paints after arbitrary downtime; only older history ages out.
     private static readonly TimeSpan SnapshotRetention = TimeSpan.FromDays(90);
     private static readonly TimeSpan FetchAttemptRetention = TimeSpan.FromDays(30);
+
     // Must exceed every scanner's replay reach (5-minute overlap windows,
     // Amp's one-day overlap, Cursor's 30-day initial backfill) so a pruned
     // fingerprint can never let a replayed event double-count.

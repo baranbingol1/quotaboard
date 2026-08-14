@@ -23,19 +23,22 @@ public sealed class StatStrip : Panel
         nameof(MinCellWidth),
         typeof(double),
         typeof(StatStrip),
-        new PropertyMetadata(230.0, OnLayoutPropertyChanged));
+        new PropertyMetadata(230.0, OnLayoutPropertyChanged)
+    );
 
     public static readonly DependencyProperty ColumnSpacingProperty = DependencyProperty.Register(
         nameof(ColumnSpacing),
         typeof(double),
         typeof(StatStrip),
-        new PropertyMetadata(28.0, OnLayoutPropertyChanged));
+        new PropertyMetadata(28.0, OnLayoutPropertyChanged)
+    );
 
     public static readonly DependencyProperty RowSpacingProperty = DependencyProperty.Register(
         nameof(RowSpacing),
         typeof(double),
         typeof(StatStrip),
-        new PropertyMetadata(22.0, OnLayoutPropertyChanged));
+        new PropertyMetadata(22.0, OnLayoutPropertyChanged)
+    );
 
     /// <summary>Narrowest a cell may get before the strip drops to fewer columns.</summary>
     public double MinCellWidth
@@ -106,11 +109,7 @@ public sealed class StatStrip : Panel
                 {
                     break;
                 }
-                Children[index].Arrange(new Rect(
-                    column * (cellWidth + gap),
-                    y,
-                    cellWidth,
-                    rowHeight));
+                Children[index].Arrange(new Rect(column * (cellWidth + gap), y, cellWidth, rowHeight));
             }
             y += rowHeight + Math.Max(0, RowSpacing);
         }

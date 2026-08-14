@@ -10,7 +10,17 @@ public sealed class ExplicitModelResolver : IModelResolver
 
     public ExplicitModelResolver(IEnumerable<ModelAlias> aliases)
     {
-        _aliases = aliases.ToDictionary((ModelAlias alias) => (Value: alias.Service.Value, ModelIdNormalizer.Normalize(alias.RawModelId)), (ModelAlias alias) => new ModelResolution(alias.PricingProviderId, alias.CanonicalModelId, alias.RawModelId.Equals(alias.CanonicalModelId, StringComparison.OrdinalIgnoreCase) ? ResolutionConfidence.Exact : ResolutionConfidence.ExplicitAlias));
+        _aliases = aliases.ToDictionary(
+            (ModelAlias alias) => (Value: alias.Service.Value, ModelIdNormalizer.Normalize(alias.RawModelId)),
+            (ModelAlias alias) =>
+                new ModelResolution(
+                    alias.PricingProviderId,
+                    alias.CanonicalModelId,
+                    alias.RawModelId.Equals(alias.CanonicalModelId, StringComparison.OrdinalIgnoreCase)
+                        ? ResolutionConfidence.Exact
+                        : ResolutionConfidence.ExplicitAlias
+                )
+        );
     }
 
     public ModelResolution? Resolve(ServiceProviderId service, string rawModelId)

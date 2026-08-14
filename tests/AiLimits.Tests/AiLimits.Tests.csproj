@@ -4,6 +4,8 @@
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- Existing tests use snake_case names; CA1707 would drown the suite. -->
+    <NoWarn>$(NoWarn);CA1707;CA1711</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\AiLimits.Domain\AiLimits.Domain.csproj" />
@@ -11,11 +13,20 @@
     <ProjectReference Include="..\..\src\AiLimits.Infrastructure\AiLimits.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\AiLimits.Platform.Windows\AiLimits.Platform.Windows.csproj" />
     <ProjectReference Include="..\..\src\AiLimits.Presentation.WinUI\AiLimits.Presentation.WinUI.csproj" />
+    <PackageReference Include="coverlet.collector">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="TngTech.ArchUnitNET.xUnit" />
+    <PackageReference Include="xRetry" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

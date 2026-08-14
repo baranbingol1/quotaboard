@@ -13,20 +13,13 @@ namespace AiLimits.Infrastructure.Providers.Common;
 /// </summary>
 public static class SafeFileEnumeration
 {
-    public static EnumerationOptions Recursive { get; } = new()
-    {
-        RecurseSubdirectories = true,
-        AttributesToSkip = FileAttributes.ReparsePoint
-    };
+    public static EnumerationOptions Recursive { get; } =
+        new() { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint };
 
-    public static EnumerationOptions TopLevel { get; } = new()
-    {
-        RecurseSubdirectories = false,
-        AttributesToSkip = FileAttributes.ReparsePoint
-    };
+    public static EnumerationOptions TopLevel { get; } =
+        new() { RecurseSubdirectories = false, AttributesToSkip = FileAttributes.ReparsePoint };
 
-    public static bool IsReparsePoint(string path) =>
-        (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
+    public static bool IsReparsePoint(string path) => (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
 
     /// <summary>
     /// Returns <see langword="true"/> when <paramref name="path"/> exists and

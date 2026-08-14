@@ -25,7 +25,8 @@ namespace AiLimits.Infrastructure.Providers.Cursor;
 internal sealed class CursorUsageEventsTokenSource(
     HttpClient httpClient,
     IClock clock,
-    CursorCredentialSource credentialSource) : ITokenUsageSource
+    CursorCredentialSource credentialSource
+) : ITokenUsageSource
 {
     private static readonly Uri UsageEventsUri = new("https://cursor.com/api/dashboard/get-filtered-usage-events");
 
@@ -45,7 +46,8 @@ internal sealed class CursorUsageEventsTokenSource(
     public async IAsyncEnumerable<TokenUsageEvent> ReadAsync(
         ProviderAccount account,
         ScannerCursor? cursor,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+        [EnumeratorCancellation] CancellationToken cancellationToken
+    )
     {
         CursorCredential? credential = await credentialSource.ReadAsync(cancellationToken).ConfigureAwait(false);
         if (credential is null || !string.Equals(credential.Subject, account.Key.Value, StringComparison.Ordinal))
@@ -58,7 +60,8 @@ internal sealed class CursorUsageEventsTokenSource(
         bool reachedBoundary = false;
         for (int page = 1; page <= MaxPagesPerScan && !reachedBoundary; page++)
         {
-            using ProviderJsonResult exchange = await FetchPageAsync(page, cookieHeader, cancellationToken).ConfigureAwait(false);
+            using ProviderJsonResult exchange = await FetchPageAsync(page, cookieHeader, cancellationToken)
+                .ConfigureAwait(false);
             if (!exchange.IsSuccess)
             {
                 // All-or-nothing: emitting the newer half of a window whose
@@ -68,8 +71,10 @@ internal sealed class CursorUsageEventsTokenSource(
                 // emitted yet, so the cursor still cannot advance past a gap.
                 throw new TokenScanException(exchange.Failure!.SafeMessage);
             }
-            if (!exchange.Document!.RootElement.TryGetProperty("usageEventsDisplay", out JsonElement events)
-                || events.ValueKind != JsonValueKind.Array)
+            if (
+                !exchange.Document!.RootElement.TryGetProperty("usageEventsDisplay", out JsonElement events)
+                || events.ValueKind != JsonValueKind.Array
+            )
             {
                 throw new TokenScanException("Cursor returned an unrecognized usage-events response.");
             }
@@ -104,15 +109,21 @@ internal sealed class CursorUsageEventsTokenSource(
                 break;
             }
         }
-        foreach (TokenUsageEvent tokenEvent in collected
-            .OrderBy(item => item.OccurredAt)
-            .ThenBy(item => item.SourceEventId, StringComparer.Ordinal))
+        foreach (
+            TokenUsageEvent tokenEvent in collected
+                .OrderBy(item => item.OccurredAt)
+                .ThenBy(item => item.SourceEventId, StringComparer.Ordinal)
+        )
         {
             yield return tokenEvent;
         }
     }
 
-    private async Task<ProviderJsonResult> FetchPageAsync(int page, string cookieHeader, CancellationToken cancellationToken)
+    private async Task<ProviderJsonResult> FetchPageAsync(
+        int page,
+        string cookieHeader,
+        CancellationToken cancellationToken
+    )
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, UsageEventsUri);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -124,16 +135,27 @@ internal sealed class CursorUsageEventsTokenSource(
         request.Content = new StringContent(
             JsonSerializer.Serialize(new Dictionary<string, object> { ["page"] = page, ["pageSize"] = PageSize }),
             Encoding.UTF8,
-            "application/json");
-        return await ProviderHttp.GetJsonAsync(httpClient, request, Id, "Cursor", Stopwatch.GetTimestamp(), cancellationToken).ConfigureAwait(false);
+            "application/json"
+        );
+        return await ProviderHttp
+            .GetJsonAsync(httpClient, request, Id, "Cursor", Stopwatch.GetTimestamp(), cancellationToken)
+            .ConfigureAwait(false);
     }
 
-    private static bool TryMapEvent(ProviderAccount account, JsonElement entry, DateTimeOffset occurredAt, out TokenUsageEvent? mapped)
+    private static bool TryMapEvent(
+        ProviderAccount account,
+        JsonElement entry,
+        DateTimeOffset occurredAt,
+        out TokenUsageEvent? mapped
+    )
     {
         mapped = null;
         // Events without token usage (non-token-based calls) carry nothing for
         // the usage pipeline; skipping one bad event never fails the batch.
-        if (!entry.TryGetProperty("tokenUsage", out JsonElement tokenUsage) || tokenUsage.ValueKind != JsonValueKind.Object)
+        if (
+            !entry.TryGetProperty("tokenUsage", out JsonElement tokenUsage)
+            || tokenUsage.ValueKind != JsonValueKind.Object
+        )
         {
             return false;
         }
@@ -145,18 +167,21 @@ internal sealed class CursorUsageEventsTokenSource(
         {
             return false;
         }
-        string model = entry.TryGetProperty("model", out JsonElement modelElement)
+        string model =
+            entry.TryGetProperty("model", out JsonElement modelElement)
             && modelElement.ValueKind == JsonValueKind.String
             && !string.IsNullOrWhiteSpace(modelElement.GetString())
-            ? modelElement.GetString()!.Trim()
-            : "unknown";
-        string conversation = entry.TryGetProperty("conversationId", out JsonElement conversationElement)
+                ? modelElement.GetString()!.Trim()
+                : "unknown";
+        string conversation =
+            entry.TryGetProperty("conversationId", out JsonElement conversationElement)
             && conversationElement.ValueKind == JsonValueKind.String
-            ? conversationElement.GetString() ?? string.Empty
-            : string.Empty;
+                ? conversationElement.GetString() ?? string.Empty
+                : string.Empty;
         // The API exposes no per-event id; timestamp + a content hash is stable
         // across reads of the same event.
-        string sourceEventId = $"cursor:{occurredAt.ToUnixTimeMilliseconds()}:{Hash16($"{model}|{input}|{output}|{cacheRead}|{cacheWrite}|{conversation}")}";
+        string sourceEventId =
+            $"cursor:{occurredAt.ToUnixTimeMilliseconds()}:{Hash16($"{model}|{input}|{output}|{cacheRead}|{cacheWrite}|{conversation}")}";
         mapped = new TokenUsageEvent(
             account.Key,
             new ServiceProviderId("cursor"),
@@ -168,7 +193,8 @@ internal sealed class CursorUsageEventsTokenSource(
             cacheWrite,
             ReasoningTokens: 0,
             sourceEventId,
-            ProjectIdentity.Unknown);
+            ProjectIdentity.Unknown
+        );
         return true;
     }
 
@@ -184,8 +210,15 @@ internal sealed class CursorUsageEventsTokenSource(
         {
             unixMs = numeric;
         }
-        else if (timestamp.ValueKind == JsonValueKind.String
-            && long.TryParse(timestamp.GetString(), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long parsed))
+        else if (
+            timestamp.ValueKind == JsonValueKind.String
+            && long.TryParse(
+                timestamp.GetString(),
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out long parsed
+            )
+        )
         {
             unixMs = parsed;
         }
@@ -203,7 +236,8 @@ internal sealed class CursorUsageEventsTokenSource(
 
     private static long ReadTokenCount(JsonElement tokenUsage, string property)
     {
-        return tokenUsage.TryGetProperty(property, out JsonElement value)
+        return
+            tokenUsage.TryGetProperty(property, out JsonElement value)
             && value.ValueKind == JsonValueKind.Number
             && value.TryGetInt64(out long count)
             && count > 0

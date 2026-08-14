@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-using AiLimits.Domain;
 using System.Runtime.CompilerServices;
+using AiLimits.Domain;
 
 namespace AiLimits.Application.Pricing;
 
@@ -15,7 +15,10 @@ public sealed class CatalogModelResolver
     // Host-path ids like "accounts/fireworks/models/glm-5p2" are globally unique,
     // so they can be matched against the whole catalog when the vendor-scoped
     // lookup misses. Built once per catalog snapshot.
-    private static readonly ConditionalWeakTable<PricingCatalogSnapshot, Dictionary<string, (string Provider, string Model)>> FullIdIndexes = new();
+    private static readonly ConditionalWeakTable<
+        PricingCatalogSnapshot,
+        Dictionary<string, (string Provider, string Model)>
+    > FullIdIndexes = new();
 
     public CatalogModelResolver(ExplicitModelResolver explicitResolver)
     {
@@ -32,7 +35,7 @@ public sealed class CatalogModelResolver
             ModelResolution lowered = modelResolution with
             {
                 PricingProviderId = modelResolution.PricingProviderId.ToLowerInvariant(),
-                CanonicalModelId = modelResolution.CanonicalModelId.ToLowerInvariant()
+                CanonicalModelId = modelResolution.CanonicalModelId.ToLowerInvariant(),
             };
             if (catalog.ExactIndex.ContainsKey((lowered.PricingProviderId, lowered.CanonicalModelId)))
             {
@@ -53,12 +56,18 @@ public sealed class CatalogModelResolver
                 return new ModelResolution(pricingProviderId, text, ResolutionConfidence.Exact);
             }
             string text2 = ModelIdNormalizer.Normalize(text);
-            if (!string.Equals(text, text2, StringComparison.Ordinal) && catalog.ExactIndex.ContainsKey((pricingProviderId, text2)))
+            if (
+                !string.Equals(text, text2, StringComparison.Ordinal)
+                && catalog.ExactIndex.ContainsKey((pricingProviderId, text2))
+            )
             {
                 return new ModelResolution(pricingProviderId, text2, ResolutionConfidence.Exact);
             }
             string text3 = text2.Replace('.', '-');
-            if (!string.Equals(text2, text3, StringComparison.Ordinal) && catalog.ExactIndex.ContainsKey((pricingProviderId, text3)))
+            if (
+                !string.Equals(text2, text3, StringComparison.Ordinal)
+                && catalog.ExactIndex.ContainsKey((pricingProviderId, text3))
+            )
             {
                 return new ModelResolution(pricingProviderId, text3, ResolutionConfidence.Exact);
             }
@@ -67,7 +76,12 @@ public sealed class CatalogModelResolver
                 string baseId = text2[..^"-fast".Length];
                 if (baseId.Length > 0 && catalog.ExactIndex.ContainsKey((pricingProviderId, baseId)))
                 {
-                    return new ModelResolution(pricingProviderId, baseId, ResolutionConfidence.DerivedMultiplier, FastVariantMultiplier);
+                    return new ModelResolution(
+                        pricingProviderId,
+                        baseId,
+                        ResolutionConfidence.DerivedMultiplier,
+                        FastVariantMultiplier
+                    );
                 }
             }
         }
@@ -93,7 +107,9 @@ public sealed class CatalogModelResolver
 
     private static Dictionary<string, (string Provider, string Model)> BuildFullIdIndex(PricingCatalogSnapshot catalog)
     {
-        Dictionary<string, (string Provider, string Model)> index = new Dictionary<string, (string, string)>(StringComparer.Ordinal);
+        Dictionary<string, (string Provider, string Model)> index = new Dictionary<string, (string, string)>(
+            StringComparer.Ordinal
+        );
         foreach ((string Provider, string Model) key in catalog.ExactIndex.Keys)
         {
             if (key.Model.Contains('/'))

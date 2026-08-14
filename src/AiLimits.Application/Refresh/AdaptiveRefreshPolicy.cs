@@ -18,7 +18,7 @@ public sealed class AdaptiveRefreshPolicy
         Warm,
         Idle,
         LongIdle,
-        Constrained
+        Constrained,
     }
 
     public readonly record struct Decision(TimeSpan Delay, Reason Reason);
@@ -74,7 +74,7 @@ public sealed class AdaptiveRefreshPolicy
             2 => TimeSpan.FromSeconds(45),
             3 => TimeSpan.FromSeconds(120),
             4 => TimeSpan.FromSeconds(300),
-            _ => null
+            _ => null,
         };
     }
 
@@ -84,7 +84,13 @@ public sealed class AdaptiveRefreshPolicy
     /// failures remain actionable rather than being retried aggressively.
     /// </summary>
     public static bool IsTransientFailure(RefreshPublication publication) =>
-        publication.Status is RefreshPublicationStatus.FailedWithCachedData or RefreshPublicationStatus.FailedWithoutData
-        && publication.Attempts.Any(attempt => attempt.FailureKind is
-            FetchFailureKind.Network or FetchFailureKind.Timeout or FetchFailureKind.TemporarilyUnavailable);
+        publication.Status
+            is RefreshPublicationStatus.FailedWithCachedData
+                or RefreshPublicationStatus.FailedWithoutData
+        && publication.Attempts.Any(attempt =>
+            attempt.FailureKind
+                is FetchFailureKind.Network
+                    or FetchFailureKind.Timeout
+                    or FetchFailureKind.TemporarilyUnavailable
+        );
 }

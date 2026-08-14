@@ -9,16 +9,14 @@ namespace AiLimits.Tests;
 
 public sealed class AlertTests
 {
-    private static readonly DateTimeOffset Now =
-        new(2026, 7, 15, 8, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset Now = new(2026, 7, 15, 8, 0, 0, TimeSpan.Zero);
 
     [Fact]
     public void Suggested_policy_emits_both_thresholds_and_reset_reminder()
     {
         ProviderSnapshot snapshot = Snapshot(usedPercent: 96, resetsAt: Now.AddMinutes(20));
 
-        IReadOnlyList<AlertCandidate> alerts =
-            new AlertEvaluator().Evaluate(snapshot, AlertPolicy.Suggested, Now);
+        IReadOnlyList<AlertCandidate> alerts = new AlertEvaluator().Evaluate(snapshot, AlertPolicy.Suggested, Now);
 
         Assert.Equal(3, alerts.Count);
         Assert.Equal(2, alerts.Count(alert => alert.Kind == AlertKind.UsageThreshold));
@@ -41,8 +39,7 @@ public sealed class AlertTests
         var text = new RecordingAlertTextProvider();
         ProviderSnapshot snapshot = Snapshot(usedPercent: 80, resetsAt: Now.AddMinutes(20));
 
-        IReadOnlyList<AlertCandidate> alerts =
-            new AlertEvaluator(text).Evaluate(snapshot, AlertPolicy.Suggested, Now);
+        IReadOnlyList<AlertCandidate> alerts = new AlertEvaluator(text).Evaluate(snapshot, AlertPolicy.Suggested, Now);
 
         Assert.Collection(
             alerts,
@@ -55,7 +52,8 @@ public sealed class AlertTests
             {
                 Assert.Equal("reset-title", alert.Title);
                 Assert.Equal("reset-message", alert.Message);
-            });
+            }
+        );
         Assert.Equal(1, text.UsageTitleCalls);
         Assert.Equal(1, text.UsageMessageCalls);
         Assert.Equal(1, text.ResetTitleCalls);
@@ -91,10 +89,7 @@ public sealed class AlertTests
     [Fact]
     public async Task Sqlite_claim_survives_repository_instances()
     {
-        string directory = Path.Combine(
-            Path.GetTempPath(),
-            "AiLimits.Tests",
-            Guid.NewGuid().ToString("N"));
+        string directory = Path.Combine(Path.GetTempPath(), "AiLimits.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         string path = Path.Combine(directory, "alerts.db");
 
@@ -106,12 +101,14 @@ public sealed class AlertTests
                 new AlertEvaluator().Evaluate(
                     Snapshot(usedPercent: 80, resetsAt: Now.AddHours(2)),
                     AlertPolicy.Suggested,
-                    Now));
+                    Now
+                )
+            );
 
-            Assert.True(await new SqliteAlertStateRepository(database)
-                .TryClaimAsync(candidate, Now, default));
-            Assert.False(await new SqliteAlertStateRepository(database)
-                .TryClaimAsync(candidate, Now.AddMinutes(1), default));
+            Assert.True(await new SqliteAlertStateRepository(database).TryClaimAsync(candidate, Now, default));
+            Assert.False(
+                await new SqliteAlertStateRepository(database).TryClaimAsync(candidate, Now.AddMinutes(1), default)
+            );
         }
         finally
         {
@@ -138,7 +135,8 @@ public sealed class AlertTests
             resetsAt,
             null,
             MeterStatus.Critical,
-            new MeterProvenance("test", "$.limit", Now, true));
+            new MeterProvenance("test", "$.limit", Now, true)
+        );
         return new ProviderSnapshot(
             account,
             [meter],
@@ -146,7 +144,8 @@ public sealed class AlertTests
             SnapshotCompleteness.Authoritative,
             Now,
             DataConfidence.Exact,
-            new Dictionary<string, JsonElement>());
+            new Dictionary<string, JsonElement>()
+        );
     }
 
     private sealed class InMemoryAlertStateStore : IAlertStateStore
@@ -156,8 +155,8 @@ public sealed class AlertTests
         public Task<bool> TryClaimAsync(
             AlertCandidate candidate,
             DateTimeOffset claimedAt,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(_claims.Add(candidate.DeduplicationKey));
+            CancellationToken cancellationToken
+        ) => Task.FromResult(_claims.Add(candidate.DeduplicationKey));
 
         public Task ReleaseAsync(AlertCandidate candidate, CancellationToken cancellationToken)
         {
@@ -171,9 +170,7 @@ public sealed class AlertTests
         public bool Succeeds { get; set; } = true;
         public List<AlertCandidate> Delivered { get; } = [];
 
-        public Task<bool> TryShowAsync(
-            AlertCandidate candidate,
-            CancellationToken cancellationToken)
+        public Task<bool> TryShowAsync(AlertCandidate candidate, CancellationToken cancellationToken)
         {
             if (Succeeds)
             {

@@ -17,7 +17,10 @@ public sealed class WrapRowPanel : Panel
 {
     protected override Size MeasureOverride(Size availableSize)
     {
-        double rowWidth = 0, rowHeight = 0, totalWidth = 0, totalHeight = 0;
+        double rowWidth = 0,
+            rowHeight = 0,
+            totalWidth = 0,
+            totalHeight = 0;
         foreach (UIElement child in Children)
         {
             child.Measure(new Size(availableSize.Width, double.PositiveInfinity));
@@ -34,7 +37,10 @@ public sealed class WrapRowPanel : Panel
         }
         totalWidth = Math.Max(totalWidth, rowWidth);
         totalHeight += rowHeight;
-        return new Size(double.IsInfinity(availableSize.Width) ? totalWidth : Math.Min(totalWidth, availableSize.Width), totalHeight);
+        return new Size(
+            double.IsInfinity(availableSize.Width) ? totalWidth : Math.Min(totalWidth, availableSize.Width),
+            totalHeight
+        );
     }
 
     protected override Size ArrangeOverride(Size finalSize)
@@ -42,7 +48,8 @@ public sealed class WrapRowPanel : Panel
         // First pass: group children into rows so each row's height is known
         // before any child is arranged.
         List<(int Start, int Count, double Height)> rows = [];
-        double rowWidth = 0, rowHeight = 0;
+        double rowWidth = 0,
+            rowHeight = 0;
         int rowStart = 0;
         for (int index = 0; index < Children.Count; index++)
         {

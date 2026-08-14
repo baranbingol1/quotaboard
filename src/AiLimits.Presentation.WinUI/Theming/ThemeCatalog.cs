@@ -29,7 +29,16 @@ public static class ThemeCatalog
         new("#ff966c", "#b15c00"),
         new("#ff757f", "#f52a65"),
         new("#82aaff", "#2e7de9"),
-        new ThemeColor[] { new("#82aaff", "#2e7de9"), new("#c3e88d", "#587539"), new("#ff966c", "#b15c00"), new("#c099ff", "#9854f1"), new("#73daca", "#118c74"), new("#ff757f", "#f52a65") });
+        new ThemeColor[]
+        {
+            new("#82aaff", "#2e7de9"),
+            new("#c3e88d", "#587539"),
+            new("#ff966c", "#b15c00"),
+            new("#c099ff", "#9854f1"),
+            new("#73daca", "#118c74"),
+            new("#ff757f", "#f52a65"),
+        }
+    );
 
     public static readonly ThemePalette Catppuccin = new(
         "catppuccin",
@@ -49,7 +58,16 @@ public static class ThemeCatalog
         new("#f9e2af", "#df8e1d"),
         new("#f38ba8", "#d20f39"),
         new("#94e2d5", "#179299"),
-        new ThemeColor[] { new("#89b4fa", "#1e66f5"), new("#a6e3a1", "#40a02b"), new("#f5c2e7", "#ea76cb"), new("#cba6f7", "#8839ef"), new("#f9e2af", "#df8e1d"), new("#f38ba8", "#d20f39") });
+        new ThemeColor[]
+        {
+            new("#89b4fa", "#1e66f5"),
+            new("#a6e3a1", "#40a02b"),
+            new("#f5c2e7", "#ea76cb"),
+            new("#cba6f7", "#8839ef"),
+            new("#f9e2af", "#df8e1d"),
+            new("#f38ba8", "#d20f39"),
+        }
+    );
 
     public static readonly ThemePalette Catppuccinmacchiato = new(
         "catppuccin-macchiato",
@@ -69,7 +87,16 @@ public static class ThemeCatalog
         new("#eed49f", "#eed49f"),
         new("#ed8796", "#ed8796"),
         new("#8bd5ca", "#8bd5ca"),
-        new ThemeColor[] { new("#8aadf4", "#8aadf4"), new("#a6da95", "#a6da95"), new("#f5bde6", "#f5bde6"), new("#c6a0f6", "#c6a0f6"), new("#eed49f", "#eed49f"), new("#ed8796", "#ed8796") });
+        new ThemeColor[]
+        {
+            new("#8aadf4", "#8aadf4"),
+            new("#a6da95", "#a6da95"),
+            new("#f5bde6", "#f5bde6"),
+            new("#c6a0f6", "#c6a0f6"),
+            new("#eed49f", "#eed49f"),
+            new("#ed8796", "#ed8796"),
+        }
+    );
 
     public static readonly ThemePalette Gruvbox = new(
         "gruvbox",
@@ -89,7 +116,16 @@ public static class ThemeCatalog
         new("#fe8019", "#af3a03"),
         new("#fb4934", "#9d0006"),
         new("#fabd2f", "#b57614"),
-        new ThemeColor[] { new("#83a598", "#076678"), new("#b8bb26", "#79740e"), new("#8ec07c", "#427b58"), new("#d3869b", "#8f3f71"), new("#fe8019", "#af3a03"), new("#fb4934", "#9d0006") });
+        new ThemeColor[]
+        {
+            new("#83a598", "#076678"),
+            new("#b8bb26", "#79740e"),
+            new("#8ec07c", "#427b58"),
+            new("#d3869b", "#8f3f71"),
+            new("#fe8019", "#af3a03"),
+            new("#fb4934", "#9d0006"),
+        }
+    );
 
     public static readonly ThemePalette Nord = new(
         "nord",
@@ -109,7 +145,16 @@ public static class ThemeCatalog
         new("#D08770", "#D08770"),
         new("#BF616A", "#BF616A"),
         new("#88C0D0", "#5E81AC"),
-        new ThemeColor[] { new("#88C0D0", "#5E81AC"), new("#A3BE8C", "#A3BE8C"), new("#EBCB8B", "#EBCB8B"), new("#81A1C1", "#81A1C1"), new("#D08770", "#D08770"), new("#BF616A", "#BF616A") });
+        new ThemeColor[]
+        {
+            new("#88C0D0", "#5E81AC"),
+            new("#A3BE8C", "#A3BE8C"),
+            new("#EBCB8B", "#EBCB8B"),
+            new("#81A1C1", "#81A1C1"),
+            new("#D08770", "#D08770"),
+            new("#BF616A", "#BF616A"),
+        }
+    );
 
     public static readonly ThemePalette Everforest = new(
         "everforest",
@@ -129,7 +174,16 @@ public static class ThemeCatalog
         new("#e69875", "#f57d26"),
         new("#e67e80", "#f85552"),
         new("#83c092", "#35a77c"),
-        new ThemeColor[] { new("#a7c080", "#8da101"), new("#dbbc7f", "#dfa000"), new("#d699b6", "#df69ba"), new("#7fbbb3", "#3a94c5"), new("#e69875", "#f57d26"), new("#e67e80", "#f85552") });
+        new ThemeColor[]
+        {
+            new("#a7c080", "#8da101"),
+            new("#dbbc7f", "#dfa000"),
+            new("#d699b6", "#df69ba"),
+            new("#7fbbb3", "#3a94c5"),
+            new("#e69875", "#f57d26"),
+            new("#e67e80", "#f85552"),
+        }
+    );
 
     public static readonly ThemePalette Kanagawa = new(
         "kanagawa",
@@ -149,7 +203,16 @@ public static class ThemeCatalog
         new("#D7A657", "#D7A657"),
         new("#E82424", "#E82424"),
         new("#76946A", "#76946A"),
-        new ThemeColor[] { new("#7E9CD8", "#2D4F67"), new("#98BB6C", "#98BB6C"), new("#D27E99", "#D27E99"), new("#957FB8", "#957FB8"), new("#D7A657", "#D7A657"), new("#E82424", "#E82424") });
+        new ThemeColor[]
+        {
+            new("#7E9CD8", "#2D4F67"),
+            new("#98BB6C", "#98BB6C"),
+            new("#D27E99", "#D27E99"),
+            new("#957FB8", "#957FB8"),
+            new("#D7A657", "#D7A657"),
+            new("#E82424", "#E82424"),
+        }
+    );
 
     public static readonly ThemePalette Ayu = new(
         "ayu",
@@ -169,7 +232,16 @@ public static class ThemeCatalog
         new("#E6B673", "#E6B673"),
         new("#D95757", "#D95757"),
         new("#39BAE6", "#39BAE6"),
-        new ThemeColor[] { new("#59C2FF", "#59C2FF"), new("#7FD962", "#7FD962"), new("#E6B450", "#E6B450"), new("#D2A6FF", "#D2A6FF"), new("#95E6CB", "#95E6CB"), new("#D95757", "#D95757") });
+        new ThemeColor[]
+        {
+            new("#59C2FF", "#59C2FF"),
+            new("#7FD962", "#7FD962"),
+            new("#E6B450", "#E6B450"),
+            new("#D2A6FF", "#D2A6FF"),
+            new("#95E6CB", "#95E6CB"),
+            new("#D95757", "#D95757"),
+        }
+    );
 
     public static readonly ThemePalette Onedark = new(
         "one-dark",
@@ -189,7 +261,16 @@ public static class ThemeCatalog
         new("#e5c07b", "#c18401"),
         new("#e06c75", "#e45649"),
         new("#d19a66", "#986801"),
-        new ThemeColor[] { new("#61afef", "#4078f2"), new("#98c379", "#50a14f"), new("#56b6c2", "#0184bc"), new("#c678dd", "#a626a4"), new("#e5c07b", "#c18401"), new("#e06c75", "#e45649") });
+        new ThemeColor[]
+        {
+            new("#61afef", "#4078f2"),
+            new("#98c379", "#50a14f"),
+            new("#56b6c2", "#0184bc"),
+            new("#c678dd", "#a626a4"),
+            new("#e5c07b", "#c18401"),
+            new("#e06c75", "#e45649"),
+        }
+    );
 
     public static readonly ThemePalette Matrix = new(
         "matrix",
@@ -209,10 +290,32 @@ public static class ThemeCatalog
         new("#e6ff57", "#e6ff57"),
         new("#ff4b4b", "#ff4b4b"),
         new("#30b3ff", "#30b3ff"),
-        new ThemeColor[] { new("#2eff6a", "#1cc24b"), new("#62ff94", "#1cc24b"), new("#c770ff", "#c770ff"), new("#00efff", "#24f6d9"), new("#e6ff57", "#e6ff57"), new("#ff4b4b", "#ff4b4b") },
-        ContentFontId: "cascadia-mono");
+        new ThemeColor[]
+        {
+            new("#2eff6a", "#1cc24b"),
+            new("#62ff94", "#1cc24b"),
+            new("#c770ff", "#c770ff"),
+            new("#00efff", "#24f6d9"),
+            new("#e6ff57", "#e6ff57"),
+            new("#ff4b4b", "#ff4b4b"),
+        },
+        ContentFontId: "cascadia-mono"
+    );
 
-    public static IReadOnlyList<ThemePalette> All { get; } = new[] { Tokyonight, Catppuccin, Catppuccinmacchiato, Gruvbox, Nord, Everforest, Kanagawa, Ayu, Onedark, Matrix };
+    public static IReadOnlyList<ThemePalette> All { get; } =
+        new[]
+        {
+            Tokyonight,
+            Catppuccin,
+            Catppuccinmacchiato,
+            Gruvbox,
+            Nord,
+            Everforest,
+            Kanagawa,
+            Ayu,
+            Onedark,
+            Matrix,
+        };
 
     public static ThemePalette Default => Tokyonight;
 

@@ -3,15 +3,32 @@ namespace AiLimits.Application.Pricing;
 
 public static class ModelVendorClassifier
 {
-    private static readonly (string Vendor, string PricingProvider, string[] Prefixes)[] ModelFamilies = new(string, string, string[])[14]
+    private static readonly (string Vendor, string PricingProvider, string[] Prefixes)[] ModelFamilies = new (
+        string,
+        string,
+        string[]
+    )[14]
     {
         ("Anthropic", "anthropic", new string[] { "claude-", "anthropic.claude-" }),
         ("Cursor", "cursor", new string[] { "composer-", "cursor-" }),
-        ("OpenAI", "openai", new string[]
-        {
-            "gpt-", "chatgpt-", "codex-", "openai.gpt-", "o1", "o3", "o4", "text-embedding-", "whisper-", "dall-e-",
-            "sora-"
-        }),
+        (
+            "OpenAI",
+            "openai",
+            new string[]
+            {
+                "gpt-",
+                "chatgpt-",
+                "codex-",
+                "openai.gpt-",
+                "o1",
+                "o3",
+                "o4",
+                "text-embedding-",
+                "whisper-",
+                "dall-e-",
+                "sora-",
+            }
+        ),
         ("Google", "google", new string[] { "gemini-", "gemma-" }),
         ("xAI", "xai", new string[] { "grok-" }),
         ("Zhipu AI", "zai", new string[] { "glm-", "codegeex-" }),
@@ -23,7 +40,7 @@ public static class ModelVendorClassifier
         // models.dev catalogs Moonshot under "moonshotai" (there is no "moonshot").
         ("Moonshot AI", "moonshotai", new string[] { "kimi-" }),
         ("MiniMax", "minimax", new string[] { "minimax-" }),
-        ("01.AI", "01-ai", new string[] { "yi-" })
+        ("01.AI", "01-ai", new string[] { "yi-" }),
     };
 
     public static string GetDisplayName(string service, string rawModelId)
@@ -49,16 +66,16 @@ public static class ModelVendorClassifier
         string result2;
         switch (text)
         {
-        case "codex":
-            result2 = "OpenAI";
-            break;
-        case "claude":
-        case "claude code":
-            result2 = "Anthropic";
-            break;
-        default:
-            result2 = "Unresolved";
-            break;
+            case "codex":
+                result2 = "OpenAI";
+                break;
+            case "claude":
+            case "claude code":
+                result2 = "Anthropic";
+                break;
+            default:
+                result2 = "Unresolved";
+                break;
         }
         return result2;
     }
@@ -88,16 +105,16 @@ public static class ModelVendorClassifier
         string result;
         switch (text)
         {
-        case "codex":
-            result = "openai";
-            break;
-        case "claude":
-        case "claude code":
-            result = "anthropic";
-            break;
-        default:
-            result = null;
-            break;
+            case "codex":
+                result = "openai";
+                break;
+            case "claude":
+            case "claude code":
+                result = "anthropic";
+                break;
+            default:
+                result = null;
+                break;
         }
         return result;
     }

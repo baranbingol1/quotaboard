@@ -7,12 +7,15 @@ public enum PricingCatalogOutcome
 {
     /// <summary>Still inside the current schedule slot; no network call was made.</summary>
     NotDue,
+
     /// <summary>The server confirmed the cached copy is current (HTTP 304).</summary>
     Unchanged,
+
     /// <summary>A newer catalog was downloaded and cached.</summary>
     Updated,
+
     /// <summary>The attempt failed; <see cref="PricingCatalogRefresh.Error"/> says why and the cache is unchanged.</summary>
-    Failed
+    Failed,
 }
 
 /// <summary>
@@ -30,7 +33,8 @@ public enum PricingCatalogOutcome
 public sealed record PricingCatalogRefresh(
     PricingCatalogOutcome Outcome,
     PricingCatalogSnapshot? Snapshot,
-    string? Error = null)
+    string? Error = null
+)
 {
     public bool IsFailure => Outcome == PricingCatalogOutcome.Failed;
 }

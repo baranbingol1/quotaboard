@@ -14,13 +14,12 @@ internal static class CursorUsageMapper
         JsonElement? legacy,
         JsonElement? identity,
         DateTimeOffset observedAt,
-        string strategyId)
+        string strategyId
+    )
     {
         DateTimeOffset? billingStart = ReadDate(summary, "billingCycleStart");
         DateTimeOffset? billingEnd = ReadDate(summary, "billingCycleEnd");
-        TimeSpan? billingWindow = billingStart.HasValue && billingEnd > billingStart
-            ? billingEnd - billingStart
-            : null;
+        TimeSpan? billingWindow = billingStart.HasValue && billingEnd > billingStart ? billingEnd - billingStart : null;
 
         List<UsageMeter> meters = [];
         List<BalanceMetric> balances = [];
@@ -37,9 +36,12 @@ internal static class CursorUsageMapper
         string? email = ReadString(identity, "email");
         string? accountId = ReadString(identity, "sub");
         string? planType = ReadString(summary, "membershipType");
-        if (!string.IsNullOrWhiteSpace(email)) extensions.Add(("email", email));
-        if (!string.IsNullOrWhiteSpace(accountId)) extensions.Add(("account_id", accountId));
-        if (!string.IsNullOrWhiteSpace(planType)) extensions.Add(("plan_type", planType));
+        if (!string.IsNullOrWhiteSpace(email))
+            extensions.Add(("email", email));
+        if (!string.IsNullOrWhiteSpace(accountId))
+            extensions.Add(("account_id", accountId));
+        if (!string.IsNullOrWhiteSpace(planType))
+            extensions.Add(("plan_type", planType));
 
         return new ProviderSnapshot(
             account,
@@ -48,12 +50,14 @@ internal static class CursorUsageMapper
             SnapshotCompleteness.Authoritative,
             observedAt,
             DataConfidence.High,
-            ProviderHttpSupport.SafeExtensions(extensions.ToArray()));
+            ProviderHttpSupport.SafeExtensions(extensions.ToArray())
+        );
     }
 
     internal static string? ReadString(JsonElement? element, string path)
     {
-        if (!element.HasValue) return null;
+        if (!element.HasValue)
+            return null;
         JsonElement value = Find(element.Value, path);
         return value.ValueKind == JsonValueKind.String ? value.GetString()?.Trim() : null;
     }
@@ -64,30 +68,34 @@ internal static class CursorUsageMapper
         TimeSpan? window,
         DateTimeOffset? resetsAt,
         DateTimeOffset observedAt,
-        string strategyId)
+        string strategyId
+    )
     {
-        if (!legacy.HasValue) return false;
+        if (!legacy.HasValue)
+            return false;
         JsonElement requests = Find(legacy.Value, "gpt-4");
         double? limit = ReadNumber(requests, "maxRequestUsage");
-        if (!(limit > 0)) return false;
+        if (!(limit > 0))
+            return false;
 
-        double used = ReadNumber(requests, "numRequestsTotal")
-            ?? ReadNumber(requests, "numRequests")
-            ?? 0;
+        double used = ReadNumber(requests, "numRequestsTotal") ?? ReadNumber(requests, "numRequests") ?? 0;
         used = Math.Max(0, used);
         double usedPercent = Math.Clamp(used / limit.Value * 100, 0, 100);
-        meters.Add(CreateMeter(
-            "cursor:requests",
-            "Requests",
-            MeterUnit.Requests,
-            (decimal)used,
-            (decimal)limit.Value,
-            usedPercent,
-            window,
-            resetsAt,
-            "$.gpt-4",
-            observedAt,
-            strategyId));
+        meters.Add(
+            CreateMeter(
+                "cursor:requests",
+                "Requests",
+                MeterUnit.Requests,
+                (decimal)used,
+                (decimal)limit.Value,
+                usedPercent,
+                window,
+                resetsAt,
+                "$.gpt-4",
+                observedAt,
+                strategyId
+            )
+        );
         return true;
     }
 
@@ -98,7 +106,8 @@ internal static class CursorUsageMapper
         TimeSpan? window,
         DateTimeOffset? resetsAt,
         DateTimeOffset observedAt,
-        string strategyId)
+        string strategyId
+    )
     {
         JsonElement individualUsage = Find(summary, "individualUsage");
         JsonElement plan = Find(individualUsage, "plan");
@@ -117,11 +126,10 @@ internal static class CursorUsageMapper
         // themselves.
         totalPercent ??= RatioPercent(plan) ?? RatioPercent(overall) ?? RatioPercent(pooled);
 
-        JsonElement amountSource = HasPositiveAmount(plan)
-            ? plan
-            : HasPositiveAmount(overall)
-                ? overall
-                : pooled;
+        JsonElement amountSource =
+            HasPositiveAmount(plan) ? plan
+            : HasPositiveAmount(overall) ? overall
+            : pooled;
         double? amountUsedCents = ReadNumber(amountSource, "used");
         double? amountLimitCents = ReadNumber(amountSource, "limit");
 
@@ -129,72 +137,107 @@ internal static class CursorUsageMapper
         {
             if (amountUsedCents.HasValue && amountLimitCents > 0)
             {
-                meters.Add(CreateMeter(
-                    "cursor:total",
-                    "Total",
-                    MeterUnit.Usd,
-                    (decimal)amountUsedCents.Value / 100m,
-                    (decimal)amountLimitCents.Value / 100m,
-                    totalPercent.Value,
-                    window,
-                    resetsAt,
-                    "$.individualUsage.plan",
-                    observedAt,
-                    strategyId));
+                meters.Add(
+                    CreateMeter(
+                        "cursor:total",
+                        "Total",
+                        MeterUnit.Usd,
+                        (decimal)amountUsedCents.Value / 100m,
+                        (decimal)amountLimitCents.Value / 100m,
+                        totalPercent.Value,
+                        window,
+                        resetsAt,
+                        "$.individualUsage.plan",
+                        observedAt,
+                        strategyId
+                    )
+                );
             }
             else
             {
-                meters.Add(CreatePercentMeter(
-                    "cursor:total", "Total", totalPercent.Value, window, resetsAt,
-                    "$.individualUsage.plan.totalPercentUsed", observedAt, strategyId));
+                meters.Add(
+                    CreatePercentMeter(
+                        "cursor:total",
+                        "Total",
+                        totalPercent.Value,
+                        window,
+                        resetsAt,
+                        "$.individualUsage.plan.totalPercentUsed",
+                        observedAt,
+                        strategyId
+                    )
+                );
             }
         }
         if (autoPercent.HasValue)
         {
-            meters.Add(CreatePercentMeter(
-                "cursor:auto", "Auto", autoPercent.Value, window, resetsAt,
-                "$.individualUsage.plan.autoPercentUsed", observedAt, strategyId));
+            meters.Add(
+                CreatePercentMeter(
+                    "cursor:auto",
+                    "Auto",
+                    autoPercent.Value,
+                    window,
+                    resetsAt,
+                    "$.individualUsage.plan.autoPercentUsed",
+                    observedAt,
+                    strategyId
+                )
+            );
         }
         if (apiPercent.HasValue)
         {
-            meters.Add(CreatePercentMeter(
-                "cursor:api", "API", apiPercent.Value, window, resetsAt,
-                "$.individualUsage.plan.apiPercentUsed", observedAt, strategyId));
+            meters.Add(
+                CreatePercentMeter(
+                    "cursor:api",
+                    "API",
+                    apiPercent.Value,
+                    window,
+                    resetsAt,
+                    "$.individualUsage.plan.apiPercentUsed",
+                    observedAt,
+                    strategyId
+                )
+            );
         }
 
         JsonElement personalOnDemand = Find(individualUsage, "onDemand");
         JsonElement teamOnDemand = Find(Find(summary, "teamUsage"), "onDemand");
-        JsonElement selectedOnDemand = ReadNumber(personalOnDemand, "limit") > 0
-            ? personalOnDemand
-            : ReadNumber(teamOnDemand, "limit") > 0
-                ? teamOnDemand
-                : personalOnDemand;
+        JsonElement selectedOnDemand =
+            ReadNumber(personalOnDemand, "limit") > 0 ? personalOnDemand
+            : ReadNumber(teamOnDemand, "limit") > 0 ? teamOnDemand
+            : personalOnDemand;
         double? onDemandUsedCents = ReadNumber(selectedOnDemand, "used");
         double? onDemandLimitCents = ReadNumber(selectedOnDemand, "limit");
         if (onDemandLimitCents > 0)
         {
             double usedCents = Math.Max(0, onDemandUsedCents ?? 0);
             double percent = Math.Clamp(usedCents / onDemandLimitCents.Value * 100, 0, 100);
-            meters.Add(CreateMeter(
-                "cursor:extra",
-                "Extra usage",
-                MeterUnit.Usd,
-                (decimal)usedCents / 100m,
-                (decimal)onDemandLimitCents.Value / 100m,
-                percent,
-                window,
-                resetsAt,
-                "$.individualUsage.onDemand",
-                observedAt,
-                strategyId));
+            meters.Add(
+                CreateMeter(
+                    "cursor:extra",
+                    "Extra usage",
+                    MeterUnit.Usd,
+                    (decimal)usedCents / 100m,
+                    (decimal)onDemandLimitCents.Value / 100m,
+                    percent,
+                    window,
+                    resetsAt,
+                    "$.individualUsage.onDemand",
+                    observedAt,
+                    strategyId
+                )
+            );
         }
         else if (onDemandUsedCents > 0)
         {
-            balances.Add(new BalanceMetric(
-                "cursor:extra-spend",
-                "Extra usage spend",
-                (decimal)onDemandUsedCents.Value / 100m,
-                MeterUnit.Usd));
+            balances.Add(
+                new BalanceMetric(
+                    "cursor:extra-spend",
+                    "Extra usage spend",
+                    (decimal)onDemandUsedCents.Value / 100m,
+                    MeterUnit.Usd
+                )
+            );
         }
     }
 
@@ -206,10 +249,21 @@ internal static class CursorUsageMapper
         DateTimeOffset? resetsAt,
         string sourcePath,
         DateTimeOffset observedAt,
-        string strategyId) =>
+        string strategyId
+    ) =>
         CreateMeter(
-            key, name, MeterUnit.Percent, (decimal)usedPercent, 100m, usedPercent,
-            window, resetsAt, sourcePath, observedAt, strategyId);
+            key,
+            name,
+            MeterUnit.Percent,
+            (decimal)usedPercent,
+            100m,
+            usedPercent,
+            window,
+            resetsAt,
+            sourcePath,
+            observedAt,
+            strategyId
+        );
 
     private static UsageMeter CreateMeter(
         string key,
@@ -222,7 +276,8 @@ internal static class CursorUsageMapper
         DateTimeOffset? resetsAt,
         string sourcePath,
         DateTimeOffset observedAt,
-        string strategyId) =>
+        string strategyId
+    ) =>
         new(
             new MeterKey(key),
             name,
@@ -235,7 +290,8 @@ internal static class CursorUsageMapper
             resetsAt,
             null,
             StatusFor(usedPercent),
-            new MeterProvenance(strategyId, sourcePath, observedAt, IsAuthoritative: true));
+            new MeterProvenance(strategyId, sourcePath, observedAt, IsAuthoritative: true)
+        );
 
     private static bool HasPositiveAmount(JsonElement element) =>
         ReadNumber(element, "used") > 0 || ReadNumber(element, "limit") > 0;
@@ -244,9 +300,7 @@ internal static class CursorUsageMapper
     {
         double? used = ReadNumber(element, "used");
         double? limit = ReadNumber(element, "limit");
-        return used.HasValue && limit > 0
-            ? Math.Clamp(used.Value / limit.Value * 100, 0, 100)
-            : null;
+        return used.HasValue && limit > 0 ? Math.Clamp(used.Value / limit.Value * 100, 0, 100) : null;
     }
 
     private static double? ClampPercent(double? value) =>
@@ -265,9 +319,11 @@ internal static class CursorUsageMapper
         {
             return number;
         }
-        if (value.ValueKind == JsonValueKind.String
+        if (
+            value.ValueKind == JsonValueKind.String
             && double.TryParse(value.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out number)
-            && double.IsFinite(number))
+            && double.IsFinite(number)
+        )
         {
             return number;
         }
@@ -281,7 +337,8 @@ internal static class CursorUsageMapper
             value,
             CultureInfo.InvariantCulture,
             DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
-            out DateTimeOffset parsed)
+            out DateTimeOffset parsed
+        )
             ? parsed
             : null;
     }

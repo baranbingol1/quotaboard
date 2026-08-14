@@ -15,22 +15,32 @@ public enum FetchFailureKind
     Cancelled,
     Unsupported,
     Unknown,
+
     // Appended after Unknown so persisted numeric values keep their meaning.
     OversizedResponse,
+
     // A strategy that could not run right now (e.g. a locked local database)
     // but is expected to recover on its own; rendered as retrying, never as
     // sign-in.
-    TemporarilyUnavailable
+    TemporarilyUnavailable,
 }
 
 public enum FallbackPolicy
 {
     Stop,
     TryNextStrategy,
-    TryNextOnlyOnAvailabilityFailure
+    TryNextOnlyOnAvailabilityFailure,
 }
 
-public sealed record FetchResult(ProviderSnapshot? Snapshot, FetchFailureKind FailureKind, string SafeMessage, FallbackPolicy FallbackPolicy, TimeSpan Duration, string StrategyId, TimeSpan? RetryAfter = null)
+public sealed record FetchResult(
+    ProviderSnapshot? Snapshot,
+    FetchFailureKind FailureKind,
+    string SafeMessage,
+    FallbackPolicy FallbackPolicy,
+    TimeSpan Duration,
+    string StrategyId,
+    TimeSpan? RetryAfter = null
+)
 {
     public bool IsSuccess
     {
@@ -49,20 +59,35 @@ public sealed record FetchResult(ProviderSnapshot? Snapshot, FetchFailureKind Fa
         return new FetchResult(snapshot, FetchFailureKind.None, "Success", FallbackPolicy.Stop, duration, strategyId);
     }
 
-    public static FetchResult Failure(FetchFailureKind kind, string safeMessage, FallbackPolicy fallback, string strategyId, TimeSpan duration, TimeSpan? retryAfter = null)
+    public static FetchResult Failure(
+        FetchFailureKind kind,
+        string safeMessage,
+        FallbackPolicy fallback,
+        string strategyId,
+        TimeSpan duration,
+        TimeSpan? retryAfter = null
+    )
     {
         return new FetchResult(null, kind, safeMessage, fallback, duration, strategyId, retryAfter);
     }
 }
 
-public sealed record FetchAttempt(string Id, AccountKey Account, string StrategyId, DateTimeOffset StartedAt, TimeSpan Duration, FetchFailureKind FailureKind, string SafeMessage);
+public sealed record FetchAttempt(
+    string Id,
+    AccountKey Account,
+    string StrategyId,
+    DateTimeOffset StartedAt,
+    TimeSpan Duration,
+    FetchFailureKind FailureKind,
+    string SafeMessage
+);
 
 public enum StrategyAvailability
 {
     Available,
     NotConfigured,
     TemporarilyUnavailable,
-    Unsupported
+    Unsupported,
 }
 
 public sealed record StrategyAvailabilityResult(StrategyAvailability Availability, string SafeReason)
@@ -73,7 +98,12 @@ public sealed record StrategyAvailabilityResult(StrategyAvailability Availabilit
     }
 }
 
-public sealed record RefreshRequest(AccountKey Account, long ConfigurationRevision, bool Force = false, string Reason = "scheduled");
+public sealed record RefreshRequest(
+    AccountKey Account,
+    long ConfigurationRevision,
+    bool Force = false,
+    string Reason = "scheduled"
+);
 
 public enum RefreshPublicationStatus
 {
@@ -81,7 +111,14 @@ public enum RefreshPublicationStatus
     StaleResultRejected,
     NoStrategyAvailable,
     FailedWithCachedData,
-    FailedWithoutData
+    FailedWithoutData,
 }
 
-public sealed record RefreshPublication(RefreshPublicationStatus Status, ProviderSnapshot? Snapshot, IReadOnlyList<FetchAttempt> Attempts, long Generation, string SafeMessage, TimeSpan? RetryAfterHint = null);
+public sealed record RefreshPublication(
+    RefreshPublicationStatus Status,
+    ProviderSnapshot? Snapshot,
+    IReadOnlyList<FetchAttempt> Attempts,
+    long Generation,
+    string SafeMessage,
+    TimeSpan? RetryAfterHint = null
+);

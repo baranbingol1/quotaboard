@@ -18,11 +18,11 @@ namespace AiLimits.Presentation.WinUI.Theming;
 internal static class SystemFonts
 {
     private const int DefaultCharSet = 1;
+
     // LOGFONTW.lfFaceName is a fixed 32-wchar buffer including the terminator.
     private const int MaxFaceNameLength = 31;
 
-    private static readonly ConcurrentDictionary<string, bool> Cache =
-        new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, bool> Cache = new(StringComparer.OrdinalIgnoreCase);
 
     public static bool IsInstalled(string family)
     {
@@ -97,7 +97,8 @@ internal static class SystemFonts
         ref LogFont logFont,
         EnumFontFamiliesExProc callback,
         IntPtr param,
-        uint flags);
+        uint flags
+    );
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetDC(IntPtr window);

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-using AiLimits.Application.Abstractions;
-using AiLimits.Domain;
-using AiLimits.Infrastructure.Providers.Common;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using AiLimits.Application.Abstractions;
+using AiLimits.Domain;
+using AiLimits.Infrastructure.Providers.Common;
 
 namespace AiLimits.Infrastructure.Providers.Copilot;
 
@@ -17,9 +17,19 @@ internal sealed class CopilotQuotaStrategy(HttpClient httpClient, IClock clock) 
 
     public int Order => 10;
 
-    public Task<StrategyAvailabilityResult> CheckAvailabilityAsync(ProviderAccount account, CancellationToken cancellationToken)
+    public Task<StrategyAvailabilityResult> CheckAvailabilityAsync(
+        ProviderAccount account,
+        CancellationToken cancellationToken
+    )
     {
-        return Task.FromResult(string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AILIMITS_GITHUB_TOKEN")) ? new StrategyAvailabilityResult(StrategyAvailability.NotConfigured, "GitHub device authorization is not connected.") : StrategyAvailabilityResult.Ready());
+        return Task.FromResult(
+            string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AILIMITS_GITHUB_TOKEN"))
+                ? new StrategyAvailabilityResult(
+                    StrategyAvailability.NotConfigured,
+                    "GitHub device authorization is not connected."
+                )
+                : StrategyAvailabilityResult.Ready()
+        );
     }
 
     public async Task<FetchResult> FetchAsync(ProviderAccount account, CancellationToken cancellationToken)
@@ -28,7 +38,13 @@ internal sealed class CopilotQuotaStrategy(HttpClient httpClient, IClock clock) 
         string token = Environment.GetEnvironmentVariable("AILIMITS_GITHUB_TOKEN")?.Trim();
         if (string.IsNullOrWhiteSpace(token))
         {
-            return FetchResult.Failure(FetchFailureKind.Authentication, "GitHub device authorization is not connected.", FallbackPolicy.TryNextStrategy, Id, Stopwatch.GetElapsedTime(started));
+            return FetchResult.Failure(
+                FetchFailureKind.Authentication,
+                "GitHub device authorization is not connected.",
+                FallbackPolicy.TryNextStrategy,
+                Id,
+                Stopwatch.GetElapsedTime(started)
+            );
         }
         using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, UsageUri);
         request.Headers.Authorization = new AuthenticationHeaderValue("token", token);
@@ -37,7 +53,9 @@ internal sealed class CopilotQuotaStrategy(HttpClient httpClient, IClock clock) 
         request.Headers.TryAddWithoutValidation("Editor-Plugin-Version", "copilot-chat/0.26.7");
         request.Headers.TryAddWithoutValidation("X-Github-Api-Version", "2025-04-01");
         request.Headers.UserAgent.ParseAdd("GitHubCopilotChat/0.26.7");
-        using ProviderJsonResult exchange = await ProviderHttp.GetJsonAsync(httpClient, request, Id, "GitHub Copilot", started, cancellationToken).ConfigureAwait(false);
+        using ProviderJsonResult exchange = await ProviderHttp
+            .GetJsonAsync(httpClient, request, Id, "GitHub Copilot", started, cancellationToken)
+            .ConfigureAwait(false);
         if (!exchange.IsSuccess)
         {
             return exchange.Failure!;
@@ -47,13 +65,19 @@ internal sealed class CopilotQuotaStrategy(HttpClient httpClient, IClock clock) 
         var extensionValues = new List<(string Key, string Value)> { ("source", "copilot-internal") };
         string? email = ReadString(document.RootElement, "email");
         string? login = ReadString(document.RootElement, "login") ?? ReadString(document.RootElement, "user_login");
-        if (!string.IsNullOrWhiteSpace(email)) extensionValues.Add(("email", email.Trim()));
-        if (!string.IsNullOrWhiteSpace(login)) extensionValues.Add(("login", login.Trim()));
+        if (!string.IsNullOrWhiteSpace(email))
+            extensionValues.Add(("email", email.Trim()));
+        if (!string.IsNullOrWhiteSpace(login))
+            extensionValues.Add(("login", login.Trim()));
         if (meters.Count == 0 && !ReadBool(document.RootElement, "token_based_billing"))
         {
-            return FetchResult.Failure(FetchFailureKind.ProviderChanged,
+            return FetchResult.Failure(
+                FetchFailureKind.ProviderChanged,
                 "GitHub returned no usable Copilot quota meters.",
-                FallbackPolicy.TryNextStrategy, Id, Stopwatch.GetElapsedTime(started));
+                FallbackPolicy.TryNextStrategy,
+                Id,
+                Stopwatch.GetElapsedTime(started)
+            );
         }
 
         // A token-based-billing account legitimately reports no quota windows,
@@ -61,15 +85,22 @@ internal sealed class CopilotQuotaStrategy(HttpClient httpClient, IClock clock) 
         // meters are gone for good, so the whole card emptied out to
         // "connected — no quota". Declaring it Partial keeps what was last
         // known, badged Stale, until GitHub reports windows again.
-        SnapshotCompleteness completeness = meters.Count == 0
-            ? SnapshotCompleteness.Partial
-            : SnapshotCompleteness.Authoritative;
+        SnapshotCompleteness completeness =
+            meters.Count == 0 ? SnapshotCompleteness.Partial : SnapshotCompleteness.Authoritative;
 
         return FetchResult.Success(
-            new ProviderSnapshot(account.Key, meters, Array.Empty<BalanceMetric>(), completeness,
-                clock.UtcNow, DataConfidence.High,
-                ProviderHttpSupport.SafeExtensions(extensionValues.ToArray())),
-            Id, Stopwatch.GetElapsedTime(started));
+            new ProviderSnapshot(
+                account.Key,
+                meters,
+                Array.Empty<BalanceMetric>(),
+                completeness,
+                clock.UtcNow,
+                DataConfidence.High,
+                ProviderHttpSupport.SafeExtensions(extensionValues.ToArray())
+            ),
+            Id,
+            Stopwatch.GetElapsedTime(started)
+        );
     }
 
     internal IReadOnlyList<UsageMeter> ParseMeters(ProviderId provider, JsonElement root, DateTimeOffset now)
@@ -129,8 +160,31 @@ internal sealed class CopilotQuotaStrategy(HttpClient httpClient, IClock clock) 
             {
                 num6 = Math.Max(0.0, num6.Value);
                 string text = ReadString(item.Value, "quota_id") ?? item.Name;
-                MeterStatus status = ((num6 >= 100.0) ? MeterStatus.Exhausted : ((num6 >= 95.0) ? MeterStatus.Critical : ((!(num6 >= 80.0)) ? MeterStatus.Healthy : MeterStatus.Approaching)));
-                list.Add(new UsageMeter(new MeterKey(provider.Value + ":" + text), Friendly(item.Name), MeterScope.Feature, MeterUnit.Requests, (num.HasValue && num2.HasValue) ? Math.Max(0m, num.Value - num2.Value) : null, num, num6, null, flag ? null : dateTimeOffset, null, status, new MeterProvenance(Id, "$.quota_snapshots." + item.Name, now, IsAuthoritative: true)));
+                MeterStatus status = (
+                    (num6 >= 100.0)
+                        ? MeterStatus.Exhausted
+                        : (
+                            (num6 >= 95.0)
+                                ? MeterStatus.Critical
+                                : ((!(num6 >= 80.0)) ? MeterStatus.Healthy : MeterStatus.Approaching)
+                        )
+                );
+                list.Add(
+                    new UsageMeter(
+                        new MeterKey(provider.Value + ":" + text),
+                        Friendly(item.Name),
+                        MeterScope.Feature,
+                        MeterUnit.Requests,
+                        (num.HasValue && num2.HasValue) ? Math.Max(0m, num.Value - num2.Value) : null,
+                        num,
+                        num6,
+                        null,
+                        flag ? null : dateTimeOffset,
+                        null,
+                        status,
+                        new MeterProvenance(Id, "$.quota_snapshots." + item.Name, now, IsAuthoritative: true)
+                    )
+                );
             }
         }
         return list;
@@ -151,13 +205,20 @@ internal sealed class CopilotQuotaStrategy(HttpClient httpClient, IClock clock) 
         {
             return value2;
         }
-        return (value.ValueKind == JsonValueKind.String && decimal.TryParse(value.GetString(), CultureInfo.InvariantCulture, out value2)) ? value2 : null;
+        return (
+            value.ValueKind == JsonValueKind.String
+            && decimal.TryParse(value.GetString(), CultureInfo.InvariantCulture, out value2)
+        )
+            ? value2
+            : null;
     }
 
     private static string? ReadString(JsonElement element, string name)
     {
         JsonElement value;
-        return (element.TryGetProperty(name, out value) && value.ValueKind == JsonValueKind.String) ? value.GetString() : null;
+        return (element.TryGetProperty(name, out value) && value.ValueKind == JsonValueKind.String)
+            ? value.GetString()
+            : null;
     }
 
     private static bool ReadBool(JsonElement element, string name)
@@ -170,6 +231,17 @@ internal sealed class CopilotQuotaStrategy(HttpClient httpClient, IClock clock) 
     {
         JsonElement value;
         DateTimeOffset result;
-        return (element.TryGetProperty(name, out value) && value.ValueKind == JsonValueKind.String && DateTimeOffset.TryParse(value.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out result)) ? result : null;
+        return (
+            element.TryGetProperty(name, out value)
+            && value.ValueKind == JsonValueKind.String
+            && DateTimeOffset.TryParse(
+                value.GetString(),
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal,
+                out result
+            )
+        )
+            ? result
+            : null;
     }
 }

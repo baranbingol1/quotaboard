@@ -27,7 +27,8 @@ public sealed class ProviderLimitParsingTests
     [Fact]
     public void CodexAdditionalRateLimitDoesNotDuplicateWeekly()
     {
-        using var document = JsonDocument.Parse("""
+        using var document = JsonDocument.Parse(
+            """
             {
               "rate_limit": {
                 "primary_window": {"used_percent": 20, "reset_at": 1784499168, "limit_window_seconds": 604800}
@@ -42,7 +43,8 @@ public sealed class ProviderLimitParsingTests
                 }
               ]
             }
-            """);
+            """
+        );
         var meters = CodexStrategy().ExtractMeters(document.RootElement, new ProviderId("codex"), Now);
         Assert.Equal(2, meters.Count);
         var weekly = Assert.Single(meters, meter => meter.DisplayName == "Weekly limit");
@@ -56,14 +58,16 @@ public sealed class ProviderLimitParsingTests
     [Fact]
     public void CodexPrimaryAndSecondaryWindowsSlotByRole()
     {
-        using var document = JsonDocument.Parse("""
+        using var document = JsonDocument.Parse(
+            """
             {
               "rate_limit": {
                 "primary_window": {"used_percent": 41, "reset_at": 1784499168, "limit_window_seconds": 18000},
                 "secondary_window": {"used_percent": 12, "reset_at": 1784574830, "limit_window_seconds": 604800}
               }
             }
-            """);
+            """
+        );
         var meters = CodexStrategy().ExtractMeters(document.RootElement, new ProviderId("codex"), Now);
         Assert.Equal(2, meters.Count);
         Assert.Single(meters, meter => meter.DisplayName == "5-hour limit");
@@ -73,14 +77,16 @@ public sealed class ProviderLimitParsingTests
     [Fact]
     public void CodexTwoWeeklyMainLanesGetDistinctNames()
     {
-        using var document = JsonDocument.Parse("""
+        using var document = JsonDocument.Parse(
+            """
             {
               "rate_limit": {
                 "primary_window": {"used_percent": 20, "reset_at": 1784499168, "limit_window_seconds": 604800},
                 "secondary_window": {"used_percent": 0, "reset_at": 1784574830, "limit_window_seconds": 604800}
               }
             }
-            """);
+            """
+        );
         var meters = CodexStrategy().ExtractMeters(document.RootElement, new ProviderId("codex"), Now);
         Assert.Equal(2, meters.Count);
         Assert.Equal(2, meters.Select(meter => meter.DisplayName).Distinct(StringComparer.OrdinalIgnoreCase).Count());
@@ -90,7 +96,8 @@ public sealed class ProviderLimitParsingTests
     [Fact]
     public void FactoryCorePoolMetersAreLabeledDroidCore()
     {
-        using var document = JsonDocument.Parse("""
+        using var document = JsonDocument.Parse(
+            """
             {
               "limits": {
                 "standard": {
@@ -105,7 +112,8 @@ public sealed class ProviderLimitParsingTests
                 }
               }
             }
-            """);
+            """
+        );
         var strategy = new DroidApiLimitStrategy(new HttpClient(), new FixedClock());
         var result = strategy.BuildSnapshot(
             new AccountKey(new ProviderId("droid"), "default"),
@@ -113,7 +121,8 @@ public sealed class ProviderLimitParsingTests
             billingLimits: true,
             started: 0L,
             planName: "Pro",
-            email: "factory.user@example.com");
+            email: "factory.user@example.com"
+        );
         Assert.True(result.IsSuccess);
         var meters = result.Snapshot!.Meters;
         Assert.Equal(6, meters.Count);
@@ -132,7 +141,8 @@ public sealed class ProviderLimitParsingTests
         // start on first use, and once one lapses the API keeps returning the
         // COMPLETED window — windowEnd in the past, secondsRemaining null —
         // with its old usedPercent. Factory's dashboard shows those as 0%.
-        using var document = JsonDocument.Parse("""
+        using var document = JsonDocument.Parse(
+            """
             {
               "usesTokenRateLimitsBilling": true,
               "limits": {
@@ -144,13 +154,15 @@ public sealed class ProviderLimitParsingTests
               },
               "extraUsageBalanceCents": 0
             }
-            """);
+            """
+        );
         var strategy = new DroidApiLimitStrategy(new HttpClient(), new FixedClock());
         var result = strategy.BuildSnapshot(
             new AccountKey(new ProviderId("droid"), "default"),
             document.RootElement,
             billingLimits: true,
-            started: 0L);
+            started: 0L
+        );
         Assert.True(result.IsSuccess);
         var meters = result.Snapshot!.Meters;
 
@@ -170,7 +182,8 @@ public sealed class ProviderLimitParsingTests
     [Fact]
     public void ClaudeScopedFableLimitIsParsed()
     {
-        using var document = JsonDocument.Parse("""
+        using var document = JsonDocument.Parse(
+            """
             {
               "five_hour": {"utilization": 23.0, "resets_at": "2026-07-13T21:50:00+00:00"},
               "seven_day": {"utilization": 23.0, "resets_at": "2026-07-14T23:00:00+00:00"},
@@ -181,8 +194,14 @@ public sealed class ProviderLimitParsingTests
                  "scope": {"model": {"id": null, "display_name": "Fable"}, "surface": null}, "is_active": true}
               ]
             }
-            """);
-        var strategy = new ClaudeOAuthLimitStrategy(new HttpClient(), new FixedClock(), Account("claude"), "unused.json");
+            """
+        );
+        var strategy = new ClaudeOAuthLimitStrategy(
+            new HttpClient(),
+            new FixedClock(),
+            Account("claude"),
+            "unused.json"
+        );
         var meters = new List<UsageMeter>();
         strategy.AddScopedLimitMeters(document.RootElement, Now, meters);
         var fable = Assert.Single(meters);
@@ -200,19 +219,27 @@ public sealed class ProviderLimitParsingTests
     [Fact]
     public void ClaudeLowUtilizationIsNotRescaledToOneHundredPercent()
     {
-        using var document = JsonDocument.Parse("""
+        using var document = JsonDocument.Parse(
+            """
             {
               "five_hour": {"utilization": 1.0, "resets_at": "2026-07-13T21:50:00+00:00"},
               "seven_day": {"utilization": 0.5, "resets_at": "2026-07-14T23:00:00+00:00"}
             }
-            """);
+            """
+        );
         var aliases = new Dictionary<string, MeterAlias>(StringComparer.OrdinalIgnoreCase)
         {
             ["five_hour"] = new MeterAlias("five_hour", "5-hour limit", PercentIsAbsolute: true),
-            ["seven_day"] = new MeterAlias("seven_day", "Weekly limit", PercentIsAbsolute: true)
+            ["seven_day"] = new MeterAlias("seven_day", "Weekly limit", PercentIsAbsolute: true),
         };
         var meters = new DynamicMeterExtractor().Extract(
-            new ProviderId("claude"), document.RootElement, "claude.oauth-usage", Now, authoritative: true, aliases);
+            new ProviderId("claude"),
+            document.RootElement,
+            "claude.oauth-usage",
+            Now,
+            authoritative: true,
+            aliases
+        );
 
         var fiveHour = Assert.Single(meters, meter => meter.DisplayName == "5-hour limit");
         Assert.Equal(1.0, fiveHour.UsedPercent);
@@ -228,11 +255,18 @@ public sealed class ProviderLimitParsingTests
     [Fact]
     public void UnaliasedFractionalUtilizationStillRescales()
     {
-        using var document = JsonDocument.Parse("""
+        using var document = JsonDocument.Parse(
+            """
             {"some_window": {"utilization": 0.5, "resets_at": "2026-07-13T21:50:00+00:00"}}
-            """);
+            """
+        );
         var meters = new DynamicMeterExtractor().Extract(
-            new ProviderId("fixture"), document.RootElement, "fixture", Now, authoritative: true);
+            new ProviderId("fixture"),
+            document.RootElement,
+            "fixture",
+            Now,
+            authoritative: true
+        );
         var meter = Assert.Single(meters);
         Assert.Equal(50.0, meter.UsedPercent);
     }

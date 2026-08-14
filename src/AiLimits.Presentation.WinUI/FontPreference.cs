@@ -12,7 +12,9 @@ public static class FontPreference
 {
     private static readonly string PreferencePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard", "font.json");
+        "QuotaBoard",
+        "font.json"
+    );
 
     public static FontSelection Load()
     {
@@ -26,9 +28,7 @@ public static class FontPreference
                 return new FontSelection(content, metric);
             }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { }
         return new FontSelection(null, null);
     }
 
@@ -38,13 +38,13 @@ public static class FontPreference
         {
             Directory.CreateDirectory(Path.GetDirectoryName(PreferencePath)!);
             var payload = new Dictionary<string, string>();
-            if (!string.IsNullOrWhiteSpace(selection.ContentFontId)) payload["content"] = selection.ContentFontId!;
-            if (!string.IsNullOrWhiteSpace(selection.MetricFontId)) payload["metric"] = selection.MetricFontId!;
+            if (!string.IsNullOrWhiteSpace(selection.ContentFontId))
+                payload["content"] = selection.ContentFontId!;
+            if (!string.IsNullOrWhiteSpace(selection.MetricFontId))
+                payload["metric"] = selection.MetricFontId!;
             File.WriteAllText(PreferencePath, JsonSerializer.Serialize(payload));
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
     /// <summary>

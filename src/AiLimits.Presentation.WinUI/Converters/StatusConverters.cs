@@ -12,11 +12,13 @@ public sealed class StatusBrushConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, string language)
     {
-        var key = value is MeterStatus.Critical or MeterStatus.Exhausted
-            ? "CriticalBrush"
-            : value is MeterStatus.Approaching ? "WarningBrush" : "HealthyBrush";
+        var key =
+            value is MeterStatus.Critical or MeterStatus.Exhausted ? "CriticalBrush"
+            : value is MeterStatus.Approaching ? "WarningBrush"
+            : "HealthyBrush";
         return ThemeService.ResolveThemeResource(key) ?? new SolidColorBrush(Colors.Gray);
     }
+
     public object ConvertBack(object value, Type targetType, object parameter, string language) =>
         throw new NotSupportedException();
 }
@@ -31,10 +33,11 @@ public sealed class CardStatusBrushConverter : IValueConverter
             CardStatusKind.Live => "HealthyBrush",
             CardStatusKind.Stale or CardStatusKind.RateLimited or CardStatusKind.SignInRequired => "WarningBrush",
             CardStatusKind.Error => "CriticalBrush",
-            _ => "TextQuietBrush"
+            _ => "TextQuietBrush",
         };
         return ThemeService.ResolveThemeResource(key) ?? new SolidColorBrush(Colors.Gray);
     }
+
     public object ConvertBack(object value, Type targetType, object parameter, string language) =>
         throw new NotSupportedException();
 }

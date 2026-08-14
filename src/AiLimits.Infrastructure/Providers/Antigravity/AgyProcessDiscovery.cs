@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-using Microsoft.Win32.SafeHandles;
 using System.Diagnostics;
 using System.Net;
 using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 
 namespace AiLimits.Infrastructure.Providers.Antigravity;
 
@@ -58,10 +58,10 @@ internal sealed class AgyProcessDiscovery
                 {
                     return false;
                 }
-            using (processToken)
-            {
-                return TokensHaveSameUser(currentToken, processToken);
-            }
+                using (processToken)
+                {
+                    return TokensHaveSameUser(currentToken, processToken);
+                }
             }
         }
         catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception)
@@ -76,8 +76,10 @@ internal sealed class AgyProcessDiscovery
         IntPtr rightBuffer = ReadTokenUser(right);
         if (leftBuffer == IntPtr.Zero || rightBuffer == IntPtr.Zero)
         {
-            if (leftBuffer != IntPtr.Zero) Marshal.FreeHGlobal(leftBuffer);
-            if (rightBuffer != IntPtr.Zero) Marshal.FreeHGlobal(rightBuffer);
+            if (leftBuffer != IntPtr.Zero)
+                Marshal.FreeHGlobal(leftBuffer);
+            if (rightBuffer != IntPtr.Zero)
+                Marshal.FreeHGlobal(rightBuffer);
             return false;
         }
 
@@ -120,7 +122,8 @@ internal sealed class AgyProcessDiscovery
             true,
             AddressFamilyInterNetwork,
             TcpTableClass.OwnerPidListener,
-            0);
+            0
+        );
         if (result != ErrorInsufficientBuffer || size <= 0)
         {
             return Array.Empty<TcpListenerOwner>();
@@ -135,7 +138,8 @@ internal sealed class AgyProcessDiscovery
                 true,
                 AddressFamilyInterNetwork,
                 TcpTableClass.OwnerPidListener,
-                0);
+                0
+            );
             if (result != NoError)
             {
                 return Array.Empty<TcpListenerOwner>();
@@ -170,7 +174,8 @@ internal sealed class AgyProcessDiscovery
         [MarshalAs(UnmanagedType.Bool)] bool order,
         int addressFamily,
         TcpTableClass tableClass,
-        uint reserved);
+        uint reserved
+    );
 
     private const uint TokenQuery = 0x0008;
 
@@ -179,7 +184,8 @@ internal sealed class AgyProcessDiscovery
     private static extern bool OpenProcessToken(
         IntPtr processHandle,
         uint desiredAccess,
-        out SafeAccessTokenHandle tokenHandle);
+        out SafeAccessTokenHandle tokenHandle
+    );
 
     [DllImport("advapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -188,7 +194,8 @@ internal sealed class AgyProcessDiscovery
         TokenInformationClass tokenInformationClass,
         IntPtr tokenInformation,
         int tokenInformationLength,
-        out int returnLength);
+        out int returnLength
+    );
 
     [DllImport("advapi32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -196,12 +203,12 @@ internal sealed class AgyProcessDiscovery
 
     private enum TcpTableClass
     {
-        OwnerPidListener = 3
+        OwnerPidListener = 3,
     }
 
     private enum TokenInformationClass
     {
-        User = 1
+        User = 1,
     }
 
     [StructLayout(LayoutKind.Sequential)]

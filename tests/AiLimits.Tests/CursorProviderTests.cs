@@ -33,7 +33,8 @@ public sealed class CursorProviderTests
     {
         using var database = TestDatabase.Create(
             "cursorAuth/accessToken",
-            Encoding.Unicode.GetBytes(Jwt("auth0|blob-user", Now.AddHours(1))));
+            Encoding.Unicode.GetBytes(Jwt("auth0|blob-user", Now.AddHours(1)))
+        );
         var source = new CursorCredentialSource(database.Path, new FixedClock());
 
         CursorCredential? credential = await source.ReadAsync(default);
@@ -53,26 +54,35 @@ public sealed class CursorProviderTests
     [Fact]
     public void MapsModernUsageSummaryUsingCursorSchema()
     {
-        using JsonDocument summary = JsonDocument.Parse("""
-        {
-          "billingCycleStart":"2026-07-01T00:00:00Z",
-          "billingCycleEnd":"2026-08-01T00:00:00Z",
-          "membershipType":"pro",
-          "individualUsage": {
-            "plan": {
-              "used":1500, "limit":5000,
-              "totalPercentUsed":30, "autoPercentUsed":12.5, "apiPercentUsed":3
-            },
-            "onDemand": {"used":500, "limit":10000}
-          }
-        }
-        """);
+        using JsonDocument summary = JsonDocument.Parse(
+            """
+            {
+              "billingCycleStart":"2026-07-01T00:00:00Z",
+              "billingCycleEnd":"2026-08-01T00:00:00Z",
+              "membershipType":"pro",
+              "individualUsage": {
+                "plan": {
+                  "used":1500, "limit":5000,
+                  "totalPercentUsed":30, "autoPercentUsed":12.5, "apiPercentUsed":3
+                },
+                "onDemand": {"used":500, "limit":10000}
+              }
+            }
+            """
+        );
         using JsonDocument identity = JsonDocument.Parse("""{"sub":"auth0|user-123","email":"user@example.com"}""");
 
         ProviderSnapshot snapshot = CursorUsageMapper.Map(
-            Account(), summary.RootElement, null, identity.RootElement, Now, "cursor.test");
+            Account(),
+            summary.RootElement,
+            null,
+            identity.RootElement,
+            Now,
+            "cursor.test"
+        );
 
-        Assert.Collection(snapshot.Meters,
+        Assert.Collection(
+            snapshot.Meters,
             meter =>
             {
                 Assert.Equal("cursor:total", meter.Key.Value);
@@ -89,7 +99,8 @@ public sealed class CursorProviderTests
                 Assert.Equal("cursor:extra", meter.Key.Value);
                 Assert.Equal(5m, meter.Used);
                 Assert.Equal(100m, meter.Limit);
-            });
+            }
+        );
         Assert.Equal("user@example.com", snapshot.Extensions["email"].GetString());
         Assert.Equal("pro", snapshot.Extensions["plan_type"].GetString());
         Assert.Equal(DataConfidence.High, snapshot.Confidence);
@@ -99,12 +110,16 @@ public sealed class CursorProviderTests
     [Fact]
     public void UsesEnterpriseOverallThenTeamPoolForTotal()
     {
-        using JsonDocument overall = JsonDocument.Parse("""
-        {"membershipType":"enterprise","individualUsage":{"overall":{"used":7384,"limit":10000}}}
-        """);
-        using JsonDocument pooled = JsonDocument.Parse("""
-        {"membershipType":"team","teamUsage":{"pooled":{"used":2500,"limit":10000}}}
-        """);
+        using JsonDocument overall = JsonDocument.Parse(
+            """
+            {"membershipType":"enterprise","individualUsage":{"overall":{"used":7384,"limit":10000}}}
+            """
+        );
+        using JsonDocument pooled = JsonDocument.Parse(
+            """
+            {"membershipType":"team","teamUsage":{"pooled":{"used":2500,"limit":10000}}}
+            """
+        );
 
         ProviderSnapshot personal = CursorUsageMapper.Map(Account(), overall.RootElement, null, null, Now, "test");
         ProviderSnapshot team = CursorUsageMapper.Map(Account(), pooled.RootElement, null, null, Now, "test");
@@ -116,17 +131,20 @@ public sealed class CursorProviderTests
     [Fact]
     public void ZeroValuedPlanFallsThroughToEnterpriseOverall()
     {
-        using JsonDocument summary = JsonDocument.Parse("""
-        {
-          "individualUsage": {
-            "plan":{"used":0,"limit":0},
-            "overall":{"used":2500,"limit":10000}
-          }
-        }
-        """);
+        using JsonDocument summary = JsonDocument.Parse(
+            """
+            {
+              "individualUsage": {
+                "plan":{"used":0,"limit":0},
+                "overall":{"used":2500,"limit":10000}
+              }
+            }
+            """
+        );
 
-        UsageMeter meter = Assert.Single(CursorUsageMapper.Map(
-            Account(), summary.RootElement, null, null, Now, "test").Meters);
+        UsageMeter meter = Assert.Single(
+            CursorUsageMapper.Map(Account(), summary.RootElement, null, null, Now, "test").Meters
+        );
 
         Assert.Equal(25, meter.UsedPercent);
         Assert.Equal(25m, meter.Used);
@@ -136,15 +154,25 @@ public sealed class CursorProviderTests
     [Fact]
     public void LegacyRequestPlanReplacesModernMeters()
     {
-        using JsonDocument summary = JsonDocument.Parse("""
-        {"individualUsage":{"plan":{"totalPercentUsed":44,"autoPercentUsed":20,"apiPercentUsed":68}}}
-        """);
-        using JsonDocument legacy = JsonDocument.Parse("""
-        {"gpt-4":{"numRequests":12,"numRequestsTotal":24,"maxRequestUsage":100}}
-        """);
+        using JsonDocument summary = JsonDocument.Parse(
+            """
+            {"individualUsage":{"plan":{"totalPercentUsed":44,"autoPercentUsed":20,"apiPercentUsed":68}}}
+            """
+        );
+        using JsonDocument legacy = JsonDocument.Parse(
+            """
+            {"gpt-4":{"numRequests":12,"numRequestsTotal":24,"maxRequestUsage":100}}
+            """
+        );
 
         ProviderSnapshot snapshot = CursorUsageMapper.Map(
-            Account(), summary.RootElement, legacy.RootElement, null, Now, "test");
+            Account(),
+            summary.RootElement,
+            legacy.RootElement,
+            null,
+            Now,
+            "test"
+        );
 
         UsageMeter meter = Assert.Single(snapshot.Meters);
         Assert.Equal("cursor:requests", meter.Key.Value);
@@ -166,9 +194,10 @@ public sealed class CursorProviderTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(3, handler.Requests.Count);
-        Assert.All(handler.Requests, request => Assert.Equal(
-            $"WorkosCursorSessionToken=user-123%3A%3A{token}",
-            request.Cookie));
+        Assert.All(
+            handler.Requests,
+            request => Assert.Equal($"WorkosCursorSessionToken=user-123%3A%3A{token}", request.Cookie)
+        );
         Assert.Contains(handler.Requests, request => request.Path == "/api/usage-summary");
         Assert.Contains(handler.Requests, request => request.Path == "/api/auth/me");
         Assert.Contains(handler.Requests, request => request.Path == "/api/usage?user=auth0%7Cuser-123");
@@ -185,7 +214,12 @@ public sealed class CursorProviderTests
         var strategy = new CursorWebLimitStrategy(new HttpClient(handler), new FixedClock(), source);
         var oldAccount = new ProviderAccount(
             new AccountKey(BuiltInProviderDescriptors.Cursor.Id, "auth0|old-user"),
-            "Cursor", null, "Cursor app session", 1, true);
+            "Cursor",
+            null,
+            "Cursor app session",
+            1,
+            true
+        );
 
         FetchResult result = await strategy.FetchAsync(oldAccount, default);
 
@@ -203,7 +237,11 @@ public sealed class CursorProviderTests
 
         // Hold the file with an exclusive lock so SQLite cannot open it.
         await using var lockedStream = new FileStream(
-            database.Path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            database.Path,
+            FileMode.Open,
+            FileAccess.ReadWrite,
+            FileShare.None
+        );
 
         var adapter = new CursorProviderAdapter(new HttpClient(), new FixedClock(), database.Path);
 
@@ -226,7 +264,11 @@ public sealed class CursorProviderTests
 
         // Now lock the file exclusively.
         await using var lockedStream = new FileStream(
-            database.Path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            database.Path,
+            FileMode.Open,
+            FileAccess.ReadWrite,
+            FileShare.None
+        );
 
         var strategy = Assert.Single(adapter.CreateLimitStrategies(account));
         FetchResult result = await strategy.FetchAsync(account, default);
@@ -235,13 +277,14 @@ public sealed class CursorProviderTests
         Assert.False(result.IsSuccess);
     }
 
-    private static AccountKey Account() =>
-        new(BuiltInProviderDescriptors.Cursor.Id, "auth0|user-123");
+    private static AccountKey Account() => new(BuiltInProviderDescriptors.Cursor.Id, "auth0|user-123");
 
     private static string Jwt(string subject, DateTimeOffset expiresAt)
     {
         string header = Base64Url("""{"alg":"none","typ":"JWT"}""");
-        string payload = Base64Url(JsonSerializer.Serialize(new { sub = subject, exp = expiresAt.ToUnixTimeSeconds() }));
+        string payload = Base64Url(
+            JsonSerializer.Serialize(new { sub = subject, exp = expiresAt.ToUnixTimeSeconds() })
+        );
         return $"{header}.{payload}.test-signature";
     }
 
@@ -257,7 +300,10 @@ public sealed class CursorProviderTests
     {
         public List<(string Path, string? Cookie)> Requests { get; } = [];
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken
+        )
         {
             Requests.Add((request.RequestUri!.PathAndQuery, request.Headers.GetValues("Cookie").Single()));
             string json = request.RequestUri.AbsolutePath switch
@@ -267,12 +313,14 @@ public sealed class CursorProviderTests
                     """,
                 "/api/auth/me" => """{"sub":"auth0|user-123","email":"user@example.com"}""",
                 "/api/usage" => "{}",
-                _ => "{}"
+                _ => "{}",
             };
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent(json, Encoding.UTF8, "application/json")
-            });
+            return Task.FromResult(
+                new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(json, Encoding.UTF8, "application/json"),
+                }
+            );
         }
     }
 
@@ -289,13 +337,19 @@ public sealed class CursorProviderTests
 
         public static TestDatabase Create(string key, object value)
         {
-            string directory = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ai-limits-cursor-" + Guid.NewGuid().ToString("N"));
+            string directory = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "ai-limits-cursor-" + Guid.NewGuid().ToString("N")
+            );
             Directory.CreateDirectory(directory);
             string path = System.IO.Path.Combine(directory, "state.vscdb");
-            using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path }.ToString());
+            using var connection = new SqliteConnection(
+                new SqliteConnectionStringBuilder { DataSource = path }.ToString()
+            );
             connection.Open();
             using var command = connection.CreateCommand();
-            command.CommandText = "CREATE TABLE ItemTable(key TEXT PRIMARY KEY, value BLOB); INSERT INTO ItemTable(key, value) VALUES($key, $value);";
+            command.CommandText =
+                "CREATE TABLE ItemTable(key TEXT PRIMARY KEY, value BLOB); INSERT INTO ItemTable(key, value) VALUES($key, $value);";
             command.Parameters.AddWithValue("$key", key);
             command.Parameters.AddWithValue("$value", value);
             command.ExecuteNonQuery();
@@ -304,7 +358,11 @@ public sealed class CursorProviderTests
 
         public void Dispose()
         {
-            try { Directory.Delete(directory, recursive: true); } catch { }
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+            catch { }
         }
     }
 }

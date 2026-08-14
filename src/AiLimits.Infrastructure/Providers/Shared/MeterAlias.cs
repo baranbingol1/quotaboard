@@ -3,4 +3,10 @@ using AiLimits.Domain;
 
 namespace AiLimits.Infrastructure.Providers.Shared;
 
-public sealed record MeterAlias(string Key, string DisplayName, MeterScope? Scope = null, MeterUnit? Unit = null, bool PercentIsAbsolute = false);
+public sealed record MeterAlias(
+    string Key,
+    string DisplayName,
+    MeterScope? Scope = null,
+    MeterUnit? Unit = null,
+    bool PercentIsAbsolute = false
+);

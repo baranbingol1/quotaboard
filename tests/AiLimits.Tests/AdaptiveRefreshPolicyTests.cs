@@ -18,12 +18,12 @@ public sealed class AdaptiveRefreshPolicyTests
     }
 
     [Theory]
-    [InlineData(5, 2)]      // exactly at the recent threshold stays recent
-    [InlineData(6, 5)]      // just past it goes warm
-    [InlineData(60, 5)]     // exactly one hour stays warm
-    [InlineData(61, 15)]    // just past one hour goes idle
-    [InlineData(239, 15)]   // just under four hours stays idle
-    [InlineData(240, 30)]   // four hours flips to long idle
+    [InlineData(5, 2)] // exactly at the recent threshold stays recent
+    [InlineData(6, 5)] // just past it goes warm
+    [InlineData(60, 5)] // exactly one hour stays warm
+    [InlineData(61, 15)] // just past one hour goes idle
+    [InlineData(239, 15)] // just under four hours stays idle
+    [InlineData(240, 30)] // four hours flips to long idle
     [InlineData(600, 30)]
     public void CadenceFollowsInteractionAge(int ageMinutes, int expectedDelayMinutes)
     {
@@ -82,14 +82,24 @@ public sealed class AdaptiveRefreshPolicyTests
     [InlineData(FetchFailureKind.Authorization, false)]
     [InlineData(FetchFailureKind.MalformedResponse, false)]
     [InlineData(FetchFailureKind.Unsupported, false)]
-    public void OnlySchedulerTransientFailureKindsEnterTheFastRetryLadder(
-        FetchFailureKind failureKind,
-        bool expected)
+    public void OnlySchedulerTransientFailureKindsEnterTheFastRetryLadder(FetchFailureKind failureKind, bool expected)
     {
-        var attempt = new FetchAttempt("attempt", new AccountKey(new ProviderId("fake"), "one"),
-            "strategy", Now, TimeSpan.Zero, failureKind, "message");
-        var publication = new RefreshPublication(RefreshPublicationStatus.FailedWithoutData,
-            null, [attempt], 1, "failed");
+        var attempt = new FetchAttempt(
+            "attempt",
+            new AccountKey(new ProviderId("fake"), "one"),
+            "strategy",
+            Now,
+            TimeSpan.Zero,
+            failureKind,
+            "message"
+        );
+        var publication = new RefreshPublication(
+            RefreshPublicationStatus.FailedWithoutData,
+            null,
+            [attempt],
+            1,
+            "failed"
+        );
 
         Assert.Equal(expected, AdaptiveRefreshPolicy.IsTransientFailure(publication));
     }

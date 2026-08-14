@@ -15,7 +15,9 @@ namespace AiLimits.Application.Preferences;
 /// </summary>
 public sealed class ProviderVisibilitySet
 {
-    public static readonly ProviderVisibilitySet Empty = new ProviderVisibilitySet(new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+    public static readonly ProviderVisibilitySet Empty = new ProviderVisibilitySet(
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    );
 
     private readonly HashSet<string> _hidden;
 
@@ -58,9 +60,11 @@ public sealed class ProviderVisibilitySet
         try
         {
             using JsonDocument document = JsonDocument.Parse(json);
-            if (document.RootElement.ValueKind != JsonValueKind.Object
+            if (
+                document.RootElement.ValueKind != JsonValueKind.Object
                 || !document.RootElement.TryGetProperty("hidden", out JsonElement hiddenElement)
-                || hiddenElement.ValueKind != JsonValueKind.Array)
+                || hiddenElement.ValueKind != JsonValueKind.Array
+            )
             {
                 return Empty;
             }
@@ -82,9 +86,11 @@ public sealed class ProviderVisibilitySet
 
     public string Serialize()
     {
-        return JsonSerializer.Serialize(new Dictionary<string, string[]>
-        {
-            ["hidden"] = _hidden.OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToArray()
-        });
+        return JsonSerializer.Serialize(
+            new Dictionary<string, string[]>
+            {
+                ["hidden"] = _hidden.OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToArray(),
+            }
+        );
     }
 }

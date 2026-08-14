@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-using AiLimits.Application.Abstractions;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using AiLimits.Application.Abstractions;
 
 namespace AiLimits.Platform.Windows.Security;
 
@@ -56,7 +56,10 @@ public sealed class WindowsCredentialSecretStore : ISecretStore
         string targetName = Target(scope, key);
         if (Encoding.Unicode.GetByteCount(secret) > MaxSecretBytes)
         {
-            throw new ArgumentOutOfRangeException(nameof(secret), "Credential Manager secrets are limited to 2560 UTF-16 characters.");
+            throw new ArgumentOutOfRangeException(
+                nameof(secret),
+                "Credential Manager secrets are limited to 2560 UTF-16 characters."
+            );
         }
         byte[] bytes = Encoding.Unicode.GetBytes(secret);
         nint num = Marshal.AllocCoTaskMem(bytes.Length);
@@ -71,7 +74,7 @@ public sealed class WindowsCredentialSecretStore : ISecretStore
                 CredentialBlob = num,
                 Persist = CredPersistLocalMachine,
                 UserName = Environment.UserName,
-                Comment = "QuotaBoard provider credential"
+                Comment = "QuotaBoard provider credential",
             };
             if (!CredWrite(ref userCredential, 0))
             {
@@ -108,7 +111,11 @@ public sealed class WindowsCredentialSecretStore : ISecretStore
         try
         {
             NativeCredential nativeCredential = Marshal.PtrToStructure<NativeCredential>(credentialPtr);
-            return Task.FromResult((nativeCredential.CredentialBlobSize == 0) ? string.Empty : Marshal.PtrToStringUni(nativeCredential.CredentialBlob, nativeCredential.CredentialBlobSize / 2));
+            return Task.FromResult(
+                (nativeCredential.CredentialBlobSize == 0)
+                    ? string.Empty
+                    : Marshal.PtrToStringUni(nativeCredential.CredentialBlob, nativeCredential.CredentialBlobSize / 2)
+            );
         }
         finally
         {

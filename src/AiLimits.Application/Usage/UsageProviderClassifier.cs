@@ -24,8 +24,10 @@ public static class UsageProviderClassifier
         // harness that authorized the request — the only thing actually
         // observed — instead of asserting an OAuth flow we never detected.
         // OpenCode is the one source that does detect it, below.
-        if (source == "codex" && provider == "codex") return "OpenAI (Codex)";
-        if (source == "claude" && provider == "claude") return "Anthropic (Claude Code)";
+        if (source == "codex" && provider == "codex")
+            return "OpenAI (Codex)";
+        if (source == "claude" && provider == "claude")
+            return "Anthropic (Claude Code)";
 
         return provider switch
         {
@@ -48,7 +50,7 @@ public static class UsageProviderClassifier
             "azure" or "azure-openai" => "Azure OpenAI",
             "cline-pass" or "clinepass" => "ClinePass",
             "cline" => "Cline",
-            _ => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(provider.Replace('-', ' '))
+            _ => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(provider.Replace('-', ' ')),
         };
     }
 

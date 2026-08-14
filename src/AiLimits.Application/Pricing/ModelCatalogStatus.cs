@@ -15,7 +15,8 @@ public sealed record ModelCatalogStatus(
     DateTimeOffset? FetchedAt,
     DateTimeOffset? NextDue,
     DateTimeOffset? LastAttemptAt,
-    string? LastError)
+    string? LastError
+)
 {
     public static ModelCatalogStatus Unavailable(string? lastError, DateTimeOffset? lastAttemptAt) =>
         new(false, 0, string.Empty, null, null, lastAttemptAt, lastError);

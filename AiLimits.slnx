@@ -9,5 +9,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/AiLimits.Tests/AiLimits.Tests.csproj" />
+    <Project Path="tests/AiLimits.IntegrationTests/AiLimits.IntegrationTests.csproj" />
   </Folder>
 </Solution>

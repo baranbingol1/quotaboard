@@ -13,11 +13,15 @@ public static class PlanCostPreference
 {
     private static readonly string PreferencePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard", "plan-costs.json");
+        "QuotaBoard",
+        "plan-costs.json"
+    );
 
     private static readonly string LegacySingleValuePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard", "plan-cost.preference");
+        "QuotaBoard",
+        "plan-cost.preference"
+    );
 
     public static IReadOnlyDictionary<string, decimal> LoadAll()
     {
@@ -30,9 +34,7 @@ public static class PlanCostPreference
                 File.Delete(LegacySingleValuePath);
             }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         try
         {
             if (!File.Exists(PreferencePath))
@@ -42,7 +44,8 @@ public static class PlanCostPreference
             var parsed = JsonSerializer.Deserialize<Dictionary<string, decimal>>(File.ReadAllText(PreferencePath));
             return new Dictionary<string, decimal>(
                 (parsed ?? []).Where(pair => pair.Value > 0m),
-                StringComparer.OrdinalIgnoreCase);
+                StringComparer.OrdinalIgnoreCase
+            );
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -69,8 +72,6 @@ public static class PlanCostPreference
             }
             PreferenceFile.WriteAtomic(PreferencePath, JsonSerializer.Serialize(costs));
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 }

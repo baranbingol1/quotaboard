@@ -55,12 +55,17 @@ public static partial class DiagnosticRedactor
     /// </summary>
     private static bool LooksLikeSecret(string candidate)
     {
-        bool digit = false, upper = false, lower = false;
+        bool digit = false,
+            upper = false,
+            lower = false;
         foreach (char c in candidate)
         {
-            if (char.IsAsciiDigit(c)) digit = true;
-            else if (char.IsAsciiLetterUpper(c)) upper = true;
-            else if (char.IsAsciiLetterLower(c)) lower = true;
+            if (char.IsAsciiDigit(c))
+                digit = true;
+            else if (char.IsAsciiLetterUpper(c))
+                upper = true;
+            else if (char.IsAsciiLetterLower(c))
+                lower = true;
         }
         // Mixed case plus digits is the signature of a generated credential.
         // A 40+ character run is treated as one even without mixed case, which
@@ -77,13 +82,15 @@ public static partial class DiagnosticRedactor
     /// </summary>
     [GeneratedRegex(
         """(?<lead>"?[A-Za-z0-9_.\-]*(?:token|secret|password|passwd|pwd|api[_\-]?key|apikey|auth|credential|cookie|session|signature|sig)[A-Za-z0-9_.\-]*"?\s*[:=]\s*"?)(?<value>(?!(?:Bearer|Basic|Digest|Token|ApiKey|SSWS|OAuth)\b)[^\s"',;&}\]]+)""",
-        RegexOptions.IgnoreCase)]
+        RegexOptions.IgnoreCase
+    )]
     private static partial Regex KeyedSecret();
 
     /// <summary>An HTTP authorization scheme and the credential after it.</summary>
     [GeneratedRegex(
         @"(?<scheme>\b(?:Bearer|Basic|Digest|Token|ApiKey|SSWS|OAuth))\s+(?<value>[^\s"",;&}\]]+)",
-        RegexOptions.IgnoreCase)]
+        RegexOptions.IgnoreCase
+    )]
     private static partial Regex SchemeSecret();
 
     /// <summary>A three-segment base64url JWT, wherever it appears.</summary>

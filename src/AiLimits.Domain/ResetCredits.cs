@@ -7,7 +7,7 @@ public enum ResetCreditStatus
     Available,
     Redeeming,
     Redeemed,
-    Expired
+    Expired,
 }
 
 /// <summary>
@@ -22,7 +22,8 @@ public sealed record ResetCredit(
     DateTimeOffset? GrantedAt,
     DateTimeOffset? ExpiresAt,
     string? Title,
-    string? Description);
+    string? Description
+);
 
 public sealed record ResetCreditInventory(IReadOnlyList<ResetCredit> Credits, DateTimeOffset ObservedAt)
 {
@@ -31,7 +32,11 @@ public sealed record ResetCreditInventory(IReadOnlyList<ResetCredit> Credits, Da
     public IReadOnlyList<ResetCredit> Available(DateTimeOffset now)
     {
         return Credits
-            .Where((ResetCredit credit) => credit.Status == ResetCreditStatus.Available && (!credit.ExpiresAt.HasValue || credit.ExpiresAt.Value > now))
+            .Where(
+                (ResetCredit credit) =>
+                    credit.Status == ResetCreditStatus.Available
+                    && (!credit.ExpiresAt.HasValue || credit.ExpiresAt.Value > now)
+            )
             .OrderBy((ResetCredit credit) => credit.ExpiresAt ?? DateTimeOffset.MaxValue)
             .ThenBy((ResetCredit credit) => credit.Id, StringComparer.Ordinal)
             .ToArray();

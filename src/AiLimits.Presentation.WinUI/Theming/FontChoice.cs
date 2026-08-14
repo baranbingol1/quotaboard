@@ -25,7 +25,8 @@ public sealed record FontChoice(string Id, string DisplayName, IReadOnlyList<str
 /// </summary>
 public static class FontCatalog
 {
-    public const string BundledSansSource = "ms-appx:///Assets/Fonts/FamiljenGrotesk-VariableFont_wght.ttf#Familjen Grotesk";
+    public const string BundledSansSource =
+        "ms-appx:///Assets/Fonts/FamiljenGrotesk-VariableFont_wght.ttf#Familjen Grotesk";
     public const string BundledMonoSource = "ms-appx:///Assets/Fonts/AzeretMono-VariableFont_wght.ttf#Azeret Mono";
 
     /// <summary>Used when neither the user nor the theme names a font.</summary>
@@ -93,7 +94,8 @@ public static class FontCatalog
         IReadOnlyList<FontChoice> choices,
         string? selectedId,
         string? themeFontId,
-        string defaultId)
+        string defaultId
+    )
     {
         foreach (string? id in new[] { selectedId, themeFontId, defaultId })
         {

@@ -16,7 +16,8 @@ public sealed class ClaudeProviderAdapterTests
         {
             await File.WriteAllTextAsync(
                 Path.Combine(home, ".credentials.json"),
-                """{"claudeAiOauth":{"accessToken":"opaque-test-token"}}""");
+                """{"claudeAiOauth":{"accessToken":"opaque-test-token"}}"""
+            );
             var runner = new FakeRunner("""{"loggedIn":true,"email":"dev@example.com","orgName":"Acme"}""");
             var adapter = new ClaudeProviderAdapter(new HttpClient(), new FixedClock(), home, runner, "claude-test");
 
@@ -45,7 +46,8 @@ public sealed class ClaudeProviderAdapterTests
             string executable,
             IReadOnlyList<string> arguments,
             TimeSpan timeout,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken
+        )
         {
             Arguments = arguments;
             return Task.FromResult(new ProcessResult(0, output, string.Empty, TimeSpan.Zero));

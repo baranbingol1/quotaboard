@@ -5,14 +5,14 @@ public enum UsageTimeGrain
 {
     Day,
     Week,
-    Month
+    Month,
 }
 
 public enum UsageChartSeriesDimension
 {
     Provider,
     Harness,
-    Model
+    Model,
 }
 
 public enum UsageBreakdownDimension
@@ -20,7 +20,7 @@ public enum UsageBreakdownDimension
     Provider,
     Harness,
     Project,
-    Model
+    Model,
 }
 
 public sealed record UsageAnalyticsRecord(
@@ -39,7 +39,8 @@ public sealed record UsageAnalyticsRecord(
     long CacheReadTokens,
     long CacheWriteTokens,
     long ReasoningTokens,
-    decimal? ApiEquivalentCostUsd);
+    decimal? ApiEquivalentCostUsd
+);
 
 public sealed record UsageAnalyticsQuery(
     DateOnly From,
@@ -51,7 +52,8 @@ public sealed record UsageAnalyticsQuery(
     IReadOnlyCollection<string>? Projects = null,
     IReadOnlyCollection<string>? Models = null,
     bool ComparePreviousPeriod = true,
-    UsageChartSeriesDimension ChartSeries = UsageChartSeriesDimension.Provider);
+    UsageChartSeriesDimension ChartSeries = UsageChartSeriesDimension.Provider
+);
 
 public sealed record UsageFacetOption(string Key, string Label, long Tokens);
 
@@ -59,7 +61,8 @@ public sealed record UsageFacetSet(
     IReadOnlyList<UsageFacetOption> Providers,
     IReadOnlyList<UsageFacetOption> Harnesses,
     IReadOnlyList<UsageFacetOption> Projects,
-    IReadOnlyList<UsageFacetOption> Models);
+    IReadOnlyList<UsageFacetOption> Models
+);
 
 public sealed record UsageChartSegment(string Key, string Label, long Tokens, bool IsOthers);
 
@@ -68,13 +71,15 @@ public sealed record UsageChartLegendItem(
     string Label,
     long Tokens,
     bool IsOthers,
-    int PooledSeriesCount = 0);
+    int PooledSeriesCount = 0
+);
 
 public sealed record UsageChartBucket(
     DateOnly From,
     DateOnly Through,
     long Tokens,
-    IReadOnlyList<UsageChartSegment> Segments);
+    IReadOnlyList<UsageChartSegment> Segments
+);
 
 public sealed record UsageBreakdownItem(
     string Key,
@@ -86,13 +91,10 @@ public sealed record UsageBreakdownItem(
     long CacheWriteTokens,
     long ReasoningTokens,
     decimal? ApiEquivalentCostUsd,
-    double SharePercent);
+    double SharePercent
+);
 
-public sealed record UsageComparison(
-    long CurrentTokens,
-    long PreviousTokens,
-    double? PercentChange,
-    bool IsNew);
+public sealed record UsageComparison(long CurrentTokens, long PreviousTokens, double? PercentChange, bool IsNew);
 
 /// <summary>
 /// What the matching rows are actually made of. Distinct from
@@ -100,12 +102,7 @@ public sealed record UsageComparison(
 /// filter so a selection can be widened — those are "what you could pick",
 /// these are "what you picked".
 /// </summary>
-public sealed record UsageComposition(
-    int Providers,
-    int Harnesses,
-    int Projects,
-    int Models,
-    int ActiveBuckets);
+public sealed record UsageComposition(int Providers, int Harnesses, int Projects, int Models, int ActiveBuckets);
 
 /// <summary>
 /// One model's usage across the window, with a per-bucket series aligned
@@ -125,7 +122,8 @@ public sealed record UsageModelTrend(
     long PeakBucketTokens,
     int ActiveBuckets,
     DateOnly? FirstUsed,
-    DateOnly? LastUsed);
+    DateOnly? LastUsed
+);
 
 public sealed record UsageAnalyticsResult(
     DateOnly From,
@@ -140,7 +138,8 @@ public sealed record UsageAnalyticsResult(
     IReadOnlyList<UsageChartLegendItem> ChartLegend,
     IReadOnlyList<UsageBreakdownItem> Breakdown,
     IReadOnlyList<UsageModelTrend> ModelTrends,
-    UsageComposition Composition);
+    UsageComposition Composition
+);
 
 /// <summary>
 /// Pure, deterministic query engine for the local usage ledger. Empty filter
@@ -149,9 +148,7 @@ public sealed record UsageAnalyticsResult(
 /// </summary>
 public static class UsageAnalyticsQueryEngine
 {
-    public static UsageAnalyticsResult Run(
-        IReadOnlyList<UsageAnalyticsRecord> records,
-        UsageAnalyticsQuery query)
+    public static UsageAnalyticsResult Run(IReadOnlyList<UsageAnalyticsRecord> records, UsageAnalyticsQuery query)
     {
         ArgumentNullException.ThrowIfNull(records);
         ArgumentNullException.ThrowIfNull(query);
@@ -175,7 +172,8 @@ public static class UsageAnalyticsQueryEngine
             through,
             normalized.TimeGrain,
             normalized.ChartSeries,
-            HasExplicitChartSeries(normalized));
+            HasExplicitChartSeries(normalized)
+        );
 
         return new UsageAnalyticsResult(
             from,
@@ -190,22 +188,23 @@ public static class UsageAnalyticsQueryEngine
             chart.Legend,
             BuildBreakdown(current, normalized.Breakdown),
             BuildModelTrends(current, chart.Buckets, normalized.TimeGrain),
-            BuildComposition(current, chart.Buckets));
+            BuildComposition(current, chart.Buckets)
+        );
     }
 
     private static UsageComposition BuildComposition(
         IReadOnlyList<UsageAnalyticsRecord> records,
-        IReadOnlyList<UsageChartBucket> buckets) =>
+        IReadOnlyList<UsageChartBucket> buckets
+    ) =>
         new(
             Distinct(records, record => record.ProviderKey),
             Distinct(records, record => record.HarnessKey),
             Distinct(records, record => record.ProjectKey),
             Distinct(records, record => record.ModelKey),
-            buckets.Count(bucket => bucket.Tokens > 0));
+            buckets.Count(bucket => bucket.Tokens > 0)
+        );
 
-    private static int Distinct(
-        IEnumerable<UsageAnalyticsRecord> records,
-        Func<UsageAnalyticsRecord, string> key) =>
+    private static int Distinct(IEnumerable<UsageAnalyticsRecord> records, Func<UsageAnalyticsRecord, string> key) =>
         records.Select(key).Distinct(StringComparer.OrdinalIgnoreCase).Count();
 
     /// <summary>
@@ -216,7 +215,8 @@ public static class UsageAnalyticsQueryEngine
     private static IReadOnlyList<UsageModelTrend> BuildModelTrends(
         IReadOnlyList<UsageAnalyticsRecord> records,
         IReadOnlyList<UsageChartBucket> buckets,
-        UsageTimeGrain grain)
+        UsageTimeGrain grain
+    )
     {
         long total = Math.Max(1, records.Sum(record => record.Tokens));
         // Bucket lookup by start day, so a record maps to its column in O(1).
@@ -250,7 +250,8 @@ public static class UsageAnalyticsQueryEngine
                     series.Length == 0 ? 0 : series.Max(),
                     series.Count(value => value > 0),
                     values.Min(record => record.Day),
-                    values.Max(record => record.Day));
+                    values.Max(record => record.Day)
+                );
             })
             .Where(trend => trend.Tokens > 0)
             .OrderByDescending(trend => trend.Tokens)
@@ -265,18 +266,21 @@ public static class UsageAnalyticsQueryEngine
     /// </summary>
     private static string DominantLabel(
         IReadOnlyList<UsageAnalyticsRecord> records,
-        UsageBreakdownDimension dimension) =>
+        UsageBreakdownDimension dimension
+    ) =>
         records
             .GroupBy(record => Label(record, dimension))
             .OrderByDescending(group => group.Sum(record => record.Tokens))
             .ThenBy(group => group.Key, StringComparer.Ordinal)
             .Select(group => group.Key)
-            .FirstOrDefault() ?? string.Empty;
+            .FirstOrDefault()
+        ?? string.Empty;
 
     private static UsageComparison BuildComparison(
         IReadOnlyList<UsageAnalyticsRecord> records,
         UsageAnalyticsQuery query,
-        IReadOnlyList<UsageAnalyticsRecord> current)
+        IReadOnlyList<UsageAnalyticsRecord> current
+    )
     {
         int days = query.Through.DayNumber - query.From.DayNumber + 1;
         DateOnly previousThrough = query.From.AddDays(-1);
@@ -287,25 +291,28 @@ public static class UsageAnalyticsQueryEngine
             .Where(record => MatchesFilters(record, query, null))
             .Sum(record => record.Tokens);
         bool isNew = previousTokens == 0 && currentTokens > 0;
-        double? change = previousTokens == 0
-            ? currentTokens == 0 ? 0 : null
-            : 100.0 * (currentTokens - previousTokens) / previousTokens;
+        double? change =
+            previousTokens == 0
+                ? currentTokens == 0
+                    ? 0
+                    : null
+                : 100.0 * (currentTokens - previousTokens) / previousTokens;
         return new UsageComparison(currentTokens, previousTokens, change, isNew);
     }
 
-    private static UsageFacetSet BuildFacets(
-        IReadOnlyList<UsageAnalyticsRecord> records,
-        UsageAnalyticsQuery query) =>
+    private static UsageFacetSet BuildFacets(IReadOnlyList<UsageAnalyticsRecord> records, UsageAnalyticsQuery query) =>
         new(
             BuildFacet(records, query, UsageBreakdownDimension.Provider),
             BuildFacet(records, query, UsageBreakdownDimension.Harness),
             BuildFacet(records, query, UsageBreakdownDimension.Project),
-            BuildFacet(records, query, UsageBreakdownDimension.Model));
+            BuildFacet(records, query, UsageBreakdownDimension.Model)
+        );
 
     private static IReadOnlyList<UsageFacetOption> BuildFacet(
         IReadOnlyList<UsageAnalyticsRecord> records,
         UsageAnalyticsQuery query,
-        UsageBreakdownDimension dimension) =>
+        UsageBreakdownDimension dimension
+    ) =>
         records
             .Where(record => record.Day >= query.From && record.Day <= query.Through)
             .Where(record => MatchesFilters(record, query, dimension))
@@ -316,7 +323,8 @@ public static class UsageAnalyticsQueryEngine
             .Select(group => new UsageFacetOption(
                 group.Key,
                 DominantLabel(group.ToArray(), dimension),
-                group.Sum(record => record.Tokens)))
+                group.Sum(record => record.Tokens)
+            ))
             .Where(option => option.Tokens > 0)
             .OrderByDescending(option => option.Tokens)
             .ThenBy(option => option.Label, StringComparer.CurrentCultureIgnoreCase)
@@ -328,7 +336,8 @@ public static class UsageAnalyticsQueryEngine
         DateOnly through,
         UsageTimeGrain grain,
         UsageChartSeriesDimension dimension,
-        bool explicitSelection)
+        bool explicitSelection
+    )
     {
         // Segments below resolve by key, so the totals must be keyed the same
         // way: two totals sharing a key would each claim the key's whole sum
@@ -338,7 +347,8 @@ public static class UsageAnalyticsQueryEngine
             .Select(group => new SeriesTotal(
                 group.Key,
                 DominantLabel(group.ToArray(), SeriesBreakdown(dimension)),
-                group.Sum(record => record.Tokens)))
+                group.Sum(record => record.Tokens)
+            ))
             .Where(item => item.Tokens > 0)
             .OrderByDescending(item => item.Tokens)
             .ThenBy(item => item.Label, StringComparer.CurrentCultureIgnoreCase)
@@ -348,19 +358,20 @@ public static class UsageAnalyticsQueryEngine
         var legend = primary
             .Select(item => new UsageChartLegendItem(item.Key, item.Label, item.Tokens, false))
             .ToList();
-        HashSet<string> primaryKeys = primary
-            .Select(item => item.Key)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> primaryKeys = primary.Select(item => item.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
         SeriesTotal[] pooled = totals.Where(item => !primaryKeys.Contains(item.Key)).ToArray();
         long othersTokens = pooled.Sum(item => item.Tokens);
         if (othersTokens > 0)
         {
-            legend.Add(new UsageChartLegendItem(
-                "__others__",
-                "Others",
-                othersTokens,
-                true,
-                explicitSelection ? pooled.Length : 0));
+            legend.Add(
+                new UsageChartLegendItem(
+                    "__others__",
+                    "Others",
+                    othersTokens,
+                    true,
+                    explicitSelection ? pooled.Length : 0
+                )
+            );
         }
 
         Dictionary<DateOnly, UsageAnalyticsRecord[]> recordsByBucket = records
@@ -382,44 +393,47 @@ public static class UsageAnalyticsQueryEngine
                             .Where(record => !primaryKeys.Contains(SeriesKey(record, dimension)))
                             .Sum(record => record.Tokens)
                         : bucketRecords
-                            .Where(record => string.Equals(
-                                SeriesKey(record, dimension),
-                                item.Key,
-                                StringComparison.OrdinalIgnoreCase))
+                            .Where(record =>
+                                string.Equals(
+                                    SeriesKey(record, dimension),
+                                    item.Key,
+                                    StringComparison.OrdinalIgnoreCase
+                                )
+                            )
                             .Sum(record => record.Tokens),
-                    item.IsOthers))
+                    item.IsOthers
+                ))
                 .ToArray();
-            buckets.Add(new UsageChartBucket(
-                visibleFrom,
-                visibleThrough,
-                segments.Sum(segment => segment.Tokens),
-                segments));
+            buckets.Add(
+                new UsageChartBucket(visibleFrom, visibleThrough, segments.Sum(segment => segment.Tokens), segments)
+            );
         }
         return new UsageChartProjection(buckets, legend);
     }
 
-    private static bool HasExplicitChartSeries(UsageAnalyticsQuery query) => query.ChartSeries switch
-    {
-        UsageChartSeriesDimension.Provider => query.Providers is { Count: > 0 },
-        UsageChartSeriesDimension.Harness => query.Harnesses is { Count: > 0 },
-        _ => query.Models is { Count: > 0 }
-    };
+    private static bool HasExplicitChartSeries(UsageAnalyticsQuery query) =>
+        query.ChartSeries switch
+        {
+            UsageChartSeriesDimension.Provider => query.Providers is { Count: > 0 },
+            UsageChartSeriesDimension.Harness => query.Harnesses is { Count: > 0 },
+            _ => query.Models is { Count: > 0 },
+        };
 
-    private static UsageBreakdownDimension SeriesBreakdown(UsageChartSeriesDimension dimension) => dimension switch
-    {
-        UsageChartSeriesDimension.Provider => UsageBreakdownDimension.Provider,
-        UsageChartSeriesDimension.Harness => UsageBreakdownDimension.Harness,
-        _ => UsageBreakdownDimension.Model
-    };
+    private static UsageBreakdownDimension SeriesBreakdown(UsageChartSeriesDimension dimension) =>
+        dimension switch
+        {
+            UsageChartSeriesDimension.Provider => UsageBreakdownDimension.Provider,
+            UsageChartSeriesDimension.Harness => UsageBreakdownDimension.Harness,
+            _ => UsageBreakdownDimension.Model,
+        };
 
-    private static string SeriesKey(
-        UsageAnalyticsRecord record,
-        UsageChartSeriesDimension dimension) =>
+    private static string SeriesKey(UsageAnalyticsRecord record, UsageChartSeriesDimension dimension) =>
         Key(record, SeriesBreakdown(dimension));
 
     private static IReadOnlyList<UsageBreakdownItem> BuildBreakdown(
         IReadOnlyList<UsageAnalyticsRecord> records,
-        UsageBreakdownDimension dimension)
+        UsageBreakdownDimension dimension
+    )
     {
         long total = Math.Max(1, records.Sum(record => record.Tokens));
         return records
@@ -438,7 +452,8 @@ public static class UsageAnalyticsQueryEngine
                     values.Sum(record => record.CacheWriteTokens),
                     values.Sum(record => record.ReasoningTokens),
                     SumCost(values),
-                    100.0 * tokens / total);
+                    100.0 * tokens / total
+                );
             })
             .Where(item => item.Tokens > 0)
             .OrderByDescending(item => item.Tokens)
@@ -449,7 +464,8 @@ public static class UsageAnalyticsQueryEngine
     private static bool MatchesFilters(
         UsageAnalyticsRecord record,
         UsageAnalyticsQuery query,
-        UsageBreakdownDimension? ignored) =>
+        UsageBreakdownDimension? ignored
+    ) =>
         (ignored == UsageBreakdownDimension.Provider || Contains(query.Providers, record.ProviderKey))
         && (ignored == UsageBreakdownDimension.Harness || Contains(query.Harnesses, record.HarnessKey))
         && (ignored == UsageBreakdownDimension.Project || Contains(query.Projects, record.ProjectKey))
@@ -458,55 +474,59 @@ public static class UsageAnalyticsQueryEngine
     private static bool Contains(IReadOnlyCollection<string>? selected, string value) =>
         selected is null || selected.Count == 0 || selected.Contains(value, StringComparer.OrdinalIgnoreCase);
 
-    private static string Key(UsageAnalyticsRecord record, UsageBreakdownDimension dimension) => dimension switch
-    {
-        UsageBreakdownDimension.Provider => record.ProviderKey,
-        UsageBreakdownDimension.Harness => record.HarnessKey,
-        UsageBreakdownDimension.Project => record.ProjectKey,
-        _ => record.ModelKey
-    };
+    private static string Key(UsageAnalyticsRecord record, UsageBreakdownDimension dimension) =>
+        dimension switch
+        {
+            UsageBreakdownDimension.Provider => record.ProviderKey,
+            UsageBreakdownDimension.Harness => record.HarnessKey,
+            UsageBreakdownDimension.Project => record.ProjectKey,
+            _ => record.ModelKey,
+        };
 
-    private static string Label(UsageAnalyticsRecord record, UsageBreakdownDimension dimension) => dimension switch
-    {
-        UsageBreakdownDimension.Provider => record.ProviderLabel,
-        UsageBreakdownDimension.Harness => record.HarnessLabel,
-        UsageBreakdownDimension.Project => record.ProjectLabel,
-        _ => record.ModelLabel
-    };
+    private static string Label(UsageAnalyticsRecord record, UsageBreakdownDimension dimension) =>
+        dimension switch
+        {
+            UsageBreakdownDimension.Provider => record.ProviderLabel,
+            UsageBreakdownDimension.Harness => record.HarnessLabel,
+            UsageBreakdownDimension.Project => record.ProjectLabel,
+            _ => record.ModelLabel,
+        };
 
-    private static DateOnly BucketStart(DateOnly day, UsageTimeGrain grain) => grain switch
-    {
-        UsageTimeGrain.Week => day.AddDays(-(((int)day.DayOfWeek + 6) % 7)),
-        UsageTimeGrain.Month => new DateOnly(day.Year, day.Month, 1),
-        _ => day
-    };
+    private static DateOnly BucketStart(DateOnly day, UsageTimeGrain grain) =>
+        grain switch
+        {
+            UsageTimeGrain.Week => day.AddDays(-(((int)day.DayOfWeek + 6) % 7)),
+            UsageTimeGrain.Month => new DateOnly(day.Year, day.Month, 1),
+            _ => day,
+        };
 
-    private static DateOnly NextBucket(DateOnly day, UsageTimeGrain grain) => grain switch
-    {
-        UsageTimeGrain.Week => day.AddDays(7),
-        UsageTimeGrain.Month => day.AddMonths(1),
-        _ => day.AddDays(1)
-    };
+    private static DateOnly NextBucket(DateOnly day, UsageTimeGrain grain) =>
+        grain switch
+        {
+            UsageTimeGrain.Week => day.AddDays(7),
+            UsageTimeGrain.Month => day.AddMonths(1),
+            _ => day.AddDays(1),
+        };
 
     private sealed record SeriesTotal(string Key, string Label, long Tokens);
 
     private sealed record UsageChartProjection(
         IReadOnlyList<UsageChartBucket> Buckets,
-        IReadOnlyList<UsageChartLegendItem> Legend);
+        IReadOnlyList<UsageChartLegendItem> Legend
+    );
 
     private static decimal? SumCost(IEnumerable<UsageAnalyticsRecord> records)
     {
         UsageAnalyticsRecord[] values = records.ToArray();
         return values.Any(record => record.ApiEquivalentCostUsd.HasValue)
-            ? values.Where(record => record.ApiEquivalentCostUsd.HasValue).Sum(record => record.ApiEquivalentCostUsd.GetValueOrDefault())
+            ? values
+                .Where(record => record.ApiEquivalentCostUsd.HasValue)
+                .Sum(record => record.ApiEquivalentCostUsd.GetValueOrDefault())
             : null;
     }
 }
 
-public sealed record UsageChartGeometry(
-    double ItemWidth,
-    double BarWidth,
-    double ConsumedWidth);
+public sealed record UsageChartGeometry(double ItemWidth, double BarWidth, double ConsumedWidth);
 
 /// <summary>
 /// Shared chart sizing policy: every bucket receives an equal slice of the
@@ -549,10 +569,7 @@ public static class UsageChartLayout
         return labelled;
     }
 
-    public static UsageChartGeometry Calculate(
-        double availableWidth,
-        int itemCount,
-        double gap = 3)
+    public static UsageChartGeometry Calculate(double availableWidth, int itemCount, double gap = 3)
     {
         if (itemCount <= 0 || !double.IsFinite(availableWidth) || availableWidth <= 0)
         {

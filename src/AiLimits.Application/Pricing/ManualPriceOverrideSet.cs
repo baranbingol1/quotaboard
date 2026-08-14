@@ -11,7 +11,8 @@ public sealed record ManualModelPrice(
     decimal InputPerMillion,
     decimal OutputPerMillion,
     decimal? CacheReadPerMillion = null,
-    decimal? CacheWritePerMillion = null)
+    decimal? CacheWritePerMillion = null
+)
 {
     /// <summary>
     /// Prices the four token lanes. A missing cache-write rate falls back to
@@ -20,7 +21,13 @@ public sealed record ManualModelPrice(
     /// zero because the read discount cannot be guessed. Reasoning tokens fold
     /// into the output lane, matching <see cref="PricingEngine"/>.
     /// </summary>
-    public decimal QuoteUsd(long inputTokens, long outputTokens, long cacheReadTokens, long cacheWriteTokens, long reasoningTokens = 0)
+    public decimal QuoteUsd(
+        long inputTokens,
+        long outputTokens,
+        long cacheReadTokens,
+        long cacheWriteTokens,
+        long reasoningTokens = 0
+    )
     {
         const decimal PerMillion = 1000000m;
         return inputTokens * InputPerMillion / PerMillion
@@ -37,7 +44,9 @@ public sealed record ManualModelPrice(
 /// </summary>
 public sealed class ManualPriceOverrideSet
 {
-    public static readonly ManualPriceOverrideSet Empty = new ManualPriceOverrideSet(new Dictionary<(string, string), ManualModelPrice>());
+    public static readonly ManualPriceOverrideSet Empty = new ManualPriceOverrideSet(
+        new Dictionary<(string, string), ManualModelPrice>()
+    );
 
     private readonly Dictionary<(string Service, string Model), ManualModelPrice> _prices;
 
@@ -65,8 +74,12 @@ public sealed class ManualPriceOverrideSet
             return this;
         }
         var prices = new Dictionary<(string, string), ManualModelPrice>(_prices);
-        if (price is null || price.InputPerMillion < 0m || price.OutputPerMillion < 0m
-            || (price.InputPerMillion == 0m && price.OutputPerMillion == 0m))
+        if (
+            price is null
+            || price.InputPerMillion < 0m
+            || price.OutputPerMillion < 0m
+            || (price.InputPerMillion == 0m && price.OutputPerMillion == 0m)
+        )
         {
             prices.Remove(Key(serviceId, rawModelId));
         }
@@ -100,7 +113,11 @@ public sealed class ManualPriceOverrideSet
                 foreach (JsonProperty model in service.Value.EnumerateObject())
                 {
                     ManualModelPrice? price = ReadPrice(model.Value);
-                    if (price is not null && !string.IsNullOrWhiteSpace(service.Name) && !string.IsNullOrWhiteSpace(model.Name))
+                    if (
+                        price is not null
+                        && !string.IsNullOrWhiteSpace(service.Name)
+                        && !string.IsNullOrWhiteSpace(model.Name)
+                    )
                     {
                         prices[Key(service.Name, model.Name)] = price;
                     }
@@ -116,7 +133,9 @@ public sealed class ManualPriceOverrideSet
 
     public string Serialize()
     {
-        var document = new SortedDictionary<string, SortedDictionary<string, Dictionary<string, decimal>>>(StringComparer.OrdinalIgnoreCase);
+        var document = new SortedDictionary<string, SortedDictionary<string, Dictionary<string, decimal>>>(
+            StringComparer.OrdinalIgnoreCase
+        );
         foreach (var ((service, model), price) in _prices)
         {
             if (!document.TryGetValue(service, out var models))
@@ -127,7 +146,7 @@ public sealed class ManualPriceOverrideSet
             var lanes = new Dictionary<string, decimal>
             {
                 ["inputPer1M"] = price.InputPerMillion,
-                ["outputPer1M"] = price.OutputPerMillion
+                ["outputPer1M"] = price.OutputPerMillion,
             };
             if (price.CacheReadPerMillion is decimal cacheRead)
             {
@@ -154,12 +173,18 @@ public sealed class ManualPriceOverrideSet
         {
             return null;
         }
-        return new ManualModelPrice(input, output, ReadRate(element, "cacheReadPer1M"), ReadRate(element, "cacheWritePer1M"));
+        return new ManualModelPrice(
+            input,
+            output,
+            ReadRate(element, "cacheReadPer1M"),
+            ReadRate(element, "cacheWritePer1M")
+        );
     }
 
     private static decimal? ReadRate(JsonElement element, string property)
     {
-        return element.TryGetProperty(property, out JsonElement value)
+        return
+            element.TryGetProperty(property, out JsonElement value)
             && value.ValueKind == JsonValueKind.Number
             && value.TryGetDecimal(out decimal rate)
             && rate >= 0m

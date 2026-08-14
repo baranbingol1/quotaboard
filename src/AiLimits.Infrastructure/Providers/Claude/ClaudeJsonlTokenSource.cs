@@ -18,13 +18,18 @@ public sealed class ClaudeJsonlTokenSource(string claudeHome) : ITokenUsageSourc
     public async IAsyncEnumerable<TokenUsageEvent> ReadAsync(
         ProviderAccount account,
         ScannerCursor? cursor,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+        [EnumeratorCancellation] CancellationToken cancellationToken
+    )
     {
         var projects = Path.Combine(claudeHome, "projects");
-        if (!SafeFileEnumeration.IsSafeDirectory(projects)) yield break;
+        if (!SafeFileEnumeration.IsSafeDirectory(projects))
+            yield break;
 
-        foreach (var file in Directory.EnumerateFiles(projects, "*.jsonl", SafeFileEnumeration.Recursive)
-                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+        foreach (
+            var file in Directory
+                .EnumerateFiles(projects, "*.jsonl", SafeFileEnumeration.Recursive)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+        )
         {
             // FileShare.ReadWrite is essential: files actively written by
             // Claude cannot be opened with the default FileShare.Read used by
@@ -81,20 +86,30 @@ public sealed class ClaudeJsonlTokenSource(string claudeHome) : ITokenUsageSourc
                         {
                             break;
                         }
-                        if (line is null) break;
+                        if (line is null)
+                            break;
                         lineNumber++;
                         JsonDocument document;
-                        try { document = JsonDocument.Parse(line); }
-                        catch (JsonException) { continue; }
+                        try
+                        {
+                            document = JsonDocument.Parse(line);
+                        }
+                        catch (JsonException)
+                        {
+                            continue;
+                        }
                         using (document)
                         {
                             var root = document.RootElement;
                             if (TryWorkingDirectory(root) is { } workingDirectory)
                                 project = projectIdentityResolver.Resolve(workingDirectory);
-                            if (!TryTimestamp(root, out var occurredAt) ||
-                                !root.TryGetProperty("message", out var message) ||
-                                !message.TryGetProperty("usage", out var usage) ||
-                                usage.ValueKind != JsonValueKind.Object) continue;
+                            if (
+                                !TryTimestamp(root, out var occurredAt)
+                                || !root.TryGetProperty("message", out var message)
+                                || !message.TryGetProperty("usage", out var usage)
+                                || usage.ValueKind != JsonValueKind.Object
+                            )
+                                continue;
 
                             var messageId = ReadString(message, "id") ?? $"{Path.GetFileName(file)}:{lineNumber}";
                             var model = ReadString(message, "model") ?? "unknown";
@@ -102,17 +117,29 @@ public sealed class ClaudeJsonlTokenSource(string claudeHome) : ITokenUsageSourc
                                 ReadLong(usage, "input_tokens"),
                                 ReadLong(usage, "output_tokens"),
                                 ReadLong(usage, "cache_read_input_tokens"),
-                                ReadLong(usage, "cache_creation_input_tokens"));
+                                ReadLong(usage, "cache_creation_input_tokens")
+                            );
                             var previous = seen.GetValueOrDefault(messageId);
                             var delta = current.DeltaFrom(previous);
                             seen[messageId] = current;
-                            if (delta.Input + delta.Output + delta.CacheRead + delta.CacheWrite == 0) continue;
-                            if (ScannerBoundary.AlreadyCovered(cursor, occurredAt)) continue;
+                            if (delta.Input + delta.Output + delta.CacheRead + delta.CacheWrite == 0)
+                                continue;
+                            if (ScannerBoundary.AlreadyCovered(cursor, occurredAt))
+                                continue;
 
                             yield return new TokenUsageEvent(
-                                account.Key, new ServiceProviderId("claude"), model, occurredAt,
-                                delta.Input, delta.Output, delta.CacheRead, delta.CacheWrite, 0,
-                                $"claude:{messageId}:{lineNumber}", project);
+                                account.Key,
+                                new ServiceProviderId("claude"),
+                                model,
+                                occurredAt,
+                                delta.Input,
+                                delta.Output,
+                                delta.CacheRead,
+                                delta.CacheWrite,
+                                0,
+                                $"claude:{messageId}:{lineNumber}",
+                                project
+                            );
                         }
                     }
                 }
@@ -122,8 +149,10 @@ public sealed class ClaudeJsonlTokenSource(string claudeHome) : ITokenUsageSourc
 
     private static string? TryWorkingDirectory(JsonElement root)
     {
-        if (ReadString(root, "cwd") is { } cwd) return cwd;
-        if (ReadString(root, "projectPath") is { } projectPath) return projectPath;
+        if (ReadString(root, "cwd") is { } cwd)
+            return cwd;
+        if (ReadString(root, "projectPath") is { } projectPath)
+            return projectPath;
         if (root.TryGetProperty("message", out var message) && message.ValueKind == JsonValueKind.Object)
             return ReadString(message, "cwd") ?? ReadString(message, "projectPath");
         return null;
@@ -132,9 +161,14 @@ public sealed class ClaudeJsonlTokenSource(string claudeHome) : ITokenUsageSourc
     private static bool TryTimestamp(JsonElement root, out DateTimeOffset timestamp)
     {
         timestamp = default;
-        return root.TryGetProperty("timestamp", out var node) &&
-               node.ValueKind == JsonValueKind.String &&
-               DateTimeOffset.TryParse(node.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out timestamp);
+        return root.TryGetProperty("timestamp", out var node)
+            && node.ValueKind == JsonValueKind.String
+            && DateTimeOffset.TryParse(
+                node.GetString(),
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out timestamp
+            );
     }
 
     private static string? ReadString(JsonElement element, string name) =>
@@ -143,15 +177,18 @@ public sealed class ClaudeJsonlTokenSource(string claudeHome) : ITokenUsageSourc
             : null;
 
     private static long ReadLong(JsonElement element, string name) =>
-        element.TryGetProperty(name, out var value) && value.TryGetInt64(out var result)
-            ? Math.Max(0, result)
-            : 0;
+        element.TryGetProperty(name, out var value) && value.TryGetInt64(out var result) ? Math.Max(0, result) : 0;
 
     private readonly record struct Counts(long Input, long Output, long CacheRead, long CacheWrite)
     {
-        public Counts DeltaFrom(Counts previous) => new(
-            Delta(Input, previous.Input), Delta(Output, previous.Output),
-            Delta(CacheRead, previous.CacheRead), Delta(CacheWrite, previous.CacheWrite));
+        public Counts DeltaFrom(Counts previous) =>
+            new(
+                Delta(Input, previous.Input),
+                Delta(Output, previous.Output),
+                Delta(CacheRead, previous.CacheRead),
+                Delta(CacheWrite, previous.CacheWrite)
+            );
+
         private static long Delta(long current, long previous) => current >= previous ? current - previous : current;
     }
 }

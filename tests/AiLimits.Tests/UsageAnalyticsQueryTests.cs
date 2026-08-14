@@ -8,10 +8,7 @@ public sealed class UsageAnalyticsQueryTests
     [Fact]
     public void ChartGeometry_distributes_every_bucket_across_the_available_width()
     {
-        UsageChartGeometry geometry = UsageChartLayout.Calculate(
-            availableWidth: 1_200,
-            itemCount: 30,
-            gap: 3);
+        UsageChartGeometry geometry = UsageChartLayout.Calculate(availableWidth: 1_200, itemCount: 30, gap: 3);
 
         Assert.Equal(37.1, geometry.ItemWidth, precision: 1);
         Assert.InRange(geometry.BarWidth, 25, 26);
@@ -25,17 +22,20 @@ public sealed class UsageAnalyticsQueryTests
         [
             Row(0, "copilot", "GitHub Copilot", "opencode", "OpenCode", "alpha", "Alpha", "claude", 100, 1m),
             Row(0, "openai", "OpenAI", "codex", "Codex", "beta", "Beta", "gpt", 200, 2m),
-            Row(1, "copilot", "GitHub Copilot", "opencode", "OpenCode", "beta", "Beta", "claude", 300, 3m)
+            Row(1, "copilot", "GitHub Copilot", "opencode", "OpenCode", "beta", "Beta", "claude", 300, 3m),
         ];
 
-        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with
-        {
-            Through = Today.AddDays(1),
-            Providers = ["copilot"],
-            Harnesses = ["opencode"],
-            Projects = ["beta"],
-            Models = ["claude"]
-        });
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(
+            records,
+            Query() with
+            {
+                Through = Today.AddDays(1),
+                Providers = ["copilot"],
+                Harnesses = ["opencode"],
+                Projects = ["beta"],
+                Models = ["claude"],
+            }
+        );
 
         Assert.Equal(300, result.TotalTokens);
         Assert.Equal(3m, result.ApiEquivalentCostUsd);
@@ -49,14 +49,17 @@ public sealed class UsageAnalyticsQueryTests
         [
             Row(0, "copilot", "GitHub Copilot", "opencode", "OpenCode", "alpha", "Alpha", "claude", 100, 1m),
             Row(0, "openai", "OpenAI", "codex", "Codex", "beta", "Beta", "gpt", 200, 2m),
-            Row(0, "openai", "OpenAI", "opencode", "OpenCode", "alpha", "Alpha", "gpt", 300, 3m)
+            Row(0, "openai", "OpenAI", "opencode", "OpenCode", "alpha", "Alpha", "gpt", 300, 3m),
         ];
 
-        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with
-        {
-            Providers = ["openai"],
-            Harnesses = ["opencode"]
-        });
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(
+            records,
+            Query() with
+            {
+                Providers = ["openai"],
+                Harnesses = ["opencode"],
+            }
+        );
 
         Assert.Equal(["openai", "copilot"], result.Facets.Providers.Select(option => option.Key));
         Assert.Equal(["opencode", "codex"], result.Facets.Harnesses.Select(option => option.Key));
@@ -67,17 +70,16 @@ public sealed class UsageAnalyticsQueryTests
     [Fact]
     public void Chart_fills_empty_day_buckets()
     {
-        UsageAnalyticsRecord[] records =
-        [
-            Row(0, tokens: 100),
-            Row(2, tokens: 300)
-        ];
+        UsageAnalyticsRecord[] records = [Row(0, tokens: 100), Row(2, tokens: 300)];
 
-        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with
-        {
-            Through = Today.AddDays(2),
-            TimeGrain = UsageTimeGrain.Day
-        });
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(
+            records,
+            Query() with
+            {
+                Through = Today.AddDays(2),
+                TimeGrain = UsageTimeGrain.Day,
+            }
+        );
 
         Assert.Equal([100, 0, 300], result.Chart.Select(bucket => bucket.Tokens));
     }
@@ -91,14 +93,15 @@ public sealed class UsageAnalyticsQueryTests
             Row(0, "p2", "Provider 2", tokens: 400),
             Row(0, "p3", "Provider 3", tokens: 300),
             Row(0, "p4", "Provider 4", tokens: 200),
-            Row(0, "p5", "Provider 5", tokens: 100)
+            Row(0, "p5", "Provider 5", tokens: 100),
         ];
 
         UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query());
 
         Assert.Equal(
             ["Provider 1", "Provider 2", "Provider 3", "Others"],
-            result.ChartLegend.Select(item => item.Label));
+            result.ChartLegend.Select(item => item.Label)
+        );
         Assert.Equal([500, 400, 300, 300], result.Chart[0].Segments.Select(segment => segment.Tokens));
         Assert.Equal(result.Chart[0].Tokens, result.Chart[0].Segments.Sum(segment => segment.Tokens));
     }
@@ -111,13 +114,10 @@ public sealed class UsageAnalyticsQueryTests
             Row(0, "p1", "Provider 1", tokens: 500),
             Row(0, "p2", "Provider 2", tokens: 400),
             Row(0, "p3", "Provider 3", tokens: 300),
-            Row(0, "p4", "Provider 4", tokens: 200)
+            Row(0, "p4", "Provider 4", tokens: 200),
         ];
 
-        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with
-        {
-            Providers = ["p2", "p4"]
-        });
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with { Providers = ["p2", "p4"] });
 
         Assert.Equal(["p2", "p4"], result.ChartLegend.Select(item => item.Key));
         Assert.Equal([400, 200], result.Chart[0].Segments.Select(segment => segment.Tokens));
@@ -126,24 +126,24 @@ public sealed class UsageAnalyticsQueryTests
     [Fact]
     public void Explicit_selection_uses_six_series_and_pools_the_remainder()
     {
-        UsageAnalyticsRecord[] records = Enumerable.Range(1, 8)
-            .Select(index => Row(
-                0,
-                modelKey: $"model-{index}",
-                tokens: 900 - (index * 100)))
+        UsageAnalyticsRecord[] records = Enumerable
+            .Range(1, 8)
+            .Select(index => Row(0, modelKey: $"model-{index}", tokens: 900 - (index * 100)))
             .ToArray();
 
-        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with
-        {
-            ChartSeries = UsageChartSeriesDimension.Model,
-            Models = records.Select(record => record.ModelKey).ToArray()
-        });
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(
+            records,
+            Query() with
+            {
+                ChartSeries = UsageChartSeriesDimension.Model,
+                Models = records.Select(record => record.ModelKey).ToArray(),
+            }
+        );
 
         Assert.Equal(7, result.ChartLegend.Count);
         UsageChartLegendItem others = Assert.Single(result.ChartLegend, item => item.IsOthers);
         Assert.Equal(2, others.PooledSeriesCount);
-        Assert.All(result.Chart, bucket =>
-            Assert.Equal(bucket.Tokens, bucket.Segments.Sum(segment => segment.Tokens)));
+        Assert.All(result.Chart, bucket => Assert.Equal(bucket.Tokens, bucket.Segments.Sum(segment => segment.Tokens)));
     }
 
     [Fact]
@@ -152,13 +152,16 @@ public sealed class UsageAnalyticsQueryTests
         UsageAnalyticsRecord[] records =
         [
             Row(0, toolKey: "codex", toolLabel: "Codex", tokens: 500),
-            Row(0, toolKey: "opencode", toolLabel: "OpenCode", tokens: 300)
+            Row(0, toolKey: "opencode", toolLabel: "OpenCode", tokens: 300),
         ];
 
-        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with
-        {
-            ChartSeries = UsageChartSeriesDimension.Harness
-        });
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(
+            records,
+            Query() with
+            {
+                ChartSeries = UsageChartSeriesDimension.Harness,
+            }
+        );
 
         Assert.Equal(["codex", "opencode"], result.ChartLegend.Select(item => item.Key));
         Assert.Equal([500, 300], result.Chart[0].Segments.Select(segment => segment.Tokens));
@@ -172,14 +175,17 @@ public sealed class UsageAnalyticsQueryTests
             Row(-2, accessKey: "openai", tokens: 50),
             Row(-1, accessKey: "copilot", tokens: 900),
             Row(0, accessKey: "openai", tokens: 100),
-            Row(1, accessKey: "copilot", tokens: 900)
+            Row(1, accessKey: "copilot", tokens: 900),
         ];
 
-        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with
-        {
-            Through = Today.AddDays(1),
-            Providers = ["openai"]
-        });
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(
+            records,
+            Query() with
+            {
+                Through = Today.AddDays(1),
+                Providers = ["openai"],
+            }
+        );
 
         Assert.NotNull(result.Comparison);
         Assert.Equal(100, result.Comparison!.CurrentTokens);
@@ -193,14 +199,17 @@ public sealed class UsageAnalyticsQueryTests
         UsageAnalyticsRecord[] records =
         [
             Row(0, projectKey: "alpha", tokens: 100),
-            Row(1, projectKey: "beta", tokens: 300)
+            Row(1, projectKey: "beta", tokens: 300),
         ];
 
-        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with
-        {
-            Through = Today.AddDays(1),
-            Breakdown = UsageBreakdownDimension.Project
-        });
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(
+            records,
+            Query() with
+            {
+                Through = Today.AddDays(1),
+                Breakdown = UsageBreakdownDimension.Project,
+            }
+        );
 
         Assert.Equal(400, result.TotalTokens);
         Assert.Equal(2, result.Chart.Count);
@@ -214,13 +223,16 @@ public sealed class UsageAnalyticsQueryTests
         UsageAnalyticsRecord[] records =
         [
             Row(0, modelKey: "claude-fable-5", tokens: 500),
-            Row(0, modelKey: "gpt-5.6", tokens: 300)
+            Row(0, modelKey: "gpt-5.6", tokens: 300),
         ];
 
-        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with
-        {
-            ChartSeries = UsageChartSeriesDimension.Model
-        });
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(
+            records,
+            Query() with
+            {
+                ChartSeries = UsageChartSeriesDimension.Model,
+            }
+        );
 
         Assert.Equal(["claude-fable-5", "gpt-5.6"], result.ChartLegend.Select(item => item.Key));
         Assert.Equal([500, 300], result.Chart[0].Segments.Select(segment => segment.Tokens));
@@ -235,7 +247,7 @@ public sealed class UsageAnalyticsQueryTests
         UsageAnalyticsRecord[] records =
         [
             Row(0, accessKey: "openai-codex", accessLabel: "OpenAI (Codex)", toolKey: "codex", tokens: 500),
-            Row(0, accessKey: "openai-codex", accessLabel: "OpenAI", toolKey: "opencode", tokens: 300)
+            Row(0, accessKey: "openai-codex", accessLabel: "OpenAI", toolKey: "opencode", tokens: 300),
         ];
 
         UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query());
@@ -253,7 +265,7 @@ public sealed class UsageAnalyticsQueryTests
         UsageAnalyticsRecord[] records =
         [
             Row(0, accessKey: "openai-codex", accessLabel: "OpenAI (Codex)", tokens: 500),
-            Row(0, accessKey: "openai-codex", accessLabel: "OpenAI", tokens: 300)
+            Row(0, accessKey: "openai-codex", accessLabel: "OpenAI", tokens: 300),
         ];
 
         UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query());
@@ -271,13 +283,16 @@ public sealed class UsageAnalyticsQueryTests
         [
             Row(0, modelKey: "opus", tokens: 100),
             Row(2, modelKey: "opus", tokens: 300),
-            Row(1, modelKey: "haiku", tokens: 50)
+            Row(1, modelKey: "haiku", tokens: 50),
         ];
 
-        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with
-        {
-            Through = Today.AddDays(2)
-        });
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(
+            records,
+            Query() with
+            {
+                Through = Today.AddDays(2),
+            }
+        );
 
         Assert.Equal(3, result.Chart.Count);
         UsageModelTrend opus = result.ModelTrends.First(trend => trend.Key == "opus");
@@ -297,14 +312,17 @@ public sealed class UsageAnalyticsQueryTests
         [
             Row(0, toolKey: "droid", modelKey: "claude-sonnet-5", projectKey: "alpha", tokens: 400),
             Row(0, toolKey: "droid", modelKey: "glm-5.2", projectKey: "beta", tokens: 100),
-            Row(1, toolKey: "codex", modelKey: "gpt-5.6", projectKey: "gamma", tokens: 900)
+            Row(1, toolKey: "codex", modelKey: "gpt-5.6", projectKey: "gamma", tokens: 900),
         ];
 
-        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with
-        {
-            Through = Today.AddDays(1),
-            Harnesses = ["droid"]
-        });
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(
+            records,
+            Query() with
+            {
+                Through = Today.AddDays(1),
+                Harnesses = ["droid"],
+            }
+        );
 
         // Facets deliberately still offer codex so the selection can be
         // widened; the composition must report only what actually matched.
@@ -319,11 +337,7 @@ public sealed class UsageAnalyticsQueryTests
     [Fact]
     public void Model_trends_are_ranked_and_share_sums_to_the_window()
     {
-        UsageAnalyticsRecord[] records =
-        [
-            Row(0, modelKey: "small", tokens: 100),
-            Row(0, modelKey: "big", tokens: 300)
-        ];
+        UsageAnalyticsRecord[] records = [Row(0, modelKey: "small", tokens: 100), Row(0, modelKey: "big", tokens: 300)];
 
         UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query());
 
@@ -339,13 +353,10 @@ public sealed class UsageAnalyticsQueryTests
         [
             Row(0, toolKey: "droid", toolLabel: "Droid", modelKey: "claude-sonnet-5", tokens: 400),
             Row(0, toolKey: "droid", toolLabel: "Droid", modelKey: "glm-5.2", tokens: 100),
-            Row(0, toolKey: "codex", toolLabel: "Codex", modelKey: "gpt-5.6", tokens: 900)
+            Row(0, toolKey: "codex", toolLabel: "Codex", modelKey: "gpt-5.6", tokens: 900),
         ];
 
-        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with
-        {
-            Harnesses = ["droid"]
-        });
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with { Harnesses = ["droid"] });
 
         Assert.Equal(["claude-sonnet-5", "glm-5.2"], result.ModelTrends.Select(trend => trend.Key));
         Assert.Equal(80, result.ModelTrends[0].SharePercent, precision: 6);
@@ -364,18 +375,18 @@ public sealed class UsageAnalyticsQueryTests
             Row(0, modelKey: "gpt-5.6-sol", tokens: 900),
             Row(0, modelKey: "claude-fable-5", tokens: 700),
             Row(0, modelKey: "claude-sonnet-5", tokens: 300),
-            Row(0, modelKey: "codex-auto-review", tokens: 100)
+            Row(0, modelKey: "codex-auto-review", tokens: 100),
         ];
 
-        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with
-        {
-            ChartSeries = UsageChartSeriesDimension.Model
-        });
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(
+            records,
+            Query() with
+            {
+                ChartSeries = UsageChartSeriesDimension.Model,
+            }
+        );
 
-        string[] named = result.ChartLegend
-            .Where(item => !item.IsOthers)
-            .Select(item => item.Key)
-            .ToArray();
+        string[] named = result.ChartLegend.Where(item => !item.IsOthers).Select(item => item.Key).ToArray();
 
         Assert.NotEmpty(named);
         Assert.Equal(named, result.ModelTrends.Take(named.Length).Select(trend => trend.Key));
@@ -390,18 +401,18 @@ public sealed class UsageAnalyticsQueryTests
         [
             Row(0, modelKey: "b-model", tokens: 400),
             Row(0, modelKey: "a-model", tokens: 400),
-            Row(0, modelKey: "c-model", tokens: 400)
+            Row(0, modelKey: "c-model", tokens: 400),
         ];
 
-        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with
-        {
-            ChartSeries = UsageChartSeriesDimension.Model
-        });
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(
+            records,
+            Query() with
+            {
+                ChartSeries = UsageChartSeriesDimension.Model,
+            }
+        );
 
-        string[] named = result.ChartLegend
-            .Where(item => !item.IsOthers)
-            .Select(item => item.Key)
-            .ToArray();
+        string[] named = result.ChartLegend.Where(item => !item.IsOthers).Select(item => item.Key).ToArray();
 
         Assert.Equal(named, result.ModelTrends.Take(named.Length).Select(trend => trend.Key));
     }
@@ -413,14 +424,17 @@ public sealed class UsageAnalyticsQueryTests
         [
             Row(0, modelKey: "opus", tokens: 100),
             Row(1, modelKey: "opus", tokens: 200),
-            Row(8, modelKey: "opus", tokens: 400)
+            Row(8, modelKey: "opus", tokens: 400),
         ];
 
-        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query() with
-        {
-            Through = Today.AddDays(8),
-            TimeGrain = UsageTimeGrain.Week
-        });
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(
+            records,
+            Query() with
+            {
+                Through = Today.AddDays(8),
+                TimeGrain = UsageTimeGrain.Week,
+            }
+        );
 
         UsageModelTrend opus = Assert.Single(result.ModelTrends);
         Assert.Equal(result.Chart.Count, opus.BucketTokens.Count);
@@ -449,7 +463,8 @@ public sealed class UsageAnalyticsQueryTests
         {
             Assert.True(
                 gap * itemWidth >= needed,
-                $"labels {gap} buckets apart at {itemWidth}px pitch leaves only {gap * itemWidth}px for {needed}px of text");
+                $"labels {gap} buckets apart at {itemWidth}px pitch leaves only {gap * itemWidth}px for {needed}px of text"
+            );
         }
     }
 
@@ -461,11 +476,8 @@ public sealed class UsageAnalyticsQueryTests
 
     private static readonly DateOnly Today = new(2026, 7, 1);
 
-    private static UsageAnalyticsQuery Query() => new(
-        Today,
-        Today,
-        UsageTimeGrain.Day,
-        UsageBreakdownDimension.Provider);
+    private static UsageAnalyticsQuery Query() =>
+        new(Today, Today, UsageTimeGrain.Day, UsageBreakdownDimension.Provider);
 
     private static UsageAnalyticsRecord Row(
         int dayOffset,
@@ -477,7 +489,8 @@ public sealed class UsageAnalyticsQueryTests
         string projectLabel = "Alpha",
         string modelKey = "gpt",
         long tokens = 10,
-        decimal? cost = 0.1m) =>
+        decimal? cost = 0.1m
+    ) =>
         new(
             Today.AddDays(dayOffset),
             accessKey,
@@ -494,5 +507,6 @@ public sealed class UsageAnalyticsQueryTests
             0,
             0,
             0,
-            cost);
+            cost
+        );
 }

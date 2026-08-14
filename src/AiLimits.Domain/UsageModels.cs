@@ -10,7 +10,7 @@ public enum MeterScope
     Organization,
     Model,
     Feature,
-    Offering
+    Offering,
 }
 
 public enum MeterUnit
@@ -21,7 +21,7 @@ public enum MeterUnit
     Tokens,
     Credits,
     Usd,
-    Time
+    Time,
 }
 
 public enum MeterStatus
@@ -32,19 +32,46 @@ public enum MeterStatus
     Critical,
     Exhausted,
     Stale,
-    Unavailable
+    Unavailable,
 }
 
-public sealed record MeterProvenance(string StrategyId, string SourcePath, DateTimeOffset AcquiredAt, bool IsAuthoritative, string? AttemptId = null);
+public sealed record MeterProvenance(
+    string StrategyId,
+    string SourcePath,
+    DateTimeOffset AcquiredAt,
+    bool IsAuthoritative,
+    string? AttemptId = null
+);
 
-public sealed record UsageMeter(MeterKey Key, string DisplayName, MeterScope Scope, MeterUnit Unit, decimal? Used, decimal? Limit, double? UsedPercent, TimeSpan? WindowDuration, DateTimeOffset? ResetsAt, string? RawModelId, MeterStatus Status, MeterProvenance Provenance, DateTimeOffset? FirstObservedAt = null, bool IsNew = false);
+public sealed record UsageMeter(
+    MeterKey Key,
+    string DisplayName,
+    MeterScope Scope,
+    MeterUnit Unit,
+    decimal? Used,
+    decimal? Limit,
+    double? UsedPercent,
+    TimeSpan? WindowDuration,
+    DateTimeOffset? ResetsAt,
+    string? RawModelId,
+    MeterStatus Status,
+    MeterProvenance Provenance,
+    DateTimeOffset? FirstObservedAt = null,
+    bool IsNew = false
+);
 
-public sealed record BalanceMetric(string Key, string DisplayName, decimal? Value, MeterUnit Unit, string? FormattedValue = null);
+public sealed record BalanceMetric(
+    string Key,
+    string DisplayName,
+    decimal? Value,
+    MeterUnit Unit,
+    string? FormattedValue = null
+);
 
 public enum SnapshotCompleteness
 {
     Partial,
-    Authoritative
+    Authoritative,
 }
 
 public enum DataConfidence
@@ -53,13 +80,29 @@ public enum DataConfidence
     Low,
     Medium,
     High,
-    Exact
+    Exact,
 }
 
-public sealed record ProviderSnapshot(AccountKey Account, IReadOnlyList<UsageMeter> Meters, IReadOnlyList<BalanceMetric> Balances, SnapshotCompleteness Completeness, DateTimeOffset ObservedAt, DataConfidence Confidence, IReadOnlyDictionary<string, JsonElement> Extensions)
+public sealed record ProviderSnapshot(
+    AccountKey Account,
+    IReadOnlyList<UsageMeter> Meters,
+    IReadOnlyList<BalanceMetric> Balances,
+    SnapshotCompleteness Completeness,
+    DateTimeOffset ObservedAt,
+    DataConfidence Confidence,
+    IReadOnlyDictionary<string, JsonElement> Extensions
+)
 {
     public static ProviderSnapshot Empty(AccountKey account, DateTimeOffset observedAt)
     {
-        return new ProviderSnapshot(account, Array.Empty<UsageMeter>(), Array.Empty<BalanceMetric>(), SnapshotCompleteness.Partial, observedAt, DataConfidence.Unknown, new Dictionary<string, JsonElement>());
+        return new ProviderSnapshot(
+            account,
+            Array.Empty<UsageMeter>(),
+            Array.Empty<BalanceMetric>(),
+            SnapshotCompleteness.Partial,
+            observedAt,
+            DataConfidence.Unknown,
+            new Dictionary<string, JsonElement>()
+        );
     }
 }

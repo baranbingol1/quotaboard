@@ -58,7 +58,8 @@ public partial class App : Microsoft.UI.Xaml.Application
             },
             IsEnergySaverOn,
             new SystemClock(),
-            logger: NullLogger<RefreshScheduler>.Instance);
+            logger: NullLogger<RefreshScheduler>.Instance
+        );
         _scheduler = scheduler;
         // Window focus is the "user is looking" signal that drives the
         // adaptive cadence (2 min while active, up to 30 min when idle).
@@ -70,7 +71,8 @@ public partial class App : Microsoft.UI.Xaml.Application
             }
         };
         window.Activate();
-        bool startMinimized = args.Arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+        bool startMinimized = args
+            .Arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .Concat(Environment.GetCommandLineArgs().Skip(1))
             .Any(argument => string.Equals(argument.Trim('"'), "--minimized", StringComparison.OrdinalIgnoreCase));
         if (startMinimized)
@@ -94,11 +96,20 @@ public partial class App : Microsoft.UI.Xaml.Application
         RefreshScheduler scheduler,
         LiveDashboardViewModel dashboard,
         LiveDashboardDataSource dataSource,
-        Task startup)
+        Task startup
+    )
     {
         dashboard.Dispose();
-        try { await startup.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false); } catch { }
-        try { await scheduler.StopAsync().WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false); } catch { }
+        try
+        {
+            await startup.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }
+        catch { }
+        try
+        {
+            await scheduler.StopAsync().WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }
+        catch { }
         dataSource.Dispose();
         scheduler.Dispose();
     }
@@ -106,7 +117,11 @@ public partial class App : Microsoft.UI.Xaml.Application
     // The cached pass inside InitializeAsync paints last-known data instantly;
     // the scheduler is armed from the outcome of the startup refresh so an
     // offline launch enters the 15/45/120/300s connectivity retry ladder.
-    private static async Task InitializeAndArmSchedulerAsync(LiveDashboardViewModel dashboard, LiveDashboardDataSource dataSource, RefreshScheduler scheduler)
+    private static async Task InitializeAndArmSchedulerAsync(
+        LiveDashboardViewModel dashboard,
+        LiveDashboardDataSource dataSource,
+        RefreshScheduler scheduler
+    )
     {
         scheduler.Start();
         await dashboard.InitializeAsync();
@@ -117,7 +132,11 @@ public partial class App : Microsoft.UI.Xaml.Application
         }
     }
 
-    private static async Task<RefreshOutcome> RunScheduledRefreshAsync(DispatcherQueue dispatcher, LiveDashboardViewModel dashboard, LiveDashboardDataSource dataSource)
+    private static async Task<RefreshOutcome> RunScheduledRefreshAsync(
+        DispatcherQueue dispatcher,
+        LiveDashboardViewModel dashboard,
+        LiveDashboardDataSource dataSource
+    )
     {
         var completion = new TaskCompletionSource<RefreshOutcome>(TaskCreationOptions.RunContinuationsAsynchronously);
         bool enqueued = dispatcher.TryEnqueue(async () =>
@@ -125,9 +144,11 @@ public partial class App : Microsoft.UI.Xaml.Application
             try
             {
                 bool ran = await dashboard.RefreshFromSchedulerAsync();
-                completion.TrySetResult(!ran
-                    ? RefreshOutcome.Skipped
-                    : dataSource.LastRefreshHadTransientFailure ? RefreshOutcome.TransientFailure : RefreshOutcome.Completed);
+                completion.TrySetResult(
+                    !ran ? RefreshOutcome.Skipped
+                    : dataSource.LastRefreshHadTransientFailure ? RefreshOutcome.TransientFailure
+                    : RefreshOutcome.Completed
+                );
             }
             catch (Exception ex)
             {
@@ -179,7 +200,10 @@ public partial class App : Microsoft.UI.Xaml.Application
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Legacy data directory migration failed; the app rebuilds aggregates from local histories.");
+            _logger.LogWarning(
+                ex,
+                "Legacy data directory migration failed; the app rebuilds aggregates from local histories."
+            );
             // Fresh start: the app rebuilds aggregates from local histories.
         }
     }

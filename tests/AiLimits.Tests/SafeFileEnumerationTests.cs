@@ -29,7 +29,8 @@ public sealed class SafeFileEnumerationTests
         // overload follows it — this is the leak the guard closes.
         Assert.Contains(
             Directory.EnumerateFiles(root.FullName, "*.jsonl", SearchOption.AllDirectories),
-            path => path.StartsWith(link, StringComparison.OrdinalIgnoreCase));
+            path => path.StartsWith(link, StringComparison.OrdinalIgnoreCase)
+        );
 
         var guarded = Directory.EnumerateFiles(root.FullName, "*.jsonl", SafeFileEnumeration.Recursive).ToArray();
 
@@ -68,8 +69,7 @@ public sealed class SafeFileEnumerationTests
         string nestedFile = Path.Combine(hiddenDirectory.FullName, "nested.jsonl");
         File.WriteAllText(nestedFile, "{}");
 
-        string[] files = Directory.EnumerateFiles(
-            root.FullName, "*.jsonl", SafeFileEnumeration.Recursive).ToArray();
+        string[] files = Directory.EnumerateFiles(root.FullName, "*.jsonl", SafeFileEnumeration.Recursive).ToArray();
 
         Assert.Contains(hiddenFile, files);
         Assert.Contains(nestedFile, files);
@@ -105,21 +105,26 @@ public sealed class SafeFileEnumerationTests
         using var temp = new TemporaryDirectory();
         // A valid Claude history living OUTSIDE the provider tree.
         var outside = Directory.CreateDirectory(Path.Combine(temp.Path, "outside", "evil-project"));
-        await File.WriteAllLinesAsync(Path.Combine(outside.FullName, "leak.jsonl"),
-        [
-            "{\"timestamp\":\"2026-07-13T10:00:00Z\",\"message\":{\"id\":\"m1\",\"model\":\"claude-sonnet-4\",\"usage\":{\"input_tokens\":100,\"output_tokens\":20}}}"
-        ]);
+        await File.WriteAllLinesAsync(
+            Path.Combine(outside.FullName, "leak.jsonl"),
+            [
+                "{\"timestamp\":\"2026-07-13T10:00:00Z\",\"message\":{\"id\":\"m1\",\"model\":\"claude-sonnet-4\",\"usage\":{\"input_tokens\":100,\"output_tokens\":20}}}",
+            ]
+        );
         var claudeHome = Directory.CreateDirectory(Path.Combine(temp.Path, "claude-home"));
         var projects = Directory.CreateDirectory(Path.Combine(claudeHome.FullName, "projects"));
         var legit = Directory.CreateDirectory(Path.Combine(projects.FullName, "legit"));
-        await File.WriteAllLinesAsync(Path.Combine(legit.FullName, "chat.jsonl"),
-        [
-            "{\"timestamp\":\"2026-07-13T10:00:00Z\",\"message\":{\"id\":\"m2\",\"model\":\"claude-sonnet-4\",\"usage\":{\"input_tokens\":5,\"output_tokens\":3}}}"
-        ]);
+        await File.WriteAllLinesAsync(
+            Path.Combine(legit.FullName, "chat.jsonl"),
+            [
+                "{\"timestamp\":\"2026-07-13T10:00:00Z\",\"message\":{\"id\":\"m2\",\"model\":\"claude-sonnet-4\",\"usage\":{\"input_tokens\":5,\"output_tokens\":3}}}",
+            ]
+        );
         CreateJunction(Path.Combine(projects.FullName, "evil-project"), outside.FullName);
 
         var events = await CollectAsync(
-            new ClaudeJsonlTokenSource(claudeHome.FullName).ReadAsync(Account("claude"), null, default));
+            new ClaudeJsonlTokenSource(claudeHome.FullName).ReadAsync(Account("claude"), null, default)
+        );
 
         var usage = Assert.Single(events);
         Assert.Equal(5, usage.InputTokens);
@@ -148,21 +153,22 @@ public sealed class SafeFileEnumerationTests
     private static void CreateJunction(string link, string target)
     {
         (int exitCode, string error) = RunCmd($"/c mklink /J \"{link}\" \"{target}\"");
-        Assert.True(exitCode == 0 && Directory.Exists(link),
-            $"mklink failed ({exitCode}): {error}");
+        Assert.True(exitCode == 0 && Directory.Exists(link), $"mklink failed ({exitCode}): {error}");
     }
 
     private static (int ExitCode, string Error) RunCmd(string arguments)
     {
-        using Process process = Process.Start(new ProcessStartInfo
-        {
-            FileName = "cmd.exe",
-            Arguments = arguments,
-            CreateNoWindow = true,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        })!;
+        using Process process = Process.Start(
+            new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = arguments,
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            }
+        )!;
         process.WaitForExit();
         return (process.ExitCode, process.StandardError.ReadToEnd());
     }
@@ -183,13 +189,14 @@ public sealed class SafeFileEnumerationTests
         }
     }
 
-    private static ProviderAccount Account(string provider) => new(
-        new AccountKey(new ProviderId(provider), "one"), "one", null, "fixture", 1, true);
+    private static ProviderAccount Account(string provider) =>
+        new(new AccountKey(new ProviderId(provider), "one"), "one", null, "fixture", 1, true);
 
     private static async Task<List<T>> CollectAsync<T>(IAsyncEnumerable<T> source)
     {
         var items = new List<T>();
-        await foreach (var item in source) items.Add(item);
+        await foreach (var item in source)
+            items.Add(item);
         return items;
     }
 
@@ -200,10 +207,13 @@ public sealed class SafeFileEnumerationTests
             Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AiLimits.Tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(Path);
         }
+
         public string Path { get; }
+
         public void Dispose()
         {
-            if (!Directory.Exists(Path)) return;
+            if (!Directory.Exists(Path))
+                return;
             RemoveJunctions(Path);
             Directory.Delete(Path, true);
         }

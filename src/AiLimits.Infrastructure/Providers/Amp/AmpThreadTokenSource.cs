@@ -11,6 +11,7 @@ namespace AiLimits.Infrastructure.Providers.Amp;
 public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSource, IScanFailureCheckpointSource
 {
     private const int PageSize = 20;
+
     // Safety valve for pathological accounts; a scan visiting this many
     // threads has almost certainly paged far past any real activity window.
     private const int MaxThreadsPerScan = 200;
@@ -50,9 +51,7 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
     private bool _hasYieldedEvent;
 
     public AmpThreadTokenSource(IProcessRunner runner)
-        : this(runner, AmpCliStrategy.FindExecutable)
-    {
-    }
+        : this(runner, AmpCliStrategy.FindExecutable) { }
 
     internal AmpThreadTokenSource(IProcessRunner runner, Func<string?> executableResolver)
     {
@@ -70,11 +69,13 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
     public async IAsyncEnumerable<TokenUsageEvent> ReadAsync(
         ProviderAccount account,
         ScannerCursor? cursor,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+        [EnumeratorCancellation] CancellationToken cancellationToken
+    )
     {
         _hasYieldedEvent = false;
         string? executable = executableResolver();
-        if (executable is null) yield break;
+        if (executable is null)
+            yield break;
 
         DateTimeOffset? cutoff = cursor?.LastObservedAt?.Subtract(RescanOverlap);
         // What we exported last time, keyed by thread. A thread whose `updated`
@@ -94,14 +95,32 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
         for (int offset = 0; summaries.Count < MaxThreadsPerScan; offset += PageSize)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            ProcessResult listResult = await runner.RunAsync(
-                executable,
-                ["threads", "list", "--include-archived", "--limit", PageSize.ToString(CultureInfo.InvariantCulture), "--offset", offset.ToString(CultureInfo.InvariantCulture), "--json"],
-                TimeSpan.FromSeconds(20),
-                cancellationToken).ConfigureAwait(false);
+            ProcessResult listResult = await runner
+                .RunAsync(
+                    executable,
+                    [
+                        "threads",
+                        "list",
+                        "--include-archived",
+                        "--limit",
+                        PageSize.ToString(CultureInfo.InvariantCulture),
+                        "--offset",
+                        offset.ToString(CultureInfo.InvariantCulture),
+                        "--json",
+                    ],
+                    TimeSpan.FromSeconds(20),
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
             if (listResult.OutputTruncated)
                 throw new TokenScanException("Amp thread listing exceeded the capture limit and was truncated.");
-            if (listResult.ExitCode != 0 || !AmpThreadParser.TryParseThreadList(listResult.StandardOutput, out IReadOnlyList<AmpThreadSummary> page))
+            if (
+                listResult.ExitCode != 0
+                || !AmpThreadParser.TryParseThreadList(
+                    listResult.StandardOutput,
+                    out IReadOnlyList<AmpThreadSummary> page
+                )
+            )
                 throw new TokenScanException("Amp thread listing failed.");
             if (page.Count == 0)
             {
@@ -117,16 +136,20 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
             }
             // Once an entire page is older than the rescan cutoff, deeper pages
             // cannot contain activity the cursor has not already covered.
-            if (!retriesOutstanding
+            if (
+                !retriesOutstanding
                 && cutoff.HasValue
-                && page.All(thread => thread.UpdatedAt.HasValue && thread.UpdatedAt < cutoff)) break;
+                && page.All(thread => thread.UpdatedAt.HasValue && thread.UpdatedAt < cutoff)
+            )
+                break;
             // Likewise once an entire page is already at its recorded revision:
             // the listing is ordered newest-updated first, so everything deeper
             // is older still and equally covered. This is what keeps a steady
             // state to a single page instead of six. It is suspended while any
             // thread still owes a retry, because that thread may sit on a page
             // this shortcut would never reach.
-            if (!retriesOutstanding && page.All(previous.IsUnchanged)) break;
+            if (!retriesOutstanding && page.All(previous.IsUnchanged))
+                break;
         }
 
         // Carry forward the recorded revision of every thread still in the
@@ -148,8 +171,7 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
         // unseen pending id as proof that it disappeared.
         foreach (string pendingThreadId in previous.PendingRetryThreadIds)
         {
-            if (previous.TryGetRecorded(pendingThreadId, out string? retryMarker)
-                && retryMarker is not null)
+            if (previous.TryGetRecorded(pendingThreadId, out string? retryMarker) && retryMarker is not null)
             {
                 current.TryAdd(pendingThreadId, retryMarker);
             }
@@ -165,12 +187,16 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
         int directFailures = 0;
         int unchanged = 0;
         var attemptedThreadIds = new HashSet<string>(StringComparer.Ordinal);
-        foreach (AmpThreadSummary thread in summaries
-                     .Where(thread => previous.IsPendingRetry(thread.Id)
-                         || !cutoff.HasValue
-                         || !thread.UpdatedAt.HasValue
-                         || thread.UpdatedAt >= cutoff)
-                     .Take(MaxThreadsPerScan))
+        foreach (
+            AmpThreadSummary thread in summaries
+                .Where(thread =>
+                    previous.IsPendingRetry(thread.Id)
+                    || !cutoff.HasValue
+                    || !thread.UpdatedAt.HasValue
+                    || thread.UpdatedAt >= cutoff
+                )
+                .Take(MaxThreadsPerScan)
+        )
         {
             cancellationToken.ThrowIfCancellationRequested();
             attemptedThreadIds.Add(thread.Id);
@@ -181,19 +207,23 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
                 // written off after spending its retry budget, overwriting it
                 // with the revision would quietly promote an export we could
                 // never read into a successful ingestion watermark.
-                current[thread.Id] = previous.TryGetRecorded(thread.Id, out string? covered) && covered is not null
-                    ? covered
-                    : AmpScanState.Revision(thread);
+                current[thread.Id] =
+                    previous.TryGetRecorded(thread.Id, out string? covered) && covered is not null
+                        ? covered
+                        : AmpScanState.Revision(thread);
                 unchanged++;
                 continue;
             }
 
-            ProcessResult exportResult = await runner.RunAsync(
-                executable,
-                ["threads", "export", thread.Id],
-                TimeSpan.FromSeconds(30),
-                MaxExportChars,
-                cancellationToken).ConfigureAwait(false);
+            ProcessResult exportResult = await runner
+                .RunAsync(
+                    executable,
+                    ["threads", "export", thread.Id],
+                    TimeSpan.FromSeconds(30),
+                    MaxExportChars,
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
 
             // One unreadable thread must not discard the whole scan. Before
             // this, a single oversized export threw, the scan loop caught it,
@@ -216,12 +246,15 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
                 current[thread.Id] = NextRetryValue(previous, thread.Id, AmpScanState.Revision(thread));
                 continue;
             }
-            if (exportResult.OutputTruncated
+            if (
+                exportResult.OutputTruncated
                 || !AmpThreadParser.TryParseUsage(
                     thread.Id,
                     exportResult.StandardOutput,
                     previous.IsPendingRetry(thread.Id) ? null : cutoff,
-                    out IReadOnlyList<AmpThreadUsage> usage))
+                    out IReadOnlyList<AmpThreadUsage> usage
+                )
+            )
             {
                 // A later QuotaBoard parser may understand this output, and a
                 // truncated or temporarily malformed export may recover, so this
@@ -244,24 +277,32 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
         // Without a listing revision, a successful retry is left unrecorded;
         // its stable event ids make replay safe, and a future thread update
         // brings it back into the normal overlap window.
-        foreach (string pendingThreadId in previous.PendingRetryThreadIds
-                     .Where(id => !attemptedThreadIds.Contains(id))
-                     .Take(MaxDirectRetriesPerScan))
+        foreach (
+            string pendingThreadId in previous
+                .PendingRetryThreadIds.Where(id => !attemptedThreadIds.Contains(id))
+                .Take(MaxDirectRetriesPerScan)
+        )
         {
             cancellationToken.ThrowIfCancellationRequested();
-            ProcessResult retryResult = await runner.RunAsync(
-                executable,
-                ["threads", "export", pendingThreadId],
-                TimeSpan.FromSeconds(30),
-                MaxExportChars,
-                cancellationToken).ConfigureAwait(false);
-            if (retryResult.ExitCode != 0
+            ProcessResult retryResult = await runner
+                .RunAsync(
+                    executable,
+                    ["threads", "export", pendingThreadId],
+                    TimeSpan.FromSeconds(30),
+                    MaxExportChars,
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
+            if (
+                retryResult.ExitCode != 0
                 || retryResult.OutputTruncated
                 || !AmpThreadParser.TryParseUsage(
                     pendingThreadId,
                     retryResult.StandardOutput,
                     null,
-                    out IReadOnlyList<AmpThreadUsage> retryUsage))
+                    out IReadOnlyList<AmpThreadUsage> retryUsage
+                )
+            )
             {
                 directFailures++;
                 int attempts = previous.RetryAttempts(pendingThreadId, revision: null) + 1;
@@ -275,8 +316,7 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
                 }
                 else
                 {
-                    current[pendingThreadId] =
-                        AmpScanState.Retry(attempts, previous.RetryRevisionOf(pendingThreadId));
+                    current[pendingThreadId] = AmpScanState.Retry(attempts, previous.RetryRevisionOf(pendingThreadId));
                 }
                 continue;
             }
@@ -301,8 +341,7 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
             // deliberately: those threads were already known to be failing, so
             // on a scan whose listed window happens to be empty they would
             // otherwise report the whole provider as broken on every refresh.
-            throw new TokenScanException(
-                $"Amp could not export any of {listedFailures + directFailures} thread(s).");
+            throw new TokenScanException($"Amp could not export any of {listedFailures + directFailures} thread(s).");
         }
 
         foreach (AmpThreadUsage usage in allUsage.OrderBy(item => item.OccurredAt))
@@ -322,7 +361,8 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
                 usage.CacheWriteTokens,
                 0,
                 usage.SourceEventId,
-                ProjectIdentity.Unknown);
+                ProjectIdentity.Unknown
+            );
         }
     }
 
@@ -334,9 +374,7 @@ public sealed class AmpThreadTokenSource : ITokenUsageSource, IScanPositionSourc
     private static string NextRetryValue(AmpScanState previous, string threadId, string revision)
     {
         int attempts = previous.RetryAttempts(threadId, revision) + 1;
-        return attempts >= MaxRetryAttempts
-            ? AmpScanState.GaveUp(revision)
-            : AmpScanState.Retry(attempts, revision);
+        return attempts >= MaxRetryAttempts ? AmpScanState.GaveUp(revision) : AmpScanState.Retry(attempts, revision);
     }
 }
 
@@ -383,28 +421,33 @@ internal sealed class AmpScanState
     {
         attempts = 0;
         revision = string.Empty;
-        if (!value.StartsWith(RetryMarker, StringComparison.Ordinal)) return false;
+        if (!value.StartsWith(RetryMarker, StringComparison.Ordinal))
+            return false;
         if (value.Length == RetryMarker.Length)
         {
             attempts = 1;
             return true;
         }
-        if (value[RetryMarker.Length] != ':') return false;
+        if (value[RetryMarker.Length] != ':')
+            return false;
 
         string rest = value[(RetryMarker.Length + 1)..];
         int separator = rest.IndexOf(':', StringComparison.Ordinal);
         string attemptsText = separator < 0 ? rest : rest[..separator];
         revision = separator < 0 ? string.Empty : rest[(separator + 1)..];
-        if (!int.TryParse(attemptsText, NumberStyles.Integer, CultureInfo.InvariantCulture, out attempts)
-            || attempts < 1)
+        if (
+            !int.TryParse(attemptsText, NumberStyles.Integer, CultureInfo.InvariantCulture, out attempts)
+            || attempts < 1
+        )
         {
             attempts = 1;
         }
         return true;
     }
 
-    private static readonly JsonSerializerOptions SerializerOptions =
-        new JsonSerializerOptions(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions SerializerOptions = new JsonSerializerOptions(
+        JsonSerializerDefaults.Web
+    );
 
     private readonly Dictionary<string, string> _threads;
 
@@ -416,8 +459,7 @@ internal sealed class AmpScanState
     /// </summary>
     public bool IsUnchanged(AmpThreadSummary thread)
     {
-        if (!thread.UpdatedAt.HasValue
-            || !_threads.TryGetValue(thread.Id, out string? recorded))
+        if (!thread.UpdatedAt.HasValue || !_threads.TryGetValue(thread.Id, out string? recorded))
         {
             return false;
         }
@@ -434,8 +476,7 @@ internal sealed class AmpScanState
         _threads.Values.Any(value => value.StartsWith(RetryMarker, StringComparison.Ordinal));
 
     public IEnumerable<string> PendingRetryThreadIds =>
-        _threads.Where(pair => pair.Value.StartsWith(RetryMarker, StringComparison.Ordinal))
-            .Select(pair => pair.Key);
+        _threads.Where(pair => pair.Value.StartsWith(RetryMarker, StringComparison.Ordinal)).Select(pair => pair.Key);
 
     public bool IsPendingRetry(string threadId) =>
         _threads.TryGetValue(threadId, out string? recorded)
@@ -448,25 +489,24 @@ internal sealed class AmpScanState
     /// </summary>
     public int RetryAttempts(string threadId, string? revision)
     {
-        if (!_threads.TryGetValue(threadId, out string? recorded)
-            || !TryParseRetry(recorded, out int attempts, out string recordedRevision))
+        if (
+            !_threads.TryGetValue(threadId, out string? recorded)
+            || !TryParseRetry(recorded, out int attempts, out string recordedRevision)
+        )
         {
             return 0;
         }
-        return revision is not null
-            && !string.Equals(recordedRevision, revision, StringComparison.Ordinal)
-                ? 0
-                : attempts;
+        return revision is not null && !string.Equals(recordedRevision, revision, StringComparison.Ordinal)
+            ? 0
+            : attempts;
     }
 
     public string RetryRevisionOf(string threadId) =>
-        _threads.TryGetValue(threadId, out string? recorded)
-        && TryParseRetry(recorded, out _, out string revision)
+        _threads.TryGetValue(threadId, out string? recorded) && TryParseRetry(recorded, out _, out string revision)
             ? revision
             : string.Empty;
 
-    public bool TryGetRecorded(string threadId, out string? revision) =>
-        _threads.TryGetValue(threadId, out revision);
+    public bool TryGetRecorded(string threadId, out string? revision) => _threads.TryGetValue(threadId, out revision);
 
     public static string Revision(AmpThreadSummary thread) =>
         thread.UpdatedAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? string.Empty;
@@ -478,18 +518,19 @@ internal sealed class AmpScanState
     /// </summary>
     public static AmpScanState Parse(string? position)
     {
-        if (string.IsNullOrWhiteSpace(position)
-            || string.Equals(position, LegacyPosition, StringComparison.Ordinal))
+        if (string.IsNullOrWhiteSpace(position) || string.Equals(position, LegacyPosition, StringComparison.Ordinal))
         {
             return new AmpScanState([]);
         }
         try
         {
-            Dictionary<string, string>? threads =
-                JsonSerializer.Deserialize<Dictionary<string, string>>(position, SerializerOptions);
-            return new AmpScanState(threads is null
-                ? []
-                : new Dictionary<string, string>(threads, StringComparer.Ordinal));
+            Dictionary<string, string>? threads = JsonSerializer.Deserialize<Dictionary<string, string>>(
+                position,
+                SerializerOptions
+            );
+            return new AmpScanState(
+                threads is null ? [] : new Dictionary<string, string>(threads, StringComparer.Ordinal)
+            );
         }
         catch (JsonException)
         {
@@ -510,7 +551,8 @@ internal sealed record AmpThreadUsage(
     long OutputTokens,
     long CacheReadTokens,
     long CacheWriteTokens,
-    string SourceEventId);
+    string SourceEventId
+);
 
 internal static class AmpThreadParser
 {
@@ -520,14 +562,22 @@ internal static class AmpThreadParser
         try
         {
             using JsonDocument document = JsonDocument.Parse(raw ?? "");
-            if (document.RootElement.ValueKind != JsonValueKind.Array) return false;
+            if (document.RootElement.ValueKind != JsonValueKind.Array)
+                return false;
 
             var parsed = new List<AmpThreadSummary>();
             foreach (JsonElement item in document.RootElement.EnumerateArray())
             {
-                if (item.ValueKind != JsonValueKind.Object || ReadString(item, "id") is not { } id) continue;
-                DateTimeOffset? updatedAt = ReadString(item, "updated") is { } updated
-                    && DateTimeOffset.TryParse(updated, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out DateTimeOffset timestamp)
+                if (item.ValueKind != JsonValueKind.Object || ReadString(item, "id") is not { } id)
+                    continue;
+                DateTimeOffset? updatedAt =
+                    ReadString(item, "updated") is { } updated
+                    && DateTimeOffset.TryParse(
+                        updated,
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                        out DateTimeOffset timestamp
+                    )
                         ? timestamp
                         : null;
                 parsed.Add(new AmpThreadSummary(id, updatedAt));
@@ -545,47 +595,64 @@ internal static class AmpThreadParser
         string threadId,
         string? raw,
         DateTimeOffset? cutoff,
-        out IReadOnlyList<AmpThreadUsage> parsedUsage)
+        out IReadOnlyList<AmpThreadUsage> parsedUsage
+    )
     {
         parsedUsage = [];
         try
         {
             using JsonDocument document = JsonDocument.Parse(raw ?? "");
-            if (!document.RootElement.TryGetProperty("messages", out JsonElement messages)
-                || messages.ValueKind != JsonValueKind.Array)
+            if (
+                !document.RootElement.TryGetProperty("messages", out JsonElement messages)
+                || messages.ValueKind != JsonValueKind.Array
+            )
                 return false;
 
             var parsed = new List<AmpThreadUsage>();
             foreach (JsonElement message in messages.EnumerateArray())
             {
-                if (message.ValueKind != JsonValueKind.Object
+                if (
+                    message.ValueKind != JsonValueKind.Object
                     || !message.TryGetProperty("usage", out JsonElement usage)
-                    || usage.ValueKind != JsonValueKind.Object)
+                    || usage.ValueKind != JsonValueKind.Object
+                )
                     continue;
 
                 long input = ReadLong(usage, "inputTokens");
                 long output = ReadLong(usage, "outputTokens");
                 long cacheRead = ReadLong(usage, "cacheReadInputTokens");
                 long cacheWrite = ReadLong(usage, "cacheCreationInputTokens");
-                if (input + output + cacheRead + cacheWrite == 0) continue;
+                if (input + output + cacheRead + cacheWrite == 0)
+                    continue;
 
-                if (ReadString(usage, "model") is not { } model
+                if (
+                    ReadString(usage, "model") is not { } model
                     || ReadString(usage, "timestamp") is not { } timestampText
-                    || !DateTimeOffset.TryParse(timestampText, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out DateTimeOffset occurredAt))
+                    || !DateTimeOffset.TryParse(
+                        timestampText,
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                        out DateTimeOffset occurredAt
+                    )
+                )
                     return false;
-                if (cutoff.HasValue && occurredAt < cutoff.Value) continue;
+                if (cutoff.HasValue && occurredAt < cutoff.Value)
+                    continue;
 
-                string? messageId = ReadString(message, "protocolMessageID")
-                    ?? ReadIdentifier(message, "messageId");
-                if (string.IsNullOrWhiteSpace(messageId)) return false;
-                parsed.Add(new AmpThreadUsage(
-                    model,
-                    occurredAt,
-                    input,
-                    output,
-                    cacheRead,
-                    cacheWrite,
-                    $"amp:{threadId}:{messageId}"));
+                string? messageId = ReadString(message, "protocolMessageID") ?? ReadIdentifier(message, "messageId");
+                if (string.IsNullOrWhiteSpace(messageId))
+                    return false;
+                parsed.Add(
+                    new AmpThreadUsage(
+                        model,
+                        occurredAt,
+                        input,
+                        output,
+                        cacheRead,
+                        cacheWrite,
+                        $"amp:{threadId}:{messageId}"
+                    )
+                );
             }
             parsedUsage = parsed.OrderBy(item => item.OccurredAt).ToArray();
             return true;
@@ -605,7 +672,8 @@ internal static class AmpThreadParser
 
     private static string? ReadIdentifier(JsonElement element, string propertyName)
     {
-        if (!element.TryGetProperty(propertyName, out JsonElement value)) return null;
+        if (!element.TryGetProperty(propertyName, out JsonElement value))
+            return null;
         return value.ValueKind switch
         {
             JsonValueKind.String => value.GetString(),

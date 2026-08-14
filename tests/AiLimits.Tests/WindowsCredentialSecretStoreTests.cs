@@ -13,8 +13,9 @@ public sealed class WindowsCredentialSecretStoreTests
         // 2561 characters in UTF-16 = 5122 bytes, exceeding the 5120-byte limit.
         var oversized = new string('x', 2561);
 
-        var ex = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => store.SetAsync("test-scope", "oversized-key", oversized, default));
+        var ex = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            store.SetAsync("test-scope", "oversized-key", oversized, default)
+        );
 
         Assert.Contains("2560 UTF-16 characters", ex.Message, StringComparison.Ordinal);
     }

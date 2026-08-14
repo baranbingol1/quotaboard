@@ -20,7 +20,10 @@ public interface ILimitFetchStrategy
 
     int Order { get; }
 
-    Task<StrategyAvailabilityResult> CheckAvailabilityAsync(ProviderAccount account, CancellationToken cancellationToken);
+    Task<StrategyAvailabilityResult> CheckAvailabilityAsync(
+        ProviderAccount account,
+        CancellationToken cancellationToken
+    );
 
     Task<FetchResult> FetchAsync(ProviderAccount account, CancellationToken cancellationToken);
 }
@@ -40,7 +43,11 @@ public interface ITokenUsageSource
 {
     string Id { get; }
 
-    IAsyncEnumerable<TokenUsageEvent> ReadAsync(ProviderAccount account, ScannerCursor? cursor, CancellationToken cancellationToken);
+    IAsyncEnumerable<TokenUsageEvent> ReadAsync(
+        ProviderAccount account,
+        ScannerCursor? cursor,
+        CancellationToken cancellationToken
+    );
 }
 
 /// <summary>
@@ -80,13 +87,16 @@ public static class ScanFailureCheckpoint
         ITokenUsageSource source,
         string sourceId,
         string? startingPosition,
-        DateTimeOffset? committedAt) =>
-        new(sourceId,
+        DateTimeOffset? committedAt
+    ) =>
+        new(
+            sourceId,
             source is IScanFailureCheckpointSource checkpointSource
-            ? checkpointSource.FailureCheckpoint ?? startingPosition
-            : startingPosition,
+                ? checkpointSource.FailureCheckpoint ?? startingPosition
+                : startingPosition,
             committedAt,
-            null);
+            null
+        );
 }
 
 /// <summary>

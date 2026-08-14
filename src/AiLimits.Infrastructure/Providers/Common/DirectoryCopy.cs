@@ -17,7 +17,11 @@ public static class DirectoryCopy
             string target = Path.Combine(destination, Path.GetFileName(file));
             if (!File.Exists(target) && !SafeFileEnumeration.IsReparsePoint(file))
             {
-                try { File.Copy(file, target, overwrite: false); } catch { }
+                try
+                {
+                    File.Copy(file, target, overwrite: false);
+                }
+                catch { }
             }
         }
         foreach (string directory in Directory.EnumerateDirectories(source, "*", SafeFileEnumeration.TopLevel))
@@ -26,7 +30,11 @@ public static class DirectoryCopy
             {
                 continue;
             }
-            try { CopyMissing(directory, Path.Combine(destination, Path.GetFileName(directory))); } catch { }
+            try
+            {
+                CopyMissing(directory, Path.Combine(destination, Path.GetFileName(directory)));
+            }
+            catch { }
         }
     }
 }

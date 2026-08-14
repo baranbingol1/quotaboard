@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 using System.Runtime.ExceptionServices;
 using AiLimits.Application.Diagnostics;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AiLimits.App;
 
@@ -19,13 +21,19 @@ internal static class StartupDiagnostics
 
     public static bool Register()
     {
-        if (!string.Equals(Environment.GetEnvironmentVariable(OptInVariable), "1", StringComparison.Ordinal))
+        if (!IsEnabled())
             return false;
         AppDomain.CurrentDomain.FirstChanceException += OnFirstChanceException;
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
         Write("Startup diagnostics enabled.");
         return true;
     }
+
+    public static ILogger<T> CreateLogger<T>() =>
+        IsEnabled() ? new StartupDiagnosticsLogger<T>() : NullLogger<T>.Instance;
+
+    private static bool IsEnabled() =>
+        string.Equals(Environment.GetEnvironmentVariable(OptInVariable), "1", StringComparison.Ordinal);
 
     private static void OnFirstChanceException(object? sender, FirstChanceExceptionEventArgs args)
     {
@@ -56,9 +64,41 @@ internal static class StartupDiagnostics
         {
             var directory = Path.Combine(Path.GetTempPath(), "AiLimits");
             Directory.CreateDirectory(directory);
-            File.AppendAllText(Path.Combine(directory, "startup-diagnostics.log"),
-                $"{DateTimeOffset.UtcNow:O} {DiagnosticRedactor.Redact(message, LogEntryLimit)}{Environment.NewLine}");
+            File.AppendAllText(
+                Path.Combine(directory, "startup-diagnostics.log"),
+                $"{DateTimeOffset.UtcNow:O} {DiagnosticRedactor.Redact(message, LogEntryLimit)}{Environment.NewLine}"
+            );
         }
         catch { }
+    }
+
+    private sealed class StartupDiagnosticsLogger<T> : ILogger<T>
+    {
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Warning;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter
+        )
+        {
+            if (!IsEnabled(logLevel))
+            {
+                return;
+            }
+
+            string category = typeof(T).FullName ?? typeof(T).Name;
+            string message = $"{logLevel.ToString().ToUpperInvariant()} {category}: {formatter(state, exception)}";
+            if (exception is not null)
+            {
+                message += $"{Environment.NewLine}{exception}";
+            }
+            Write(message);
+        }
     }
 }

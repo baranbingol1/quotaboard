@@ -22,18 +22,29 @@ public sealed class CursorCredentialSource
     private readonly IClock clock;
     private readonly ILogger<CursorCredentialSource> _logger;
 
-    public CursorCredentialSource(string? databasePath = null, IClock? clock = null, ILogger<CursorCredentialSource>? logger = null)
+    public CursorCredentialSource(
+        string? databasePath = null,
+        IClock? clock = null,
+        ILogger<CursorCredentialSource>? logger = null
+    )
     {
-        this.databasePath = databasePath ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Cursor", "User", "globalStorage", "state.vscdb");
+        this.databasePath =
+            databasePath
+            ?? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "Cursor",
+                "User",
+                "globalStorage",
+                "state.vscdb"
+            );
         this.clock = clock ?? new SystemClock();
         _logger = logger ?? NullLogger<CursorCredentialSource>.Instance;
     }
 
     internal async Task<CursorCredential?> ReadAsync(CancellationToken cancellationToken)
     {
-        if (!File.Exists(databasePath)) return null;
+        if (!File.Exists(databasePath))
+            return null;
 
         try
         {
@@ -68,7 +79,7 @@ public sealed class CursorCredentialSource
                 {
                     DataSource = databasePath,
                     Mode = SqliteOpenMode.ReadOnly,
-                    Pooling = false
+                    Pooling = false,
                 }.ToString();
                 await using var connection = new SqliteConnection(connectionString);
                 await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -87,16 +98,17 @@ public sealed class CursorCredentialSource
         }
     }
 
-    private static bool IsBusyOrLocked(SqliteException ex) =>
-        ex.SqliteErrorCode == 5 || ex.SqliteErrorCode == 6;
+    private static bool IsBusyOrLocked(SqliteException ex) => ex.SqliteErrorCode == 5 || ex.SqliteErrorCode == 6;
 
     internal static bool TryParse(string? accessToken, DateTimeOffset now, out CursorCredential? credential)
     {
         credential = null;
-        if (string.IsNullOrWhiteSpace(accessToken)) return false;
+        if (string.IsNullOrWhiteSpace(accessToken))
+            return false;
 
         string[] segments = accessToken.Split('.');
-        if (segments.Length < 2) return false;
+        if (segments.Length < 2)
+            return false;
 
         try
         {
@@ -104,22 +116,32 @@ public sealed class CursorCredentialSource
             payload = payload.PadRight((payload.Length + 3) / 4 * 4, '=');
             using JsonDocument document = JsonDocument.Parse(Convert.FromBase64String(payload));
             JsonElement root = document.RootElement;
-            string? subject = root.TryGetProperty("sub", out JsonElement subjectElement)
+            string? subject =
+                root.TryGetProperty("sub", out JsonElement subjectElement)
                 && subjectElement.ValueKind == JsonValueKind.String
-                ? subjectElement.GetString()?.Trim()
-                : null;
-            if (string.IsNullOrWhiteSpace(subject)
+                    ? subjectElement.GetString()?.Trim()
+                    : null;
+            if (
+                string.IsNullOrWhiteSpace(subject)
                 || !root.TryGetProperty("exp", out JsonElement expiryElement)
                 || !expiryElement.TryGetInt64(out long expirySeconds)
-                || expirySeconds <= now.Add(MinimumLifetime).ToUnixTimeSeconds())
+                || expirySeconds <= now.Add(MinimumLifetime).ToUnixTimeSeconds()
+            )
             {
                 return false;
             }
 
-            string cookieUserId = subject.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .LastOrDefault() ?? string.Empty;
-            if (cookieUserId.Length == 0 || cookieUserId.Any(character =>
-                    !char.IsAsciiLetterOrDigit(character) && character is not '.' and not '_' and not '-'))
+            string cookieUserId =
+                subject
+                    .Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .LastOrDefault()
+                ?? string.Empty;
+            if (
+                cookieUserId.Length == 0
+                || cookieUserId.Any(character =>
+                    !char.IsAsciiLetterOrDigit(character) && character is not '.' and not '_' and not '-'
+                )
+            )
             {
                 return false;
             }
@@ -136,7 +158,8 @@ public sealed class CursorCredentialSource
     private static string? NormalizeStoredToken(string? value)
     {
         string? trimmed = value?.Trim().TrimEnd('\0');
-        if (string.IsNullOrEmpty(trimmed)) return null;
+        if (string.IsNullOrEmpty(trimmed))
+            return null;
         if (trimmed[0] == '"' && trimmed[^1] == '"')
         {
             try
@@ -153,8 +176,10 @@ public sealed class CursorCredentialSource
 
     private static string? DecodeSqliteValue(object? value)
     {
-        if (value is string text) return text;
-        if (value is not byte[] bytes || bytes.Length == 0) return null;
+        if (value is string text)
+            return text;
+        if (value is not byte[] bytes || bytes.Length == 0)
+            return null;
         if (bytes.Length >= 2 && bytes[1] == 0)
         {
             return Encoding.Unicode.GetString(bytes).TrimEnd('\0');
@@ -169,12 +194,20 @@ public sealed class CursorProviderAdapter : IProviderAdapter
     private readonly IClock clock;
     private readonly CursorCredentialSource credentialSource;
 
-    public CursorProviderAdapter(HttpClient httpClient, IClock clock, string? databasePath = null, ILogger<CursorProviderAdapter>? logger = null)
-        : this(httpClient, clock, new CursorCredentialSource(databasePath, clock), logger)
-    {
-    }
+    public CursorProviderAdapter(
+        HttpClient httpClient,
+        IClock clock,
+        string? databasePath = null,
+        ILogger<CursorProviderAdapter>? logger = null
+    )
+        : this(httpClient, clock, new CursorCredentialSource(databasePath, clock), logger) { }
 
-    public CursorProviderAdapter(HttpClient httpClient, IClock clock, CursorCredentialSource credentialSource, ILogger<CursorProviderAdapter>? logger = null)
+    public CursorProviderAdapter(
+        HttpClient httpClient,
+        IClock clock,
+        CursorCredentialSource credentialSource,
+        ILogger<CursorProviderAdapter>? logger = null
+    )
     {
         this.httpClient = httpClient;
         this.clock = clock;
@@ -190,13 +223,17 @@ public sealed class CursorProviderAdapter : IProviderAdapter
             CursorCredential? credential = await credentialSource.ReadAsync(cancellationToken).ConfigureAwait(false);
             return credential is null
                 ? []
-                : [new ProviderAccount(
-                    new AccountKey(Descriptor.Id, credential.Subject),
-                    "Cursor",
-                    null,
-                    "Cursor app session",
-                    1,
-                    IsConnected: true)];
+                :
+                [
+                    new ProviderAccount(
+                        new AccountKey(Descriptor.Id, credential.Subject),
+                        "Cursor",
+                        null,
+                        "Cursor app session",
+                        1,
+                        IsConnected: true
+                    ),
+                ];
         }
         catch (IOException)
         {
@@ -215,7 +252,8 @@ public sealed class CursorProviderAdapter : IProviderAdapter
 internal sealed class CursorWebLimitStrategy(
     HttpClient httpClient,
     IClock clock,
-    CursorCredentialSource credentialSource) : ILimitFetchStrategy
+    CursorCredentialSource credentialSource
+) : ILimitFetchStrategy
 {
     private static readonly Uri UsageSummaryUri = new("https://cursor.com/api/usage-summary");
     private static readonly Uri IdentityUri = new("https://cursor.com/api/auth/me");
@@ -225,18 +263,25 @@ internal sealed class CursorWebLimitStrategy(
 
     public async Task<StrategyAvailabilityResult> CheckAvailabilityAsync(
         ProviderAccount account,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         try
         {
             CursorCredential? credential = await credentialSource.ReadAsync(cancellationToken).ConfigureAwait(false);
             return credential is null
-                ? new StrategyAvailabilityResult(StrategyAvailability.NotConfigured, "Cursor app session was not found.")
+                ? new StrategyAvailabilityResult(
+                    StrategyAvailability.NotConfigured,
+                    "Cursor app session was not found."
+                )
                 : StrategyAvailabilityResult.Ready();
         }
         catch (IOException)
         {
-            return new StrategyAvailabilityResult(StrategyAvailability.TemporarilyUnavailable, "Cursor app is holding the database.");
+            return new StrategyAvailabilityResult(
+                StrategyAvailability.TemporarilyUnavailable,
+                "Cursor app is holding the database."
+            );
         }
     }
 
@@ -250,7 +295,11 @@ internal sealed class CursorWebLimitStrategy(
         }
         catch (IOException)
         {
-            return Failure(FetchFailureKind.Network, "Cursor app is holding the database; please close it and try again.", started);
+            return Failure(
+                FetchFailureKind.Network,
+                "Cursor app is holding the database; please close it and try again.",
+                started
+            );
         }
         if (credential is null)
         {
@@ -258,13 +307,18 @@ internal sealed class CursorWebLimitStrategy(
         }
         if (!string.Equals(credential.Subject, account.Key.Value, StringComparison.Ordinal))
         {
-            return Failure(FetchFailureKind.AccountMismatch, "Cursor app session belongs to a different account.", started);
+            return Failure(
+                FetchFailureKind.AccountMismatch,
+                "Cursor app session belongs to a different account.",
+                started
+            );
         }
 
         string cookieHeader = BuildCookieHeader(credential);
         using var summaryRequest = BuildRequest(UsageSummaryUri, cookieHeader);
-        using ProviderJsonResult summaryExchange = await ProviderHttp.GetJsonAsync(
-            httpClient, summaryRequest, Id, "Cursor", started, cancellationToken).ConfigureAwait(false);
+        using ProviderJsonResult summaryExchange = await ProviderHttp
+            .GetJsonAsync(httpClient, summaryRequest, Id, "Cursor", started, cancellationToken)
+            .ConfigureAwait(false);
         if (!summaryExchange.IsSuccess)
         {
             return summaryExchange.Failure!;
@@ -274,9 +328,11 @@ internal sealed class CursorWebLimitStrategy(
         using JsonDocument? identity = await TryFetchJsonAsync(IdentityUri, cookieHeader, cancellationToken)
             .ConfigureAwait(false);
         string? authenticatedSubject = CursorUsageMapper.ReadString(identity?.RootElement, "sub");
-        if (!string.IsNullOrWhiteSpace(authenticatedSubject)
+        if (
+            !string.IsNullOrWhiteSpace(authenticatedSubject)
             && !string.Equals(authenticatedSubject, credential.Subject, StringComparison.Ordinal)
-            && !string.Equals(authenticatedSubject, credential.CookieUserId, StringComparison.Ordinal))
+            && !string.Equals(authenticatedSubject, credential.CookieUserId, StringComparison.Ordinal)
+        )
         {
             return Failure(FetchFailureKind.AccountMismatch, "Cursor returned usage for a different account.", started);
         }
@@ -291,7 +347,8 @@ internal sealed class CursorWebLimitStrategy(
             legacy?.RootElement,
             identity?.RootElement,
             clock.UtcNow,
-            Id);
+            Id
+        );
         return FetchResult.Success(snapshot, Id, Stopwatch.GetElapsedTime(started));
     }
 
@@ -309,11 +366,13 @@ internal sealed class CursorWebLimitStrategy(
     private async Task<JsonDocument?> TryFetchJsonAsync(
         Uri uri,
         string cookieHeader,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         using var request = BuildRequest(uri, cookieHeader);
-        ProviderJsonResult exchange = await ProviderHttp.GetJsonAsync(
-            httpClient, request, Id, "Cursor", Stopwatch.GetTimestamp(), cancellationToken).ConfigureAwait(false);
+        ProviderJsonResult exchange = await ProviderHttp
+            .GetJsonAsync(httpClient, request, Id, "Cursor", Stopwatch.GetTimestamp(), cancellationToken)
+            .ConfigureAwait(false);
         if (!exchange.IsSuccess)
         {
             // Best-effort enrichment: swallow the classified failure.

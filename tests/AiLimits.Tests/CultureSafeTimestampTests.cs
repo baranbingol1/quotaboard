@@ -45,7 +45,9 @@ public sealed class CultureSafeTimestampTests
                 {"messages":[{"messageId":1,"usage":{"model":"gpt-5","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}
                 """;
 
-            Assert.True(AmpThreadParser.TryParseUsage("T-test", export, null, out IReadOnlyList<AmpThreadUsage> parsed));
+            Assert.True(
+                AmpThreadParser.TryParseUsage("T-test", export, null, out IReadOnlyList<AmpThreadUsage> parsed)
+            );
             AmpThreadUsage usage = Assert.Single(parsed);
             Assert.Equal(new DateTimeOffset(2026, 7, 19, 12, 0, 0, TimeSpan.Zero), usage.OccurredAt);
         }
@@ -59,13 +61,16 @@ public sealed class CultureSafeTimestampTests
         {
             var projects = Directory.CreateDirectory(Path.Combine(temp.Path, "projects", "demo"));
             var file = Path.Combine(projects.FullName, "chat.jsonl");
-            await File.WriteAllLinesAsync(file,
-            [
-                "{\"timestamp\":\"2026-07-13T10:00:00Z\",\"message\":{\"id\":\"m1\",\"model\":\"claude-sonnet-4\",\"usage\":{\"input_tokens\":100,\"output_tokens\":50}}}"
-            ]);
+            await File.WriteAllLinesAsync(
+                file,
+                [
+                    "{\"timestamp\":\"2026-07-13T10:00:00Z\",\"message\":{\"id\":\"m1\",\"model\":\"claude-sonnet-4\",\"usage\":{\"input_tokens\":100,\"output_tokens\":50}}}",
+                ]
+            );
 
             var events = await CollectAsync(
-                new ClaudeJsonlTokenSource(temp.Path).ReadAsync(Account("claude"), null, default));
+                new ClaudeJsonlTokenSource(temp.Path).ReadAsync(Account("claude"), null, default)
+            );
 
             var evt = Assert.Single(events);
             Assert.Equal(new DateTimeOffset(2026, 7, 13, 10, 0, 0, TimeSpan.Zero), evt.OccurredAt);
@@ -81,13 +86,16 @@ public sealed class CultureSafeTimestampTests
         {
             var sessions = Directory.CreateDirectory(Path.Combine(temp.Path, "sessions"));
             var file = Path.Combine(sessions.FullName, "one.jsonl");
-            await File.WriteAllLinesAsync(file,
-            [
-                "{\"timestamp\":\"2026-07-13T10:00:00Z\",\"payload\":{\"model\":\"gpt-5\",\"info\":{\"total_token_usage\":{\"input_tokens\":100,\"output_tokens\":50,\"cached_input_tokens\":20,\"reasoning_output_tokens\":10}}}}"
-            ]);
+            await File.WriteAllLinesAsync(
+                file,
+                [
+                    "{\"timestamp\":\"2026-07-13T10:00:00Z\",\"payload\":{\"model\":\"gpt-5\",\"info\":{\"total_token_usage\":{\"input_tokens\":100,\"output_tokens\":50,\"cached_input_tokens\":20,\"reasoning_output_tokens\":10}}}}",
+                ]
+            );
 
             var events = await CollectAsync(
-                new CodexSessionTokenSource(temp.Path).ReadAsync(Account("codex"), null, default));
+                new CodexSessionTokenSource(temp.Path).ReadAsync(Account("codex"), null, default)
+            );
 
             var evt = Assert.Single(events);
             Assert.Equal(new DateTimeOffset(2026, 7, 13, 10, 0, 0, TimeSpan.Zero), evt.OccurredAt);
@@ -103,13 +111,16 @@ public sealed class CultureSafeTimestampTests
         var projects = Directory.CreateDirectory(Path.Combine(temp.Path, "projects", "demo"));
         var file = Path.Combine(projects.FullName, "chat.jsonl");
         // No "Z" suffix and no offset — must still parse as UTC.
-        await File.WriteAllLinesAsync(file,
-        [
-            "{\"timestamp\":\"2026-07-13T10:00:00\",\"message\":{\"id\":\"m1\",\"model\":\"c\",\"usage\":{\"input_tokens\":10,\"output_tokens\":5}}}"
-        ]);
+        await File.WriteAllLinesAsync(
+            file,
+            [
+                "{\"timestamp\":\"2026-07-13T10:00:00\",\"message\":{\"id\":\"m1\",\"model\":\"c\",\"usage\":{\"input_tokens\":10,\"output_tokens\":5}}}",
+            ]
+        );
 
         var events = await CollectAsync(
-            new ClaudeJsonlTokenSource(temp.Path).ReadAsync(Account("claude"), null, default));
+            new ClaudeJsonlTokenSource(temp.Path).ReadAsync(Account("claude"), null, default)
+        );
 
         var evt = Assert.Single(events);
         Assert.Equal(TimeSpan.Zero, evt.OccurredAt.Offset);
@@ -121,25 +132,29 @@ public sealed class CultureSafeTimestampTests
         using var temp = new TempDir();
         var sessions = Directory.CreateDirectory(Path.Combine(temp.Path, "sessions"));
         var file = Path.Combine(sessions.FullName, "one.jsonl");
-        await File.WriteAllLinesAsync(file,
-        [
-            "{\"timestamp\":\"2026-07-13T10:00:00\",\"payload\":{\"model\":\"gpt-5\",\"info\":{\"total_token_usage\":{\"input_tokens\":100,\"output_tokens\":50}}}}"
-        ]);
+        await File.WriteAllLinesAsync(
+            file,
+            [
+                "{\"timestamp\":\"2026-07-13T10:00:00\",\"payload\":{\"model\":\"gpt-5\",\"info\":{\"total_token_usage\":{\"input_tokens\":100,\"output_tokens\":50}}}}",
+            ]
+        );
 
         var events = await CollectAsync(
-            new CodexSessionTokenSource(temp.Path).ReadAsync(Account("codex"), null, default));
+            new CodexSessionTokenSource(temp.Path).ReadAsync(Account("codex"), null, default)
+        );
 
         var evt = Assert.Single(events);
         Assert.Equal(TimeSpan.Zero, evt.OccurredAt.Offset);
     }
 
-    private static ProviderAccount Account(string provider) => new(
-        new AccountKey(new ProviderId(provider), "one"), "one", null, "fixture", 1, true);
+    private static ProviderAccount Account(string provider) =>
+        new(new AccountKey(new ProviderId(provider), "one"), "one", null, "fixture", 1, true);
 
     private static async Task<List<T>> CollectAsync<T>(IAsyncEnumerable<T> source)
     {
         var items = new List<T>();
-        await foreach (var item in source) items.Add(item);
+        await foreach (var item in source)
+            items.Add(item);
         return items;
     }
 
@@ -155,10 +170,13 @@ public sealed class CultureSafeTimestampTests
             Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AiLimits.Tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(Path);
         }
+
         public string Path { get; }
+
         public void Dispose()
         {
-            if (Directory.Exists(Path)) Directory.Delete(Path, true);
+            if (Directory.Exists(Path))
+                Directory.Delete(Path, true);
         }
     }
 }

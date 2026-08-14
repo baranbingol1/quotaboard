@@ -13,7 +13,10 @@ internal static class ClinePathDiscovery
     internal static IEnumerable<string> FindRoots()
     {
         string cliRoot = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cline", "data");
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".cline",
+            "data"
+        );
         if (Directory.Exists(cliRoot))
         {
             yield return cliRoot;
@@ -22,8 +25,7 @@ internal static class ClinePathDiscovery
         string roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         foreach (string editor in EditorNames)
         {
-            string extensionRoot = Path.Combine(
-                roaming, editor, "User", "globalStorage", "saoudrizwan.claude-dev");
+            string extensionRoot = Path.Combine(roaming, editor, "User", "globalStorage", "saoudrizwan.claude-dev");
             if (Directory.Exists(extensionRoot))
             {
                 yield return extensionRoot;

@@ -11,7 +11,8 @@ public readonly record struct UsageWindowRange(DateOnly From, DateOnly Through)
         DateOnly first,
         DateOnly second,
         DateOnly today,
-        int maximumDays = 365)
+        int maximumDays = 365
+    )
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maximumDays, 1);
 

@@ -15,7 +15,10 @@ public sealed class DiagnosticRedactorTests
 
     [Theory]
     // Query-string and form syntax.
-    [InlineData("GET /v1/usage?access_token=sk_live_9Xa2Kd8Lm3Qp7Rt1Zv4Bn6Hj failed", "sk_live_9Xa2Kd8Lm3Qp7Rt1Zv4Bn6Hj")]
+    [InlineData(
+        "GET /v1/usage?access_token=sk_live_9Xa2Kd8Lm3Qp7Rt1Zv4Bn6Hj failed",
+        "sk_live_9Xa2Kd8Lm3Qp7Rt1Zv4Bn6Hj"
+    )]
     [InlineData("refresh_token=aB3dE5gH7jK9lM1nO2pQ was rejected", "aB3dE5gH7jK9lM1nO2pQ")]
     // JSON colon form - the denylist this replaced missed all of these.
     [InlineData("""{"api_key":"aB3dE5gH7jK9lM1nO2pQ4rS6"}""", "aB3dE5gH7jK9lM1nO2pQ4rS6")]
@@ -53,7 +56,8 @@ public sealed class DiagnosticRedactorTests
     public void Every_occurrence_is_replaced_not_just_the_first()
     {
         string redacted = DiagnosticRedactor.Redact(
-            "access_token=aB3dE5gH7jK9lM1nO2pQ and refresh_token=Zv4Bn6Hj0Xa2Kd8Lm3Qp7Rt1");
+            "access_token=aB3dE5gH7jK9lM1nO2pQ and refresh_token=Zv4Bn6Hj0Xa2Kd8Lm3Qp7Rt1"
+        );
 
         Assert.DoesNotContain("aB3dE5gH7jK9lM1nO2pQ", redacted, StringComparison.Ordinal);
         Assert.DoesNotContain("Zv4Bn6Hj0Xa2Kd8Lm3Qp7Rt1", redacted, StringComparison.Ordinal);
@@ -90,6 +94,7 @@ public sealed class DiagnosticRedactorTests
     {
         Assert.Equal(
             "Authorization: Bearer " + DiagnosticRedactor.Placeholder,
-            DiagnosticRedactor.Redact("Authorization: Bearer aB3dE5gH7jK9lM1nO2pQ"));
+            DiagnosticRedactor.Redact("Authorization: Bearer aB3dE5gH7jK9lM1nO2pQ")
+        );
     }
 }

@@ -21,7 +21,8 @@ public sealed record ClineCredential(
     DateTimeOffset? ExpiresAt = null,
     string? RefreshToken = null,
     bool IsWorkOsSession = false,
-    string? Email = null);
+    string? Email = null
+);
 
 /// <summary>
 /// Resolves the ClinePass bearer token. Precedence: CLINE_API_KEY, then
@@ -34,8 +35,7 @@ public sealed record ClineCredential(
 /// </summary>
 internal static class ClineCredentialReader
 {
-    internal static ClineCredential? Resolve() =>
-        ResolveEnvironment() ?? ResolveSecrets(DefaultSecretsPath());
+    internal static ClineCredential? Resolve() => ResolveEnvironment() ?? ResolveSecrets(DefaultSecretsPath());
 
     internal static ClineCredential? ResolveEnvironment()
     {
@@ -62,23 +62,19 @@ internal static class ClineCredentialReader
         {
             using FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             using JsonDocument document = JsonDocument.Parse(stream);
-            if (document.RootElement.ValueKind == JsonValueKind.Object &&
-                document.RootElement.TryGetProperty("cline:clineAccountId", out JsonElement value) &&
-                value.ValueKind == JsonValueKind.String &&
-                !string.IsNullOrWhiteSpace(value.GetString()))
+            if (
+                document.RootElement.ValueKind == JsonValueKind.Object
+                && document.RootElement.TryGetProperty("cline:clineAccountId", out JsonElement value)
+                && value.ValueKind == JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(value.GetString())
+            )
             {
                 return ExtractCredential(value.GetString()!.Trim());
             }
         }
-        catch (IOException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
-        }
-        catch (JsonException)
-        {
-        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+        catch (JsonException) { }
         return null;
     }
 
@@ -104,18 +100,22 @@ internal static class ClineCredentialReader
                 {
                     foreach (string field in new[] { "idToken", "accessToken" })
                     {
-                        if (blob.RootElement.TryGetProperty(field, out JsonElement nested) &&
-                            nested.ValueKind == JsonValueKind.String &&
-                            !string.IsNullOrWhiteSpace(nested.GetString()))
+                        if (
+                            blob.RootElement.TryGetProperty(field, out JsonElement nested)
+                            && nested.ValueKind == JsonValueKind.String
+                            && !string.IsNullOrWhiteSpace(nested.GetString())
+                        )
                         {
                             candidate = nested.GetString()!.Trim();
                             workOsSession = true;
                             break;
                         }
                     }
-                    if (blob.RootElement.TryGetProperty("refreshToken", out JsonElement refresh) &&
-                        refresh.ValueKind == JsonValueKind.String &&
-                        !string.IsNullOrWhiteSpace(refresh.GetString()))
+                    if (
+                        blob.RootElement.TryGetProperty("refreshToken", out JsonElement refresh)
+                        && refresh.ValueKind == JsonValueKind.String
+                        && !string.IsNullOrWhiteSpace(refresh.GetString())
+                    )
                     {
                         refreshToken = refresh.GetString()!.Trim();
                     }
@@ -131,17 +131,23 @@ internal static class ClineCredentialReader
         // A bare stored value can be either a pasted dashboard API key or a raw
         // session token; only the JWT shape gets the WorkOS scheme.
         return IsHeaderSafe(candidate)
-            ? new ClineCredential(candidate, "Cline CLI account", expiresAt, refreshToken,
-                workOsSession || LooksLikeJwt(candidate), email)
+            ? new ClineCredential(
+                candidate,
+                "Cline CLI account",
+                expiresAt,
+                refreshToken,
+                workOsSession || LooksLikeJwt(candidate),
+                email
+            )
             : null;
     }
 
     private static string? ReadEmail(JsonElement root) =>
-        root.TryGetProperty("userInfo", out JsonElement userInfo) &&
-        userInfo.ValueKind == JsonValueKind.Object &&
-        userInfo.TryGetProperty("email", out JsonElement email) &&
-        email.ValueKind == JsonValueKind.String &&
-        !string.IsNullOrWhiteSpace(email.GetString())
+        root.TryGetProperty("userInfo", out JsonElement userInfo)
+        && userInfo.ValueKind == JsonValueKind.Object
+        && userInfo.TryGetProperty("email", out JsonElement email)
+        && email.ValueKind == JsonValueKind.String
+        && !string.IsNullOrWhiteSpace(email.GetString())
             ? email.GetString()!.Trim()
             : null;
 
@@ -170,9 +176,15 @@ internal static class ClineCredentialReader
                 return null;
             }
         }
-        if (raw.ValueKind == JsonValueKind.String &&
-            DateTimeOffset.TryParse(raw.GetString(), CultureInfo.InvariantCulture,
-                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out DateTimeOffset parsed))
+        if (
+            raw.ValueKind == JsonValueKind.String
+            && DateTimeOffset.TryParse(
+                raw.GetString(),
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out DateTimeOffset parsed
+            )
+        )
         {
             return parsed;
         }
@@ -182,9 +194,13 @@ internal static class ClineCredentialReader
     private static bool IsHeaderSafe(string value) =>
         value.Length > 0 && value.All(c => c is >= (char)33 and <= (char)126);
 
-    private static string DefaultSecretsPath() => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".cline", "data", "secrets.json");
+    private static string DefaultSecretsPath() =>
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".cline",
+            "data",
+            "secrets.json"
+        );
 
     private static string? ReadEnvironmentVariable(string name)
     {

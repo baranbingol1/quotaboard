@@ -35,9 +35,9 @@ public sealed class PricingCatalogScheduleTests
     }
 
     [Theory]
-    [InlineData(20, 7, 59, false)]  // just before the morning slot
-    [InlineData(20, 8, 0, true)]    // exactly on it
-    [InlineData(20, 19, 0, true)]   // still due, the slot was missed while closed
+    [InlineData(20, 7, 59, false)] // just before the morning slot
+    [InlineData(20, 8, 0, true)] // exactly on it
+    [InlineData(20, 19, 0, true)] // still due, the slot was missed while closed
     public void Due_only_once_the_next_slot_is_reached(int day, int hour, int minute, bool expected)
     {
         // Fetched at 02:30, so the 08:00 slot is the next one.

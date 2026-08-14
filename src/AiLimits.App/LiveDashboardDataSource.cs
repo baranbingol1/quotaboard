@@ -22,6 +22,7 @@ using AiLimits.Domain;
 using AiLimits.Infrastructure.Persistence;
 using AiLimits.Infrastructure.Pricing;
 using AiLimits.Infrastructure.Providers;
+using AiLimits.Infrastructure.Providers.Amp;
 using AiLimits.Infrastructure.Providers.Antigravity;
 using AiLimits.Infrastructure.Providers.Claude;
 using AiLimits.Infrastructure.Providers.Cline;
@@ -30,7 +31,6 @@ using AiLimits.Infrastructure.Providers.Common;
 using AiLimits.Infrastructure.Providers.Copilot;
 using AiLimits.Infrastructure.Providers.Cursor;
 using AiLimits.Infrastructure.Providers.Droid;
-using AiLimits.Infrastructure.Providers.Amp;
 using AiLimits.Infrastructure.Providers.OpenCode;
 using AiLimits.Infrastructure.Providers.Statuspage;
 using AiLimits.Platform.Windows.Security;
@@ -45,7 +45,17 @@ namespace AiLimits.App;
 
 internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposable
 {
-    private sealed record PricedModelRow(ModelUsageRowViewModel ViewModel, decimal? CostUsd, long RawTokens, long InputTokens, long OutputTokens, long CacheReadTokens, long CacheWriteTokens, long ReasoningTokens, decimal CacheSavedUsd = 0m);
+    private sealed record PricedModelRow(
+        ModelUsageRowViewModel ViewModel,
+        decimal? CostUsd,
+        long RawTokens,
+        long InputTokens,
+        long OutputTokens,
+        long CacheReadTokens,
+        long CacheWriteTokens,
+        long ReasoningTokens,
+        decimal CacheSavedUsd = 0m
+    );
 
     private static readonly TimeSpan ScanInterval = TimeSpan.FromMinutes(1L);
 
@@ -58,21 +68,20 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
 
     private const int ScanBatchSize = 512;
 
-    private readonly HttpClient _httpClient = new HttpClient
-    {
-        Timeout = TimeSpan.FromSeconds(25L)
-    };
+    private readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(25L) };
 
     // Cursor's app-session cookie must never follow a redirect to another host.
     // Keep this client isolated from the shared provider client and its cookie jar.
-    private readonly HttpClient _cursorHttpClient = new HttpClient(new HttpClientHandler
+    private readonly HttpClient _cursorHttpClient = new HttpClient(
+        new HttpClientHandler
+        {
+            AllowAutoRedirect = false,
+            UseCookies = false,
+            AutomaticDecompression = DecompressionMethods.All,
+        }
+    )
     {
-        AllowAutoRedirect = false,
-        UseCookies = false,
-        AutomaticDecompression = DecompressionMethods.All
-    })
-    {
-        Timeout = TimeSpan.FromSeconds(25L)
+        Timeout = TimeSpan.FromSeconds(25L),
     };
 
     private readonly SystemClock _clock = new SystemClock();
@@ -105,7 +114,6 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
     private readonly ExplicitModelResolver _modelResolver = new ExplicitModelResolver(DefaultModelAliases.All);
     private readonly CatalogModelResolver _catalogModelResolver;
 
-
     private readonly PricingEngine _pricing = new PricingEngine();
 
     // User-entered per-1M pricing for models the catalog cannot price; reloaded
@@ -124,7 +132,8 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
 
     private static readonly TimeSpan ResetCreditsTtl = TimeSpan.FromMinutes(15L);
 
-    private readonly Dictionary<AccountKey, ResetCreditInventory?> _resetCredits = new Dictionary<AccountKey, ResetCreditInventory?>();
+    private readonly Dictionary<AccountKey, ResetCreditInventory?> _resetCredits =
+        new Dictionary<AccountKey, ResetCreditInventory?>();
 
     private DateTimeOffset? _resetCreditsFetchedAt;
 
@@ -146,14 +155,20 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
 
     public LiveDashboardDataSource()
     {
-        string text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "QuotaBoard");
+        string text = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "QuotaBoard"
+        );
         Directory.CreateDirectory(text);
         _databasePath = Path.Combine(text, "ai-limits.db");
         _database = new SqliteDatabase(_databasePath);
         _accounts = new SqliteAccountRepository(_database);
         _snapshots = new SqliteSnapshotRepository(_database);
         _usage = new SqliteUsageAggregateRepository(_database);
-        _providerStatusClient = new ProviderStatusClient(_httpClient);
+        _providerStatusClient = new ProviderStatusClient(
+            _httpClient,
+            logger: StartupDiagnostics.CreateLogger<ProviderStatusClient>()
+        );
         _providerStatuses = new ProviderStatusCache(_clock);
         _quotaAlerts = new QuotaAlertMonitor(_database);
         ProcessRunner processRunner = new ProcessRunner();
@@ -169,13 +184,23 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             new CopilotProviderAdapter(_httpClient, _clock),
             new AgyProviderAdapter(_clock),
             new CursorProviderAdapter(_cursorHttpClient, _clock, logger: NullLogger<CursorProviderAdapter>.Instance),
-            new ClineProviderAdapter(_httpClient, _clock,
+            new ClineProviderAdapter(
+                _httpClient,
+                _clock,
                 secrets: new WindowsCredentialSecretStore(),
-                legacySessionCachePath: Path.Combine(text, "cline-session.json"))
+                legacySessionCachePath: Path.Combine(text, "cline-session.json")
+            ),
         };
         _adapterById = _adapters.ToDictionary((IProviderAdapter adapter) => adapter.Descriptor.Id);
         _discovery = new AccountDiscoveryService(_adapters, _accounts, NullLogger<AccountDiscoveryService>.Instance);
-        _refresh = new RefreshCoordinator(_adapters, _accounts, _snapshots, new SnapshotMerger(), _clock, NullLogger<RefreshCoordinator>.Instance);
+        _refresh = new RefreshCoordinator(
+            _adapters,
+            _accounts,
+            _snapshots,
+            new SnapshotMerger(),
+            _clock,
+            NullLogger<RefreshCoordinator>.Instance
+        );
         _catalog = new ModelsDevPricingCatalog(_httpClient, Path.Combine(text, "pricing"), _clock);
     }
 
@@ -183,7 +208,8 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         bool forceRefresh,
         IProgress<RefreshProgress>? progress,
         IProgress<DashboardData>? interim,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         await _loadGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -207,7 +233,9 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                 // their exceptions before the failure propagates: no work
                 // outlives the refresh (or runs into disposed services during
                 // shutdown) and nothing faults unobserved.
-                using CancellationTokenSource refreshCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                using CancellationTokenSource refreshCts = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken
+                );
                 CancellationToken refreshToken = refreshCts.Token;
                 Task scanTask = ScanTelemetryIfDueAsync(accounts, progress, refreshToken);
                 Task limitsTask = RefreshLimitsAsync(accounts, progress, refreshToken);
@@ -226,11 +254,15 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                         progress?.Report(new RefreshProgress(0, 0, string.Empty, RefreshStage.ScanningHistory));
                         if (interim is not null)
                         {
-                            interim.Report(await ProjectAsync(
-                                await _accounts.ListAsync(refreshToken).ConfigureAwait(false),
-                                await _catalog.GetCurrentAsync(refreshToken).ConfigureAwait(false),
-                                fromCache: false,
-                                refreshToken).ConfigureAwait(false));
+                            interim.Report(
+                                await ProjectAsync(
+                                        await _accounts.ListAsync(refreshToken).ConfigureAwait(false),
+                                        await _catalog.GetCurrentAsync(refreshToken).ConfigureAwait(false),
+                                        fromCache: false,
+                                        refreshToken
+                                    )
+                                    .ConfigureAwait(false)
+                            );
                         }
                     }
                     await scanTask.ConfigureAwait(false);
@@ -249,9 +281,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                     {
                         await Task.WhenAll(limitsTask, scanTask, catalogTask, providerStatusTask).ConfigureAwait(false);
                     }
-                    catch
-                    {
-                    }
+                    catch { }
                 }
                 accounts = await _accounts.ListAsync(cancellationToken).ConfigureAwait(false);
                 await RefreshResetCreditsIfDueAsync(accounts, forceRefresh, cancellationToken).ConfigureAwait(false);
@@ -279,8 +309,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
 
     public async Task<ModelCatalogStatus> GetModelCatalogStatusAsync(CancellationToken cancellationToken)
     {
-        PricingCatalogSnapshot? snapshot = await _catalog.GetCurrentAsync(cancellationToken)
-            .ConfigureAwait(false);
+        PricingCatalogSnapshot? snapshot = await _catalog.GetCurrentAsync(cancellationToken).ConfigureAwait(false);
         return Describe(snapshot);
     }
 
@@ -297,7 +326,8 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                 snapshot.FetchedAt,
                 PricingCatalogSchedule.NextDue(snapshot.FetchedAt.ToLocalTime()),
                 _catalog.LastAttemptAt,
-                _catalog.LastError);
+                _catalog.LastError
+            );
 
     private async Task EnsureDatabaseAsync(CancellationToken cancellationToken)
     {
@@ -335,24 +365,33 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         return _discovery.DiscoverAsync(cancellationToken);
     }
 
-    private async Task RefreshLimitsAsync(IReadOnlyList<ProviderAccount> accounts, IProgress<RefreshProgress>? progress, CancellationToken cancellationToken)
+    private async Task RefreshLimitsAsync(
+        IReadOnlyList<ProviderAccount> accounts,
+        IProgress<RefreshProgress>? progress,
+        CancellationToken cancellationToken
+    )
     {
         // Only providers with a known adapter contribute to the parallel batch;
         // the reported total mirrors that selection so the UI does not show a
         // bar stuck below 100% when one of the accounts is unknown.
-        ProviderAccount[] refreshable = accounts.Where((ProviderAccount account) => _adapterById.ContainsKey(account.Key.Provider)).ToArray();
+        ProviderAccount[] refreshable = accounts
+            .Where((ProviderAccount account) => _adapterById.ContainsKey(account.Key.Provider))
+            .ToArray();
         int total = refreshable.Length;
         int completed = 0;
         progress?.Report(new RefreshProgress(0, total, string.Empty));
         Task<RefreshPublication>[] tasks = refreshable
-            .Select(async (ProviderAccount account) =>
-            {
-                progress?.Report(new RefreshProgress(Volatile.Read(ref completed), total, account.DisplayName));
-                RefreshPublication publication = await RefreshAccountAsync(account, cancellationToken).ConfigureAwait(false);
-                int done = Interlocked.Increment(ref completed);
-                progress?.Report(new RefreshProgress(done, total, string.Empty));
-                return publication;
-            })
+            .Select(
+                async (ProviderAccount account) =>
+                {
+                    progress?.Report(new RefreshProgress(Volatile.Read(ref completed), total, account.DisplayName));
+                    RefreshPublication publication = await RefreshAccountAsync(account, cancellationToken)
+                        .ConfigureAwait(false);
+                    int done = Interlocked.Increment(ref completed);
+                    progress?.Report(new RefreshProgress(done, total, string.Empty));
+                    return publication;
+                }
+            )
             .ToArray();
         RefreshPublication[] publications = await Task.WhenAll(tasks).ConfigureAwait(false);
         _lastRefreshHadTransientFailure = publications.Any(AdaptiveRefreshPolicy.IsTransientFailure);
@@ -364,21 +403,38 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         progress?.Report(new RefreshProgress(total, total, string.Empty));
     }
 
-    private async Task<RefreshPublication> RefreshAccountAsync(ProviderAccount account, CancellationToken cancellationToken)
+    private async Task<RefreshPublication> RefreshAccountAsync(
+        ProviderAccount account,
+        CancellationToken cancellationToken
+    )
     {
-        RefreshPublication refreshPublication = await _refresh.RefreshAsync(new RefreshRequest(account.Key, account.ConfigurationRevision, Force: true, "manual"), cancellationToken).ConfigureAwait(false);
+        RefreshPublication refreshPublication = await _refresh
+            .RefreshAsync(
+                new RefreshRequest(account.Key, account.ConfigurationRevision, Force: true, "manual"),
+                cancellationToken
+            )
+            .ConfigureAwait(false);
         if (refreshPublication.Status == RefreshPublicationStatus.Published)
         {
-            await _accounts.UpsertAsync(account with
-            {
-                IsConnected = true,
-                LastSuccessfulRefreshAt = (refreshPublication.Snapshot?.ObservedAt ?? _clock.UtcNow)
-            }, cancellationToken).ConfigureAwait(false);
+            await _accounts
+                .UpsertAsync(
+                    account with
+                    {
+                        IsConnected = true,
+                        LastSuccessfulRefreshAt = (refreshPublication.Snapshot?.ObservedAt ?? _clock.UtcNow),
+                    },
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
         }
         return refreshPublication;
     }
 
-    private async Task ScanTelemetryIfDueAsync(IReadOnlyList<ProviderAccount> accounts, IProgress<RefreshProgress>? progress, CancellationToken cancellationToken)
+    private async Task ScanTelemetryIfDueAsync(
+        IReadOnlyList<ProviderAccount> accounts,
+        IProgress<RefreshProgress>? progress,
+        CancellationToken cancellationToken
+    )
     {
         DateTimeOffset? lastScanAt = _lastScanAt;
         if (lastScanAt.HasValue)
@@ -397,9 +453,11 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         // accounts even when their live credentials are gone (a CLI logout
         // must not make recorded history vanish).
         (ProviderAccount Account, ITokenUsageSource Source)[] work = accounts
-            .SelectMany(account => _adapterById.TryGetValue(account.Key.Provider, out IProviderAdapter adapter)
-                ? adapter.CreateTokenSources(account).Select(source => (Account: account, Source: source))
-                : [])
+            .SelectMany(account =>
+                _adapterById.TryGetValue(account.Key.Provider, out IProviderAdapter adapter)
+                    ? adapter.CreateTokenSources(account).Select(source => (Account: account, Source: source))
+                    : []
+            )
             .ToArray();
 
         int total = work.Length;
@@ -412,59 +470,68 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         // and writes through the serialised gate below. Running them one after
         // another meant the slowest (Amp, minutes of subprocess launches) held
         // up six others that together take seconds.
-        await Parallel.ForEachAsync(
-            work,
-            new ParallelOptions
-            {
-                MaxDegreeOfParallelism = MaxScanConcurrency,
-                CancellationToken = cancellationToken,
-            },
-            async (item, token) =>
-            {
-                try
+        await Parallel
+            .ForEachAsync(
+                work,
+                new ParallelOptions
                 {
-                    int scanned = await ScanSourceAsync(item.Account, item.Source, token).ConfigureAwait(false);
-                    Interlocked.Add(ref emitted, scanned);
-                    Interlocked.Increment(ref successful);
-                }
-                catch (OperationCanceledException) when (token.IsCancellationRequested)
+                    MaxDegreeOfParallelism = MaxScanConcurrency,
+                    CancellationToken = cancellationToken,
+                },
+                async (item, token) =>
                 {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    // A scan failure used to vanish here, so a source that
-                    // returned nothing because it got a 401 was indistinguishable
-                    // from one that simply had no new events. Keep scanning the
-                    // remaining sources, but remember that this one did not
-                    // succeed and say so in diagnostics.
-                    string message = DiagnosticRedactor.Redact(
-                        ex is TokenScanException ? ex.Message : ex.GetType().Name);
-                    lock (failureGate)
+                    try
                     {
-                        firstFailure ??= message;
+                        int scanned = await ScanSourceAsync(item.Account, item.Source, token).ConfigureAwait(false);
+                        Interlocked.Add(ref emitted, scanned);
+                        Interlocked.Increment(ref successful);
+                    }
+                    catch (OperationCanceledException) when (token.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        // A scan failure used to vanish here, so a source that
+                        // returned nothing because it got a 401 was indistinguishable
+                        // from one that simply had no new events. Keep scanning the
+                        // remaining sources, but remember that this one did not
+                        // succeed and say so in diagnostics.
+                        string message = DiagnosticRedactor.Redact(
+                            ex is TokenScanException ? ex.Message : ex.GetType().Name
+                        );
+                        lock (failureGate)
+                        {
+                            firstFailure ??= message;
+                        }
                     }
                 }
-            }).ConfigureAwait(false);
+            )
+            .ConfigureAwait(false);
 
         _scanInFlight = false;
         _lastScanAt = _clock.UtcNow;
         _scannerCount = total;
         _successfulScannerCount = successful;
-        _scannerDetail = total == 0
-            ? L("Data_NoTelemetrySource")
-            : firstFailure is not null
-                ? F("Data_ScannerFailed", total - successful, total, firstFailure)
-                : F("Data_EventsInspected", emitted);
+        _scannerDetail =
+            total == 0 ? L("Data_NoTelemetrySource")
+            : firstFailure is not null ? F("Data_ScannerFailed", total - successful, total, firstFailure)
+            : F("Data_EventsInspected", emitted);
     }
 
     /// <summary>
     /// Drains one telemetry source into the usage store and advances its cursor.
     /// Returns the number of events it emitted.
     /// </summary>
-    private async Task<int> ScanSourceAsync(ProviderAccount account, ITokenUsageSource source, CancellationToken cancellationToken)
+    private async Task<int> ScanSourceAsync(
+        ProviderAccount account,
+        ITokenUsageSource source,
+        CancellationToken cancellationToken
+    )
     {
-        ScannerCursor? cursor = await _usage.GetCursorAsync(account.Key, source.Id, cancellationToken).ConfigureAwait(false);
+        ScannerCursor? cursor = await _usage
+            .GetCursorAsync(account.Key, source.Id, cancellationToken)
+            .ConfigureAwait(false);
         List<TokenUsageEvent> batch = new List<TokenUsageEvent>(ScanBatchSize);
         // Only events that reached the database may advance the stored cursor;
         // `pending` runs ahead of `committed` for whatever is still in the batch,
@@ -476,9 +543,8 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         // A source that tracks its own per-item state hands it back here; a null
         // means "nothing to record", which must preserve what is already stored
         // rather than erase it. Everything else keeps the historical marker.
-        string? SourcePosition() => source is IScanPositionSource stateful
-            ? stateful.Position ?? cursor?.Position
-            : "incremental";
+        string? SourcePosition() =>
+            source is IScanPositionSource stateful ? stateful.Position ?? cursor?.Position : "incremental";
 
         // What the scan started from, for the failure path below.
         string? StartingPosition() => source is IScanPositionSource ? cursor?.Position : "incremental";
@@ -487,7 +553,9 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
 
         try
         {
-            await foreach (TokenUsageEvent item in source.ReadAsync(account, cursor, cancellationToken).ConfigureAwait(false))
+            await foreach (
+                TokenUsageEvent item in source.ReadAsync(account, cursor, cancellationToken).ConfigureAwait(false)
+            )
             {
                 batch.Add(item);
                 emitted++;
@@ -520,7 +588,11 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             try
             {
                 ScannerCursor failureCheckpoint = ScanFailureCheckpoint.ResolveCursor(
-                    source, source.Id, StartingPosition(), committed);
+                    source,
+                    source.Id,
+                    StartingPosition(),
+                    committed
+                );
                 await WriteCursorAsync(account.Key, failureCheckpoint, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception checkpointFailure) when (checkpointFailure is not OperationCanceledException)
@@ -563,25 +635,39 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         }
     }
 
-    private async Task<DashboardData> ProjectAsync(IReadOnlyList<ProviderAccount> accounts, PricingCatalogSnapshot? catalog, bool fromCache, CancellationToken cancellationToken)
+    private async Task<DashboardData> ProjectAsync(
+        IReadOnlyList<ProviderAccount> accounts,
+        PricingCatalogSnapshot? catalog,
+        bool fromCache,
+        CancellationToken cancellationToken
+    )
     {
         DateTimeOffset now = _clock.UtcNow;
         DateOnly today = DateOnly.FromDateTime(now.ToLocalTime().DateTime);
         _pricingOverrides = ModelPricingOverridePreference.LoadAll();
         // A 365-day custom window needs the immediately preceding 365 days for
         // period-over-period comparison.
-        IReadOnlyList<DailyUsageAggregate> historyRows = await _usage.QueryAsync(today.AddDays(-729), today, null, cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<DailyUsageAggregate> historyRows = await _usage
+            .QueryAsync(today.AddDays(-729), today, null, cancellationToken)
+            .ConfigureAwait(false);
         DateOnly monthStart = today.AddDays(-29);
-        IReadOnlyList<DailyUsageAggregate> rows = historyRows.Where((DailyUsageAggregate row) => row.Day >= monthStart).ToArray();
-        Dictionary<AccountKey, Task<ProviderSnapshot>> snapshotTasks = accounts.ToDictionary((ProviderAccount account) => account.Key, (ProviderAccount account) => _snapshots.GetLatestAsync(account.Key, cancellationToken));
+        IReadOnlyList<DailyUsageAggregate> rows = historyRows
+            .Where((DailyUsageAggregate row) => row.Day >= monthStart)
+            .ToArray();
+        Dictionary<AccountKey, Task<ProviderSnapshot>> snapshotTasks = accounts.ToDictionary(
+            (ProviderAccount account) => account.Key,
+            (ProviderAccount account) => _snapshots.GetLatestAsync(account.Key, cancellationToken)
+        );
         await Task.WhenAll(snapshotTasks.Values).ConfigureAwait(false);
-        Dictionary<AccountKey, ProviderSnapshot> latest = snapshotTasks.ToDictionary((KeyValuePair<AccountKey, Task<ProviderSnapshot>> pair) => pair.Key, (KeyValuePair<AccountKey, Task<ProviderSnapshot>> pair) => pair.Value.Result);
+        Dictionary<AccountKey, ProviderSnapshot> latest = snapshotTasks.ToDictionary(
+            (KeyValuePair<AccountKey, Task<ProviderSnapshot>> pair) => pair.Key,
+            (KeyValuePair<AccountKey, Task<ProviderSnapshot>> pair) => pair.Value.Result
+        );
         if (!fromCache)
         {
-            await _quotaAlerts.ProcessAsync(
-                latest.Values.Where(snapshot => snapshot is not null),
-                now,
-                cancellationToken).ConfigureAwait(false);
+            await _quotaAlerts
+                .ProcessAsync(latest.Values.Where(snapshot => snapshot is not null), now, cancellationToken)
+                .ConfigureAwait(false);
         }
         long totalInput = rows.Sum((DailyUsageAggregate row) => row.InputTokens);
         long totalOutput = rows.Sum((DailyUsageAggregate row) => row.OutputTokens);
@@ -595,25 +681,66 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         IReadOnlyList<PricedModelRow> priced = BuildModelRows(rows, catalog, resolutions);
         IReadOnlyList<ProviderUsageViewModel> providerUsage = BuildProviderUsage(priced);
         IReadOnlyList<ProviderUsageViewModel> harnessUsage = BuildHarnessUsage(priced);
-        decimal quotedCost = priced.Where((PricedModelRow item) => item.CostUsd.HasValue).Sum((PricedModelRow item) => item.CostUsd.GetValueOrDefault());
+        decimal quotedCost = priced
+            .Where((PricedModelRow item) => item.CostUsd.HasValue)
+            .Sum((PricedModelRow item) => item.CostUsd.GetValueOrDefault());
         bool hasPricedUsage = priced.Any((PricedModelRow item) => item.CostUsd.HasValue);
-        decimal reportedCost = rows.Where((DailyUsageAggregate row) => row.ReportedServiceCostUsd.HasValue).Sum((DailyUsageAggregate row) => row.ReportedServiceCostUsd.GetValueOrDefault());
-        IReadOnlyDictionary<AccountKey, FetchFailureKind> latestFailures = await _snapshots.ReadLatestFailureKindsAsync(cancellationToken).ConfigureAwait(false);
-        IReadOnlyList<ProviderCardViewModel> providerCards = BuildProviderCards(accounts, latest, rows, now, latestFailures);
-        ResetHorizonItemViewModel[] resets = (from item in providerCards.SelectMany((ProviderCardViewModel provider) => from meter in provider.AllMeters
-                where meter.ResetsAt.HasValue && meter.ResetsAt > now
-                select new ResetHorizonItemViewModel(provider.Name, provider.Account, meter.DisplayName, Countdown(meter.ResetsAt.Value - now), meter.ResetsAt.Value.ToLocalTime().ToString("ddd HH:mm", CultureInfo.CurrentCulture), provider.Accent, meter.ResetsAt.Value))
+        decimal reportedCost = rows.Where((DailyUsageAggregate row) => row.ReportedServiceCostUsd.HasValue)
+            .Sum((DailyUsageAggregate row) => row.ReportedServiceCostUsd.GetValueOrDefault());
+        IReadOnlyDictionary<AccountKey, FetchFailureKind> latestFailures = await _snapshots
+            .ReadLatestFailureKindsAsync(cancellationToken)
+            .ConfigureAwait(false);
+        IReadOnlyList<ProviderCardViewModel> providerCards = BuildProviderCards(
+            accounts,
+            latest,
+            rows,
+            now,
+            latestFailures
+        );
+        ResetHorizonItemViewModel[] resets = (
+            from item in providerCards.SelectMany(
+                (ProviderCardViewModel provider) =>
+                    from meter in provider.AllMeters
+                    where meter.ResetsAt.HasValue && meter.ResetsAt > now
+                    select new ResetHorizonItemViewModel(
+                        provider.Name,
+                        provider.Account,
+                        meter.DisplayName,
+                        Countdown(meter.ResetsAt.Value - now),
+                        meter.ResetsAt.Value.ToLocalTime().ToString("ddd HH:mm", CultureInfo.CurrentCulture),
+                        provider.Accent,
+                        meter.ResetsAt.Value
+                    )
+            )
             orderby item.ResetsAt
-            select item).Take(8).ToArray();
+            select item
+        )
+            .Take(8)
+            .ToArray();
         int exactProviders = rows.Select((DailyUsageAggregate row) => row.Account.Provider).Distinct().Count();
-        IReadOnlyList<ProviderConnectionViewModel> connections = BuildConnections(accounts, latest, rows, now, latestFailures);
-        IReadOnlyList<FetchAttemptViewModel> recentAttempts = await ReadRecentAttemptsAsync(cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<ProviderConnectionViewModel> connections = BuildConnections(
+            accounts,
+            latest,
+            rows,
+            now,
+            latestFailures
+        );
+        IReadOnlyList<FetchAttemptViewModel> recentAttempts = await ReadRecentAttemptsAsync(cancellationToken)
+            .ConfigureAwait(false);
         IReadOnlyList<UsageDayViewModel> usageDays = BuildDailyRows(rows, today);
         IReadOnlyList<HeatmapCellViewModel> heatmapCells = BuildHeatmap(historyRows, today);
         IReadOnlyList<UsageHistoryDayViewModel> usageHistory = BuildUsageHistory(historyRows, catalog, resolutions);
         IReadOnlyList<UsageModelSliceViewModel> usageModelSlices = BuildUsageModelSlices(historyRows);
-        IReadOnlyList<UsageAnalyticsRecord> usageAnalyticsRecords = BuildUsageAnalyticsRecords(historyRows, catalog, resolutions);
-        IReadOnlyList<ProjectUsageSliceViewModel> projectUsageSlices = BuildProjectUsageSlices(historyRows, catalog, resolutions);
+        IReadOnlyList<UsageAnalyticsRecord> usageAnalyticsRecords = BuildUsageAnalyticsRecords(
+            historyRows,
+            catalog,
+            resolutions
+        );
+        IReadOnlyList<ProjectUsageSliceViewModel> projectUsageSlices = BuildProjectUsageSlices(
+            historyRows,
+            catalog,
+            resolutions
+        );
         string weekDeltaLabel = BuildWeekDelta(rows, today);
         decimal cacheSaved = priced.Sum((PricedModelRow item) => item.CacheSavedUsd);
         string cacheSavingsLabel = cacheSaved > 0m ? F("Data_CacheSavings", FormatUsd(cacheSaved)) : "";
@@ -661,7 +788,15 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             // usage its own OAuth authorized, regardless of which CLI recorded
             // it. Plans with no attributable priced usage are omitted entirely.
             (string Provider, decimal Cost, decimal Quoted)[] valuedPlans = activePlans
-                .Select(pair => (Provider: pair.Key, Cost: pair.Value, Quoted: priced.Where(row => row.CostUsd.HasValue && CountsTowardPlan(pair.Key, row)).Sum(row => row.CostUsd.GetValueOrDefault())))
+                .Select(pair =>
+                    (
+                        Provider: pair.Key,
+                        Cost: pair.Value,
+                        Quoted: priced
+                            .Where(row => row.CostUsd.HasValue && CountsTowardPlan(pair.Key, row))
+                            .Sum(row => row.CostUsd.GetValueOrDefault())
+                    )
+                )
                 .Where(plan => plan.Quoted > 0m)
                 .OrderByDescending(plan => plan.Quoted / plan.Cost)
                 .ToArray();
@@ -672,25 +807,34 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             }
             else
             {
-                // TODO: If plan attribution expands beyond the current small provider set,
+                // TODO(QB-42): If plan attribution expands beyond the current small provider set,
                 // show only the top four multipliers here and expose the remainder as
                 // "+N more" details so the Overview summary card cannot grow unbounded.
-                planValueLabel = string.Join(Environment.NewLine, valuedPlans.Select(plan => $"{ProviderName(plan.Provider)} {plan.Quoted / plan.Cost:0.0}×"));
+                planValueLabel = string.Join(
+                    Environment.NewLine,
+                    valuedPlans.Select(plan => $"{ProviderName(plan.Provider)} {plan.Quoted / plan.Cost:0.0}×")
+                );
                 planValueDetail = F("Data_PlanValueDetail", FormatUsd(valuedPlans.Sum(plan => plan.Cost)));
             }
         }
         IReadOnlyList<ResetCycleViewModel> resetCycles = BuildResetCycles(accounts, now);
         // The cached pass must say what it is: data as old as the last fetch,
         // with a fresh one already underway — never pretend it is live.
-        DateTimeOffset? cachedAt = latest.Values.Where((ProviderSnapshot snapshot) => snapshot is not null).Select((ProviderSnapshot snapshot) => (DateTimeOffset?)snapshot.ObservedAt).DefaultIfEmpty(null).Max();
+        DateTimeOffset? cachedAt = latest
+            .Values.Where((ProviderSnapshot snapshot) => snapshot is not null)
+            .Select((ProviderSnapshot snapshot) => (DateTimeOffset?)snapshot.ObservedAt)
+            .DefaultIfEmpty(null)
+            .Max();
         // Nothing cached and nothing fetched yet is a first run, not a fault.
         // "Not loaded" over a row of zeros read as a broken app; say that the
         // history is being indexed, because that is what the wait is.
         bool firstRun = !cachedAt.HasValue && totalTokens == 0;
         string lastUpdated = fromCache
-            ? (cachedAt.HasValue
-                ? F("Data_CachedFetched", cachedAt.Value.ToLocalTime())
-                : firstRun ? L("Data_FirstRun") : L("Dashboard_NotLoaded"))
+            ? (
+                cachedAt.HasValue ? F("Data_CachedFetched", cachedAt.Value.ToLocalTime())
+                : firstRun ? L("Data_FirstRun")
+                : L("Dashboard_NotLoaded")
+            )
             : F("Data_Updated", DateTimeOffset.Now);
         // The steady live state needs no caption (the account/snapshot counts
         // used to render as a cryptic "7 · 6" here); only the cached pass and
@@ -698,11 +842,10 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         // "Showing saved data" is a lie on a first run: there is none to show.
         // And a live projection taken mid-scan has real limits but partial
         // usage totals, which needs saying or the numbers look wrong.
-        string statusMessage = _scanInFlight
-            ? L("Data_IndexingHistory")
-            : fromCache
-                ? (firstRun ? L("Data_FirstRunSaved") : L("Data_ShowingSaved"))
-                : string.Empty;
+        string statusMessage =
+            _scanInFlight ? L("Data_IndexingHistory")
+            : fromCache ? (firstRun ? L("Data_FirstRunSaved") : L("Data_ShowingSaved"))
+            : string.Empty;
         string pricingCatalogStatus = catalog is null ? L("Data_UnavailableUpper") : L("Data_ValidUpper");
         // The catalog's SHA-256 prefix used to sit here. It is still recorded
         // with every API-equivalent figure, but on screen it read as noise; the
@@ -710,17 +853,57 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         string pricingCatalogDetail = catalog is null
             ? L("Data_NoPricingCache")
             : F("Data_CatalogAge", Age(catalog.Age(now)));
-        string catalogCaption = catalog is null ? L("Data_CatalogUnavailable") : F("Data_ModelsDevAge", Age(catalog.Age(now)));
-        return new DashboardData(FormatTokens(totalTokens), (catalog is null || (!hasPricedUsage && totalTokens > 0)) ? "-" : FormatUsd(quotedCost), F("Data_ExactSources", exactProviders), catalogCaption, lastUpdated, statusMessage, planValueLabel, planValueDetail, cacheSavingsLabel, weekDeltaLabel, resets, providerCards, providerUsage, harnessUsage, usageDays, heatmapCells, usageHistory, usageModelSlices, usageAnalyticsRecords, projectUsageSlices, resetCycles, priced.Select((PricedModelRow item) => item.ViewModel).ToArray(), connections, FormatTokens(totalTokens), FormatTokens(totalInput), FormatTokens(totalOutput), FormatTokens(totalCacheRead), FormatTokens(totalCacheWrite), FormatTokens(totalReasoning), (reportedCost == 0m) ? "-" : FormatUsd(reportedCost), pricingCatalogStatus, pricingCatalogDetail, $"{_successfulScannerCount} / {_scannerCount}", _scannerDetail, L("Data_HealthyUpper"), L("Data_SchemaHealthy"), recentAttempts);
+        string catalogCaption = catalog is null
+            ? L("Data_CatalogUnavailable")
+            : F("Data_ModelsDevAge", Age(catalog.Age(now)));
+        return new DashboardData(
+            FormatTokens(totalTokens),
+            (catalog is null || (!hasPricedUsage && totalTokens > 0)) ? "-" : FormatUsd(quotedCost),
+            F("Data_ExactSources", exactProviders),
+            catalogCaption,
+            lastUpdated,
+            statusMessage,
+            planValueLabel,
+            planValueDetail,
+            cacheSavingsLabel,
+            weekDeltaLabel,
+            resets,
+            providerCards,
+            providerUsage,
+            harnessUsage,
+            usageDays,
+            heatmapCells,
+            usageHistory,
+            usageModelSlices,
+            usageAnalyticsRecords,
+            projectUsageSlices,
+            resetCycles,
+            priced.Select((PricedModelRow item) => item.ViewModel).ToArray(),
+            connections,
+            FormatTokens(totalTokens),
+            FormatTokens(totalInput),
+            FormatTokens(totalOutput),
+            FormatTokens(totalCacheRead),
+            FormatTokens(totalCacheWrite),
+            FormatTokens(totalReasoning),
+            (reportedCost == 0m) ? "-" : FormatUsd(reportedCost),
+            pricingCatalogStatus,
+            pricingCatalogDetail,
+            $"{_successfulScannerCount} / {_scannerCount}",
+            _scannerDetail,
+            L("Data_HealthyUpper"),
+            L("Data_SchemaHealthy"),
+            recentAttempts
+        );
     }
 
     private IReadOnlyList<UsageAnalyticsRecord> BuildUsageAnalyticsRecords(
         IReadOnlyList<DailyUsageAggregate> rows,
         PricingCatalogSnapshot? catalog,
-        ModelResolutionCache resolutions)
+        ModelResolutionCache resolutions
+    )
     {
-        return rows
-            .GroupBy(row => new
+        return rows.GroupBy(row => new
             {
                 row.Day,
                 Harness = row.Account.Provider.Value,
@@ -728,14 +911,15 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                 row.RawModelId,
                 row.Project.ProjectKey,
                 row.Project.ProjectPath,
-                row.Project.RepositoryRootPath
+                row.Project.RepositoryRootPath,
             })
             .Select(group =>
             {
                 DailyUsageAggregate[] values = group.ToArray();
                 decimal? cost = QuoteCost(values, catalog, resolutions);
                 string provider = RuntimeText.AuthorizationProvider(
-                    UsageProviderClassifier.GetDisplayName(group.Key.Harness, group.Key.Provider));
+                    UsageProviderClassifier.GetDisplayName(group.Key.Harness, group.Key.Provider)
+                );
                 // Key off the classified label, never the raw service id: the
                 // label folds in the recording harness, so distinct ids can
                 // share one label and keying on the id listed that provider
@@ -744,20 +928,21 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                 return new UsageAnalyticsRecord(
                     group.Key.Day,
                     providerKey,
-                        provider,
-                        group.Key.Harness,
-                        ProviderName(group.Key.Harness),
+                    provider,
+                    group.Key.Harness,
+                    ProviderName(group.Key.Harness),
                     group.Key.ProjectKey,
                     UsageProjectLabel(group.Key.ProjectPath, group.Key.RepositoryRootPath),
                     group.Key.RawModelId,
                     group.Key.RawModelId,
                     values.Sum(TotalTokens),
-                        values.Sum(row => row.InputTokens),
-                        values.Sum(row => row.OutputTokens),
-                        values.Sum(row => row.CacheReadTokens),
-                        values.Sum(row => row.CacheWriteTokens),
-                        values.Sum(row => row.ReasoningTokens),
-                    cost);
+                    values.Sum(row => row.InputTokens),
+                    values.Sum(row => row.OutputTokens),
+                    values.Sum(row => row.CacheReadTokens),
+                    values.Sum(row => row.CacheWriteTokens),
+                    values.Sum(row => row.ReasoningTokens),
+                    cost
+                );
             })
             .Where(record => record.Tokens > 0)
             .OrderBy(record => record.Day)
@@ -772,39 +957,41 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         }
         string trimmed = projectPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         string name = Path.GetFileName(trimmed);
-        if (string.IsNullOrWhiteSpace(name)) name = projectPath;
-        bool worktree = !string.IsNullOrWhiteSpace(repositoryRootPath)
+        if (string.IsNullOrWhiteSpace(name))
+            name = projectPath;
+        bool worktree =
+            !string.IsNullOrWhiteSpace(repositoryRootPath)
             && !string.Equals(repositoryRootPath, projectPath, StringComparison.OrdinalIgnoreCase);
         return worktree ? name + L("UsageWindow_WorktreeSuffix") : name;
     }
 
     private static IReadOnlyList<UsageModelSliceViewModel> BuildUsageModelSlices(
-        IReadOnlyList<DailyUsageAggregate> rows)
+        IReadOnlyList<DailyUsageAggregate> rows
+    )
     {
-        return rows
-            .GroupBy(row => new { row.Day, row.RawModelId })
+        return rows.GroupBy(row => new { row.Day, row.RawModelId })
             .OrderBy(group => group.Key.Day)
             .ThenByDescending(group => group.Sum(TotalTokens))
-            .Select(group => new UsageModelSliceViewModel(
-                group.Key.Day,
-                group.Key.RawModelId,
-                group.Sum(TotalTokens)))
+            .Select(group => new UsageModelSliceViewModel(group.Key.Day, group.Key.RawModelId, group.Sum(TotalTokens)))
             .ToArray();
     }
 
     private IReadOnlyList<UsageHistoryDayViewModel> BuildUsageHistory(
         IReadOnlyList<DailyUsageAggregate> rows,
         PricingCatalogSnapshot? catalog,
-        ModelResolutionCache resolutions)
+        ModelResolutionCache resolutions
+    )
     {
-        return rows
-            .GroupBy(row => row.Day)
+        return rows.GroupBy(row => row.Day)
             .OrderBy(group => group.Key)
             .Select(group =>
             {
                 DailyUsageAggregate[] values = group.ToArray();
-                return new UsageHistoryDayViewModel(group.Key, values.Sum(TotalTokens),
-                    QuoteCost(values, catalog, resolutions));
+                return new UsageHistoryDayViewModel(
+                    group.Key,
+                    values.Sum(TotalTokens),
+                    QuoteCost(values, catalog, resolutions)
+                );
             })
             .ToArray();
     }
@@ -812,15 +999,15 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
     private IReadOnlyList<ProjectUsageSliceViewModel> BuildProjectUsageSlices(
         IReadOnlyList<DailyUsageAggregate> rows,
         PricingCatalogSnapshot? catalog,
-        ModelResolutionCache resolutions)
+        ModelResolutionCache resolutions
+    )
     {
-        return rows
-            .GroupBy(row => new
+        return rows.GroupBy(row => new
             {
                 row.Day,
                 row.Project.ProjectKey,
                 row.Project.ProjectPath,
-                row.Project.RepositoryRootPath
+                row.Project.RepositoryRootPath,
             })
             .OrderBy(group => group.Key.Day)
             .ThenBy(group => group.Key.ProjectPath, StringComparer.OrdinalIgnoreCase)
@@ -833,7 +1020,8 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                     group.Key.ProjectPath,
                     group.Key.RepositoryRootPath,
                     projectRows.Sum(TotalTokens),
-                    QuoteCost(projectRows, catalog, resolutions));
+                    QuoteCost(projectRows, catalog, resolutions)
+                );
             })
             .ToArray();
     }
@@ -844,7 +1032,10 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
     /// way — and the history aggregations below ask about the same few dozen
     /// pairs hundreds of times each.
     /// </summary>
-    private sealed class ModelResolutionCache(ExplicitModelResolver explicitResolver, CatalogModelResolver catalogResolver)
+    private sealed class ModelResolutionCache(
+        ExplicitModelResolver explicitResolver,
+        CatalogModelResolver catalogResolver
+    )
     {
         private readonly Dictionary<(string Service, string Model), ModelResolution?> _entries = [];
 
@@ -881,14 +1072,25 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
     private decimal? QuoteCost(
         IReadOnlyList<DailyUsageAggregate> rows,
         PricingCatalogSnapshot? catalog,
-        ModelResolutionCache resolutions)
+        ModelResolutionCache resolutions
+    )
     {
         decimal total = 0m;
         bool anyPriced = false;
-        foreach (IGrouping<(ProviderId Source, ServiceProviderId Service, string RawModelId), DailyUsageAggregate> group
-            in rows.GroupBy(row => (Source: row.Account.Provider, Service: row.Service, RawModelId: row.RawModelId)))
+        foreach (
+            IGrouping<
+                (ProviderId Source, ServiceProviderId Service, string RawModelId),
+                DailyUsageAggregate
+            > group in rows.GroupBy(row =>
+                (Source: row.Account.Provider, Service: row.Service, RawModelId: row.RawModelId)
+            )
+        )
         {
-            long input = 0L, output = 0L, cacheRead = 0L, cacheWrite = 0L, reasoning = 0L;
+            long input = 0L,
+                output = 0L,
+                cacheRead = 0L,
+                cacheWrite = 0L,
+                reasoning = 0L;
             foreach (DailyUsageAggregate row in group)
             {
                 input += row.InputTokens;
@@ -906,16 +1108,31 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             if (catalog is not null)
             {
                 ModelResolution? resolution = resolutions.Resolve(group.Key.Service, group.Key.RawModelId, catalog);
-                cost = _pricing.Quote(
-                    new TokenUsageEvent(group.First().Account, group.Key.Service, group.Key.RawModelId, _clock.UtcNow,
-                        input, output, cacheRead, cacheWrite, reasoning, "dashboard-aggregate"),
-                    resolution,
-                    catalog)?.CostUsd;
+                cost = _pricing
+                    .Quote(
+                        new TokenUsageEvent(
+                            group.First().Account,
+                            group.Key.Service,
+                            group.Key.RawModelId,
+                            _clock.UtcNow,
+                            input,
+                            output,
+                            cacheRead,
+                            cacheWrite,
+                            reasoning,
+                            "dashboard-aggregate"
+                        ),
+                        resolution,
+                        catalog
+                    )
+                    ?.CostUsd;
             }
             // Gap-fill only, exactly as in BuildModelRows: a manual rate applies
             // solely when the catalog produced no quote.
-            if (!cost.HasValue
-                && _pricingOverrides.TryGet(group.Key.Service.Value, group.Key.RawModelId, out ManualModelPrice manual))
+            if (
+                !cost.HasValue
+                && _pricingOverrides.TryGet(group.Key.Service.Value, group.Key.RawModelId, out ManualModelPrice manual)
+            )
             {
                 cost = manual.QuoteUsd(input, output, cacheRead, cacheWrite, reasoning);
             }
@@ -928,59 +1145,133 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         return anyPriced ? total : null;
     }
 
-    private IReadOnlyList<PricedModelRow> BuildModelRows(IReadOnlyList<DailyUsageAggregate> rows, PricingCatalogSnapshot? catalog, ModelResolutionCache resolutions)
+    private IReadOnlyList<PricedModelRow> BuildModelRows(
+        IReadOnlyList<DailyUsageAggregate> rows,
+        PricingCatalogSnapshot? catalog,
+        ModelResolutionCache resolutions
+    )
     {
-        return (from item in (from row in rows
-                group row by (Source: row.Account.Provider, Service: row.Service, RawModelId: row.RawModelId)).Select(delegate(IGrouping<(ProviderId Source, ServiceProviderId Service, string RawModelId), DailyUsageAggregate> @group)
-            {
-                long num = @group.Sum((DailyUsageAggregate row) => row.InputTokens);
-                long num2 = @group.Sum((DailyUsageAggregate row) => row.OutputTokens);
-                long num3 = @group.Sum((DailyUsageAggregate row) => row.CacheReadTokens);
-                long num4 = @group.Sum((DailyUsageAggregate row) => row.CacheWriteTokens);
-                long num5 = @group.Sum((DailyUsageAggregate row) => row.ReasoningTokens);
-                decimal? manualCostUsd = null;
-                string? manualStatus = null;
-                ModelResolution? modelResolution = resolutions.Resolve(@group.Key.Service, @group.Key.RawModelId, catalog);
-                ApiEquivalentQuote apiEquivalentQuote = null;
-                if (catalog is not null)
+        return (
+            from item in (
+                from row in rows
+                group row by (Source: row.Account.Provider, Service: row.Service, RawModelId: row.RawModelId)
+            ).Select(
+                delegate(
+                    IGrouping<
+                        (ProviderId Source, ServiceProviderId Service, string RawModelId),
+                        DailyUsageAggregate
+                    > @group
+                )
                 {
-                    apiEquivalentQuote = _pricing.Quote(new TokenUsageEvent(@group.First().Account, @group.Key.Service, @group.Key.RawModelId, _clock.UtcNow, num, num2, num3, num4, num5, "dashboard-aggregate"), modelResolution, catalog);
-                }
-                long value = num + num2 + num3 + num4 + num5;
-                string pricingStatus = catalog is null
-                    ? L("Data_CatalogUnavailable")
-                    : apiEquivalentQuote is null
-                        ? (modelResolution is null ? L("Data_NoCatalogMatch") : L("Data_RateIncomplete"))
+                    long num = @group.Sum((DailyUsageAggregate row) => row.InputTokens);
+                    long num2 = @group.Sum((DailyUsageAggregate row) => row.OutputTokens);
+                    long num3 = @group.Sum((DailyUsageAggregate row) => row.CacheReadTokens);
+                    long num4 = @group.Sum((DailyUsageAggregate row) => row.CacheWriteTokens);
+                    long num5 = @group.Sum((DailyUsageAggregate row) => row.ReasoningTokens);
+                    decimal? manualCostUsd = null;
+                    string? manualStatus = null;
+                    ModelResolution? modelResolution = resolutions.Resolve(
+                        @group.Key.Service,
+                        @group.Key.RawModelId,
+                        catalog
+                    );
+                    ApiEquivalentQuote apiEquivalentQuote = null;
+                    if (catalog is not null)
+                    {
+                        apiEquivalentQuote = _pricing.Quote(
+                            new TokenUsageEvent(
+                                @group.First().Account,
+                                @group.Key.Service,
+                                @group.Key.RawModelId,
+                                _clock.UtcNow,
+                                num,
+                                num2,
+                                num3,
+                                num4,
+                                num5,
+                                "dashboard-aggregate"
+                            ),
+                            modelResolution,
+                            catalog
+                        );
+                    }
+                    long value = num + num2 + num3 + num4 + num5;
+                    string pricingStatus =
+                        catalog is null ? L("Data_CatalogUnavailable")
+                        : apiEquivalentQuote is null
+                            ? (modelResolution is null ? L("Data_NoCatalogMatch") : L("Data_RateIncomplete"))
                         : modelResolution?.Confidence switch
-                {
-                    ResolutionConfidence.ExplicitAlias => L("Data_PricedAlias"),
-                    ResolutionConfidence.DerivedMultiplier => L("Data_DerivedMultiplier"),
-                    _ => L("Data_PricedExact")
-                };
-                string source = ProviderName(@group.Key.Source.Value);
-                string authProvider = RuntimeText.AuthorizationProvider(UsageProviderClassifier.GetDisplayName(@group.Key.Source.Value, @group.Key.Service.Value));
-                decimal cacheSaved = 0m;
-                if (modelResolution is not null && apiEquivalentQuote is not null && catalog is not null && num3 > 0
-                    && catalog.ExactIndex.TryGetValue((modelResolution.PricingProviderId, modelResolution.CanonicalModelId), out ModelPrice price)
-                    && price.InputPerMillion.HasValue && price.CacheReadPerMillion.HasValue)
-                {
-                    cacheSaved = modelResolution.RateMultiplier * (decimal)num3 * Math.Max(0m, price.InputPerMillion.Value - price.CacheReadPerMillion.Value) / 1000000m;
+                        {
+                            ResolutionConfidence.ExplicitAlias => L("Data_PricedAlias"),
+                            ResolutionConfidence.DerivedMultiplier => L("Data_DerivedMultiplier"),
+                            _ => L("Data_PricedExact"),
+                        };
+                    string source = ProviderName(@group.Key.Source.Value);
+                    string authProvider = RuntimeText.AuthorizationProvider(
+                        UsageProviderClassifier.GetDisplayName(@group.Key.Source.Value, @group.Key.Service.Value)
+                    );
+                    decimal cacheSaved = 0m;
+                    if (
+                        modelResolution is not null
+                        && apiEquivalentQuote is not null
+                        && catalog is not null
+                        && num3 > 0
+                        && catalog.ExactIndex.TryGetValue(
+                            (modelResolution.PricingProviderId, modelResolution.CanonicalModelId),
+                            out ModelPrice price
+                        )
+                        && price.InputPerMillion.HasValue
+                        && price.CacheReadPerMillion.HasValue
+                    )
+                    {
+                        cacheSaved =
+                            modelResolution.RateMultiplier
+                            * (decimal)num3
+                            * Math.Max(0m, price.InputPerMillion.Value - price.CacheReadPerMillion.Value)
+                            / 1000000m;
+                    }
+                    // Gap-fill only: a manual per-1M rate applies solely when the catalog
+                    // produced no quote; catalog pricing is never shadowed by an override.
+                    if (
+                        apiEquivalentQuote is null
+                        && _pricingOverrides.TryGet(
+                            @group.Key.Service.Value,
+                            @group.Key.RawModelId,
+                            out ManualModelPrice manualPrice
+                        )
+                    )
+                    {
+                        manualCostUsd = manualPrice.QuoteUsd(num, num2, num3, num4, num5);
+                        manualStatus = L("Data_PricedManual");
+                    }
+                    decimal? finalCostUsd = apiEquivalentQuote?.CostUsd ?? manualCostUsd;
+                    return new PricedModelRow(
+                        new ModelUsageRowViewModel(
+                            source,
+                            @group.Key.RawModelId,
+                            authProvider,
+                            FormatTokens(value),
+                            (!finalCostUsd.HasValue) ? "-" : FormatUsd(finalCostUsd.Value),
+                            manualStatus ?? pricingStatus,
+                            @group.Key.Service.Value,
+                            finalCostUsd.HasValue
+                        ),
+                        finalCostUsd,
+                        value,
+                        num,
+                        num2,
+                        num3,
+                        num4,
+                        num5,
+                        cacheSaved
+                    );
                 }
-                // Gap-fill only: a manual per-1M rate applies solely when the catalog
-            // produced no quote; catalog pricing is never shadowed by an override.
-            if (apiEquivalentQuote is null && _pricingOverrides.TryGet(@group.Key.Service.Value, @group.Key.RawModelId, out ManualModelPrice manualPrice))
-            {
-                manualCostUsd = manualPrice.QuoteUsd(num, num2, num3, num4, num5);
-                manualStatus = L("Data_PricedManual");
-            }
-            decimal? finalCostUsd = apiEquivalentQuote?.CostUsd ?? manualCostUsd;
-            return new PricedModelRow(new ModelUsageRowViewModel(source, @group.Key.RawModelId, authProvider, FormatTokens(value), (!finalCostUsd.HasValue) ? "-" : FormatUsd(finalCostUsd.Value), manualStatus ?? pricingStatus, @group.Key.Service.Value, finalCostUsd.HasValue), finalCostUsd, value, num, num2, num3, num4, num5, cacheSaved);
-            })
+            )
             where item.RawTokens > 0
             orderby item.RawTokens descending
-            select item).ToArray();
+            select item
+        ).ToArray();
     }
-
 
     private static IReadOnlyList<ProviderUsageViewModel> BuildProviderUsage(IReadOnlyList<PricedModelRow> rows) =>
         BuildUsageGrouping(rows, row => row.ViewModel.AuthProvider);
@@ -990,33 +1281,41 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
 
     private static IReadOnlyList<ProviderUsageViewModel> BuildUsageGrouping(
         IReadOnlyList<PricedModelRow> rows,
-        Func<PricedModelRow, string> groupKey)
+        Func<PricedModelRow, string> groupKey
+    )
     {
         long grandTotal = Math.Max(1L, rows.Sum(row => row.RawTokens));
-        return rows
-            .GroupBy(row => groupKey(row), StringComparer.OrdinalIgnoreCase)
+        return rows.GroupBy(row => groupKey(row), StringComparer.OrdinalIgnoreCase)
             // A group with zero observed tokens (e.g. a one-off failed try)
             // is just wasted space.
             .Where(group => group.Sum(row => row.RawTokens) > 0L)
             .OrderByDescending(group => group.Sum(row => row.RawTokens))
             .Select(group =>
             {
-                int modelCount = group.Select(row => row.ViewModel.Model).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+                int modelCount = group
+                    .Select(row => row.ViewModel.Model)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count();
                 // One line per model, biggest first. The card is a fixed-height
                 // cell in a uniform grid, so this stays capped at three.
-                string topModels = string.Join("\n", group
-                    .GroupBy(row => row.ViewModel.Model, StringComparer.OrdinalIgnoreCase)
-                    .Select(models => new
-                    {
-                        Model = models.Key,
-                        RawTokens = models.Sum(row => row.RawTokens),
-                    })
-                    .OrderByDescending(item => item.RawTokens)
-                    .Take(3)
-                    .Select(item => item.Model + " · " + FormatTokens(item.RawTokens)));
+                string topModels = string.Join(
+                    "\n",
+                    group
+                        .GroupBy(row => row.ViewModel.Model, StringComparer.OrdinalIgnoreCase)
+                        .Select(models => new { Model = models.Key, RawTokens = models.Sum(row => row.RawTokens) })
+                        .OrderByDescending(item => item.RawTokens)
+                        .Take(3)
+                        .Select(item => item.Model + " · " + FormatTokens(item.RawTokens))
+                );
                 int pricedCount = group.Count(row => row.CostUsd.HasValue);
                 decimal cost = group.Where(row => row.CostUsd.HasValue).Sum(row => row.CostUsd.GetValueOrDefault());
-                string harnesses = string.Join(", ", group.Select(row => row.ViewModel.Source).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(value => value));
+                string harnesses = string.Join(
+                    ", ",
+                    group
+                        .Select(row => row.ViewModel.Source)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(value => value)
+                );
                 string accent = ProviderColors.Resolve(group.Key);
                 long groupTokens = group.Sum(row => row.RawTokens);
                 return new ProviderUsageViewModel(
@@ -1027,17 +1326,22 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                     topModels.Length == 0 ? F("Data_ModelCount", modelCount) : topModels,
                     harnesses,
                     accent,
-                    100.0 * groupTokens / grandTotal);
+                    100.0 * groupTokens / grandTotal
+                );
             })
             .ToArray();
     }
 
-    private static IReadOnlyList<UsageDayViewModel> BuildDailyRows(IReadOnlyList<DailyUsageAggregate> rows, DateOnly today)
+    private static IReadOnlyList<UsageDayViewModel> BuildDailyRows(
+        IReadOnlyList<DailyUsageAggregate> rows,
+        DateOnly today
+    )
     {
-        Dictionary<DateOnly, long> dictionary = (from offset in Enumerable.Range(0, 7)
-            select today.AddDays(offset - 6)).ToDictionary((DateOnly day) => day, (DateOnly _) => 0L);
-        Dictionary<DateOnly, DailyUsageAggregate[]> byDay = rows
-            .Where(row => dictionary.ContainsKey(row.Day))
+        Dictionary<DateOnly, long> dictionary = (
+            from offset in Enumerable.Range(0, 7)
+            select today.AddDays(offset - 6)
+        ).ToDictionary((DateOnly day) => day, (DateOnly _) => 0L);
+        Dictionary<DateOnly, DailyUsageAggregate[]> byDay = rows.Where(row => dictionary.ContainsKey(row.Day))
             .GroupBy(row => row.Day)
             .ToDictionary(group => group.Key, group => group.ToArray());
         foreach (KeyValuePair<DateOnly, DailyUsageAggregate[]> item in byDay)
@@ -1045,11 +1349,17 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             dictionary[item.Key] = item.Value.Sum((Func<DailyUsageAggregate, long>)TotalTokens);
         }
         long maximum = Math.Max(1L, dictionary.Values.Max());
-        return dictionary.Select((KeyValuePair<DateOnly, long> pair) => new UsageDayViewModel(
-            pair.Key.ToString("ddd", CultureInfo.InvariantCulture).ToUpperInvariant(),
-            (pair.Value == 0L) ? 4.0 : (24.0 + 116.0 * (double)pair.Value / (double)maximum),
-            FormatTokens(pair.Value),
-            BuildDayBreakdown(pair.Key, pair.Value, byDay.GetValueOrDefault(pair.Key)))).ToArray();
+        return dictionary
+            .Select(
+                (KeyValuePair<DateOnly, long> pair) =>
+                    new UsageDayViewModel(
+                        pair.Key.ToString("ddd", CultureInfo.InvariantCulture).ToUpperInvariant(),
+                        (pair.Value == 0L) ? 4.0 : (24.0 + 116.0 * (double)pair.Value / (double)maximum),
+                        FormatTokens(pair.Value),
+                        BuildDayBreakdown(pair.Key, pair.Value, byDay.GetValueOrDefault(pair.Key))
+                    )
+            )
+            .ToArray();
     }
 
     // Hover content for a day bar: top three models plus the rest aggregated.
@@ -1075,22 +1385,33 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         return F("Data_DayUsage", header, FormatTokens(total), string.Join("\n", lines));
     }
 
-    private async Task RefreshResetCreditsIfDueAsync(IReadOnlyList<ProviderAccount> accounts, bool force, CancellationToken cancellationToken)
+    private async Task RefreshResetCreditsIfDueAsync(
+        IReadOnlyList<ProviderAccount> accounts,
+        bool force,
+        CancellationToken cancellationToken
+    )
     {
         if (!force && _resetCreditsFetchedAt.HasValue && _clock.UtcNow - _resetCreditsFetchedAt.Value < ResetCreditsTtl)
         {
             return;
         }
         _resetCredits.Clear();
-        foreach (ProviderAccount account in accounts.Where((ProviderAccount providerAccount) => providerAccount.IsConnected))
+        foreach (
+            ProviderAccount account in accounts.Where((ProviderAccount providerAccount) => providerAccount.IsConnected)
+        )
         {
-            if (!_adapterById.TryGetValue(account.Key.Provider, out IProviderAdapter adapter) || adapter is not IResetCreditSource source)
+            if (
+                !_adapterById.TryGetValue(account.Key.Provider, out IProviderAdapter adapter)
+                || adapter is not IResetCreditSource source
+            )
             {
                 continue;
             }
             try
             {
-                _resetCredits[account.Key] = await source.FetchResetCreditsAsync(account, cancellationToken).ConfigureAwait(false);
+                _resetCredits[account.Key] = await source
+                    .FetchResetCreditsAsync(account, cancellationToken)
+                    .ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -1104,7 +1425,10 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         _resetCreditsFetchedAt = _clock.UtcNow;
     }
 
-    private IReadOnlyList<ResetCycleViewModel> BuildResetCycles(IReadOnlyList<ProviderAccount> accounts, DateTimeOffset now)
+    private IReadOnlyList<ResetCycleViewModel> BuildResetCycles(
+        IReadOnlyList<ProviderAccount> accounts,
+        DateTimeOffset now
+    )
     {
         List<ResetCycleViewModel> list = new List<ResetCycleViewModel>();
         foreach (KeyValuePair<AccountKey, ResetCreditInventory?> pair in _resetCredits)
@@ -1127,7 +1451,13 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             {
                 string[] expiring = available
                     .Where((ResetCredit credit) => credit.ExpiresAt.HasValue)
-                    .Select((ResetCredit credit) => Countdown(credit.ExpiresAt.Value - now) + " (" + credit.ExpiresAt.Value.ToLocalTime().ToString("dd MMM", CultureInfo.CurrentCulture) + ")")
+                    .Select(
+                        (ResetCredit credit) =>
+                            Countdown(credit.ExpiresAt.Value - now)
+                            + " ("
+                            + credit.ExpiresAt.Value.ToLocalTime().ToString("dd MMM", CultureInfo.CurrentCulture)
+                            + ")"
+                    )
                     .ToArray();
                 detail = expiring.Length == 0 ? L("Data_NoExpiry") : F("Data_Expires", string.Join(" | ", expiring));
                 int withoutExpiry = available.Count - expiring.Length;
@@ -1136,14 +1466,19 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                     detail += F("Data_WithoutExpiry", withoutExpiry);
                 }
             }
-            list.Add(new ResetCycleViewModel(
-                adapter?.Descriptor.DisplayName ?? pair.Key.Provider.Value,
-                account?.Login ?? (account is null ? string.Empty : RuntimeText.AccountFallback(pair.Key.Provider.Value)),
-                title,
-                detail,
-                adapter?.Descriptor.AccentColor ?? "#7E878B"));
+            list.Add(
+                new ResetCycleViewModel(
+                    adapter?.Descriptor.DisplayName ?? pair.Key.Provider.Value,
+                    account?.Login
+                        ?? (account is null ? string.Empty : RuntimeText.AccountFallback(pair.Key.Provider.Value)),
+                    title,
+                    detail,
+                    adapter?.Descriptor.AccentColor ?? "#7E878B"
+                )
+            );
         }
-        return list.OrderBy((ResetCycleViewModel item) => item.Provider, StringComparer.CurrentCultureIgnoreCase).ToArray();
+        return list.OrderBy((ResetCycleViewModel item) => item.Provider, StringComparer.CurrentCultureIgnoreCase)
+            .ToArray();
     }
 
     private static string BuildWeekDelta(IReadOnlyList<DailyUsageAggregate> rows, DateOnly today)
@@ -1151,7 +1486,8 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         DateOnly lastWeekStart = today.AddDays(-6);
         DateOnly prevWeekStart = today.AddDays(-13);
         long last7 = rows.Where((DailyUsageAggregate row) => row.Day >= lastWeekStart).Sum(TotalTokens);
-        long prev7 = rows.Where((DailyUsageAggregate row) => row.Day >= prevWeekStart && row.Day < lastWeekStart).Sum(TotalTokens);
+        long prev7 = rows.Where((DailyUsageAggregate row) => row.Day >= prevWeekStart && row.Day < lastWeekStart)
+            .Sum(TotalTokens);
         if (prev7 == 0L)
         {
             return last7 > 0L ? L("Data_NewActivityWeek") : "";
@@ -1160,10 +1496,16 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         return F("Data_VsPriorWeek", pct >= 0.0 ? "↑" : "↓", Math.Abs(pct));
     }
 
-    private static IReadOnlyList<HeatmapCellViewModel> BuildHeatmap(IReadOnlyList<DailyUsageAggregate> rows, DateOnly today)
+    private static IReadOnlyList<HeatmapCellViewModel> BuildHeatmap(
+        IReadOnlyList<DailyUsageAggregate> rows,
+        DateOnly today
+    )
     {
-        Dictionary<DateOnly, long> byDay = (from row in rows
-            group row by row.Day).ToDictionary((IGrouping<DateOnly, DailyUsageAggregate> group) => group.Key, (IGrouping<DateOnly, DailyUsageAggregate> group) => ((IEnumerable<DailyUsageAggregate>)group).Sum((Func<DailyUsageAggregate, long>)TotalTokens));
+        Dictionary<DateOnly, long> byDay = (from row in rows group row by row.Day).ToDictionary(
+            (IGrouping<DateOnly, DailyUsageAggregate> group) => group.Key,
+            (IGrouping<DateOnly, DailyUsageAggregate> group) =>
+                ((IEnumerable<DailyUsageAggregate>)group).Sum((Func<DailyUsageAggregate, long>)TotalTokens)
+        );
         DateOnly start = today.AddDays(-83);
         while (start.DayOfWeek != DayOfWeek.Monday)
         {
@@ -1176,12 +1518,24 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             long tokens = byDay.GetValueOrDefault(day);
             double intensity = (tokens == 0L) ? 0.0 : Math.Sqrt((double)tokens / (double)maximum);
             string usage = tokens == 0L ? L("Data_NoUsage") : F("Data_Tokens", FormatTokens(tokens));
-            cells.Add(new HeatmapCellViewModel(day.ToString("ddd, dd MMM", CultureInfo.CurrentCulture) + " — " + usage, intensity, tokens > 0L));
+            cells.Add(
+                new HeatmapCellViewModel(
+                    day.ToString("ddd, dd MMM", CultureInfo.CurrentCulture) + " — " + usage,
+                    intensity,
+                    tokens > 0L
+                )
+            );
         }
         return cells;
     }
 
-    private IReadOnlyList<ProviderCardViewModel> BuildProviderCards(IReadOnlyList<ProviderAccount> accounts, IReadOnlyDictionary<AccountKey, ProviderSnapshot?> latest, IReadOnlyList<DailyUsageAggregate> usage, DateTimeOffset now, IReadOnlyDictionary<AccountKey, FetchFailureKind> latestFailures)
+    private IReadOnlyList<ProviderCardViewModel> BuildProviderCards(
+        IReadOnlyList<ProviderAccount> accounts,
+        IReadOnlyDictionary<AccountKey, ProviderSnapshot?> latest,
+        IReadOnlyList<DailyUsageAggregate> usage,
+        DateTimeOffset now,
+        IReadOnlyDictionary<AccountKey, FetchFailureKind> latestFailures
+    )
     {
         // Overview-only filter: hidden providers keep refreshing and scanning,
         // and stay listed in Connections and Usage.
@@ -1193,7 +1547,11 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             {
                 continue;
             }
-            foreach (ProviderAccount account in accounts.Where((ProviderAccount providerAccount) => providerAccount.Key.Provider == adapter.Descriptor.Id))
+            foreach (
+                ProviderAccount account in accounts.Where(
+                    (ProviderAccount providerAccount) => providerAccount.Key.Provider == adapter.Descriptor.Id
+                )
+            )
             {
                 latest.TryGetValue(account.Key, out ProviderSnapshot? value);
                 bool hasData = value is not null && (value.Meters.Count > 0 || value.Balances.Count > 0);
@@ -1206,7 +1564,12 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                     continue;
                 }
                 bool flag = usage.Any((DailyUsageAggregate row) => row.Account == account.Key);
-                (string healthLabel, CardStatusKind statusKind) = HealthStatus(account, hasData ? value : null, now, latestFailures.GetValueOrDefault(account.Key));
+                (string healthLabel, CardStatusKind statusKind) = HealthStatus(
+                    account,
+                    hasData ? value : null,
+                    now,
+                    latestFailures.GetValueOrDefault(account.Key)
+                );
                 // The section promises "only providers that returned real quota or
                 // balance data". A connected source that simply never yields quota
                 // (e.g. OpenCode local history) would sit here as a permanently
@@ -1215,45 +1578,81 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                 {
                     continue;
                 }
-                MeterViewModel[] allMeters = value?.Meters
-                    .OrderBy(meter => meter, MeterDisplayOrderComparer.Instance)
-                    .Select(ToMeterViewModel)
-                    .ToArray() ?? Array.Empty<MeterViewModel>();
+                MeterViewModel[] allMeters =
+                    value
+                        ?.Meters.OrderBy(meter => meter, MeterDisplayOrderComparer.Instance)
+                        .Select(ToMeterViewModel)
+                        .ToArray() ?? Array.Empty<MeterViewModel>();
                 BalanceMetric balanceMetric = value?.Balances.FirstOrDefault();
                 ProviderServiceStatus? serviceStatus = _providerStatuses.Get(adapter.Descriptor.Id.Value);
                 string incidentSummary = serviceStatus is { IsOperational: false }
                     ? RuntimeText.ProviderStatus(serviceStatus.Indicator, serviceStatus.Description)
                     : string.Empty;
-                list.Add(new ProviderCardViewModel(
-                    adapter.Descriptor.Id.Value,
-                    adapter.Descriptor.DisplayName,
-                    AccountLabel(account, value),
-                    adapter.Descriptor.AccentColor,
-                    healthLabel,
-                    flag ? L("Data_ExactTokens") : (adapter.Descriptor.SupportsExactTokens ? L("Data_NoTokenData") : L("Data_LimitsOnly")),
-                    allMeters,
-                    (balanceMetric is null) ? string.Empty : FormatBalance(balanceMetric),
-                    incidentSummary,
-                    serviceStatus?.Indicator ?? string.Empty,
-                    statusKind,
-                    RuntimeText.AuthSource(account.Key.Provider.Value, account.AuthSource)));
+                list.Add(
+                    new ProviderCardViewModel(
+                        adapter.Descriptor.Id.Value,
+                        adapter.Descriptor.DisplayName,
+                        AccountLabel(account, value),
+                        adapter.Descriptor.AccentColor,
+                        healthLabel,
+                        flag
+                            ? L("Data_ExactTokens")
+                            : (adapter.Descriptor.SupportsExactTokens ? L("Data_NoTokenData") : L("Data_LimitsOnly")),
+                        allMeters,
+                        (balanceMetric is null) ? string.Empty : FormatBalance(balanceMetric),
+                        incidentSummary,
+                        serviceStatus?.Indicator ?? string.Empty,
+                        statusKind,
+                        RuntimeText.AuthSource(account.Key.Provider.Value, account.AuthSource)
+                    )
+                );
             }
         }
-        return list.OrderByDescending(card => card.AllMeters.Select(meter => meter.UsedPercent).DefaultIfEmpty(-1).Max()).ThenBy(card => card.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
+        return list.OrderByDescending(card =>
+                card.AllMeters.Select(meter => meter.UsedPercent).DefaultIfEmpty(-1).Max()
+            )
+            .ThenBy(card => card.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToArray();
     }
 
-    private IReadOnlyList<ProviderConnectionViewModel> BuildConnections(IReadOnlyList<ProviderAccount> accounts, IReadOnlyDictionary<AccountKey, ProviderSnapshot?> latest, IReadOnlyList<DailyUsageAggregate> usage, DateTimeOffset now, IReadOnlyDictionary<AccountKey, FetchFailureKind> latestFailures)
+    private IReadOnlyList<ProviderConnectionViewModel> BuildConnections(
+        IReadOnlyList<ProviderAccount> accounts,
+        IReadOnlyDictionary<AccountKey, ProviderSnapshot?> latest,
+        IReadOnlyList<DailyUsageAggregate> usage,
+        DateTimeOffset now,
+        IReadOnlyDictionary<AccountKey, FetchFailureKind> latestFailures
+    )
     {
         List<ProviderConnectionViewModel> list = new List<ProviderConnectionViewModel>();
         foreach (ProviderDescriptor descriptor in BuiltInProviderDescriptors.All)
         {
-            ProviderAccount[] array = accounts.Where((ProviderAccount providerAccount) => providerAccount.Key.Provider == descriptor.Id).ToArray();
+            ProviderAccount[] array = accounts
+                .Where((ProviderAccount providerAccount) => providerAccount.Key.Provider == descriptor.Id)
+                .ToArray();
             (string ActionLabel, string ActionKind, string ActionTarget) action = ConnectionAction(descriptor.Id.Value);
             if (array.Length == 0)
             {
-                string accountLabel = descriptor.Id.Value == "opencode" ? L("Data_NoLocalHistory") : descriptor.Id.Value == "droid" ? L("Data_NoFactorySession") : L("Data_NoLocalAccount");
-                string status = descriptor.Id.Value == "opencode" ? L("Data_HistoryNotDetected") : L("Data_NotConnected");
-                list.Add(new ProviderConnectionViewModel(descriptor.DisplayName, accountLabel, LocalizedCapabilities(descriptor.Id.Value), status, LocalizedCoverage(descriptor.Id.Value), descriptor.AccentColor, action.ActionLabel, action.ActionKind, action.ActionTarget, descriptor.Id.Value, isConnected: false));
+                string accountLabel =
+                    descriptor.Id.Value == "opencode" ? L("Data_NoLocalHistory")
+                    : descriptor.Id.Value == "droid" ? L("Data_NoFactorySession")
+                    : L("Data_NoLocalAccount");
+                string status =
+                    descriptor.Id.Value == "opencode" ? L("Data_HistoryNotDetected") : L("Data_NotConnected");
+                list.Add(
+                    new ProviderConnectionViewModel(
+                        descriptor.DisplayName,
+                        accountLabel,
+                        LocalizedCapabilities(descriptor.Id.Value),
+                        status,
+                        LocalizedCoverage(descriptor.Id.Value),
+                        descriptor.AccentColor,
+                        action.ActionLabel,
+                        action.ActionKind,
+                        action.ActionTarget,
+                        descriptor.Id.Value,
+                        isConnected: false
+                    )
+                );
                 continue;
             }
             ProviderAccount[] array2 = array;
@@ -1262,24 +1661,46 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                 latest.TryGetValue(account.Key, out ProviderSnapshot? value);
                 FetchFailureKind latestFailure = latestFailures.GetValueOrDefault(account.Key);
                 (string statusLabel, CardStatusKind statusKind) = HealthStatus(account, value, now, latestFailure);
-                string health = descriptor.Id.Value == "opencode" ? L("Data_LocalHistoryDetected") : descriptor.Id.Value == "droid" && account.IsConnected ? L("Data_FactorySessionDetected") : statusLabel;
+                string health =
+                    descriptor.Id.Value == "opencode" ? L("Data_LocalHistoryDetected")
+                    : descriptor.Id.Value == "droid" && account.IsConnected ? L("Data_FactorySessionDetected")
+                    : statusLabel;
                 // The local-history sources report Live on detection alone, but a
                 // failed latest attempt must still drop them out of Live.
-                if (descriptor.Id.Value is "opencode" or "droid" && account.IsConnected && latestFailure == FetchFailureKind.None)
+                if (
+                    descriptor.Id.Value is "opencode" or "droid"
+                    && account.IsConnected
+                    && latestFailure == FetchFailureKind.None
+                )
                 {
                     statusKind = CardStatusKind.Live;
                 }
-                string coverage = descriptor.Id.Value == "opencode"
-                    ? L("Data_OpenCodeCoverage")
-                    : usage.Any((DailyUsageAggregate row) => row.Account == account.Key) ? L("Data_ExactLocalTokens") : LocalizedCoverage(descriptor.Id.Value);
-                ProviderConnectionViewModel connection = new ProviderConnectionViewModel(descriptor.DisplayName, AccountLabel(account, value), RuntimeText.AuthSource(descriptor.Id.Value, account.AuthSource), health, coverage, descriptor.AccentColor, action.ActionLabel, action.ActionKind, action.ActionTarget, descriptor.Id.Value, account.IsConnected)
+                string coverage =
+                    descriptor.Id.Value == "opencode" ? L("Data_OpenCodeCoverage")
+                    : usage.Any((DailyUsageAggregate row) => row.Account == account.Key) ? L("Data_ExactLocalTokens")
+                    : LocalizedCoverage(descriptor.Id.Value);
+                ProviderConnectionViewModel connection = new ProviderConnectionViewModel(
+                    descriptor.DisplayName,
+                    AccountLabel(account, value),
+                    RuntimeText.AuthSource(descriptor.Id.Value, account.AuthSource),
+                    health,
+                    coverage,
+                    descriptor.AccentColor,
+                    action.ActionLabel,
+                    action.ActionKind,
+                    action.ActionTarget,
+                    descriptor.Id.Value,
+                    account.IsConnected
+                )
                 {
-                    StatusKind = statusKind
+                    StatusKind = statusKind,
                 };
-                if (value is { Extensions: { } extensions }
+                if (
+                    value is { Extensions: { } extensions }
                     && extensions.TryGetValue("plan_type", out JsonElement planElement)
                     && planElement.ValueKind == JsonValueKind.String
-                    && !string.IsNullOrWhiteSpace(planElement.GetString()))
+                    && !string.IsNullOrWhiteSpace(planElement.GetString())
+                )
                 {
                     (string planLabel, double suggested) = PlanInfo(descriptor.Id.Value, planElement.GetString()!);
                     connection.DetectedPlan = planLabel;
@@ -1301,9 +1722,11 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         {
             foreach (string key in new[] { "email", "login", "username" })
             {
-                if (extensions.TryGetValue(key, out JsonElement value)
+                if (
+                    extensions.TryGetValue(key, out JsonElement value)
                     && value.ValueKind == JsonValueKind.String
-                    && !string.IsNullOrWhiteSpace(value.GetString()))
+                    && !string.IsNullOrWhiteSpace(value.GetString())
+                )
                 {
                     return value.GetString()!.Trim();
                 }
@@ -1311,7 +1734,6 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         }
         return RuntimeText.AccountFallback(account.Key.Provider.Value);
     }
-
 
     // Detection is passive: we only ever link to the provider's own usage
     // dashboard in the browser — never launch or drive a CLI.
@@ -1326,24 +1748,48 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             "cline" => (F("Data_ViewUsageOn", "Cline"), "uri", "https://app.cline.bot/dashboard/subscription"),
             "copilot" => (L("Data_ViewCopilotSettings"), "uri", "https://github.com/settings/copilot"),
             "cursor" => (F("Data_ViewUsageOn", "Cursor"), "uri", "https://cursor.com/dashboard?tab=usage"),
-            _ => ("", "", "")
+            _ => ("", "", ""),
         };
     }
 
     private static MeterViewModel ToMeterViewModel(UsageMeter meter)
     {
         double valueOrDefault = meter.UsedPercent.GetValueOrDefault();
-        string usedLabel = !meter.Used.HasValue ? F("Meter_PercentUsed", valueOrDefault) : F("Meter_MeasureUsed", FormatMeasure(meter.Used.Value, meter.Unit));
-        string remainingLabel = meter.Limit.HasValue && meter.Used.HasValue
-            ? F("Meter_MeasureRemaining", FormatMeasure(Math.Max(0m, meter.Limit.Value - meter.Used.Value), meter.Unit))
-            : F("Meter_PercentRemaining", Math.Max(0.0, 100.0 - valueOrDefault));
-        string resetLabel = !meter.ResetsAt.HasValue ? L("Meter_NoScheduledReset") : F("Meter_ResetsIn", Countdown(meter.ResetsAt.Value - DateTimeOffset.UtcNow));
-        return new MeterViewModel(meter.Key.Value, RuntimeText.MeterDisplayName(meter.Key.Value, meter.DisplayName), valueOrDefault, usedLabel, remainingLabel, resetLabel, meter.ResetsAt, meter.Status, meter.IsNew, meter.Status == MeterStatus.Stale, PaceLabel(meter, DateTimeOffset.UtcNow));
+        string usedLabel = !meter.Used.HasValue
+            ? F("Meter_PercentUsed", valueOrDefault)
+            : F("Meter_MeasureUsed", FormatMeasure(meter.Used.Value, meter.Unit));
+        string remainingLabel =
+            meter.Limit.HasValue && meter.Used.HasValue
+                ? F(
+                    "Meter_MeasureRemaining",
+                    FormatMeasure(Math.Max(0m, meter.Limit.Value - meter.Used.Value), meter.Unit)
+                )
+                : F("Meter_PercentRemaining", Math.Max(0.0, 100.0 - valueOrDefault));
+        string resetLabel = !meter.ResetsAt.HasValue
+            ? L("Meter_NoScheduledReset")
+            : F("Meter_ResetsIn", Countdown(meter.ResetsAt.Value - DateTimeOffset.UtcNow));
+        return new MeterViewModel(
+            meter.Key.Value,
+            RuntimeText.MeterDisplayName(meter.Key.Value, meter.DisplayName),
+            valueOrDefault,
+            usedLabel,
+            remainingLabel,
+            resetLabel,
+            meter.ResetsAt,
+            meter.Status,
+            meter.IsNew,
+            meter.Status == MeterStatus.Stale,
+            PaceLabel(meter, DateTimeOffset.UtcNow)
+        );
     }
 
     private static string PaceLabel(UsageMeter meter, DateTimeOffset now)
     {
-        if (!meter.ResetsAt.HasValue || !meter.WindowDuration.HasValue || meter.Status is MeterStatus.Stale or MeterStatus.Exhausted)
+        if (
+            !meter.ResetsAt.HasValue
+            || !meter.WindowDuration.HasValue
+            || meter.Status is MeterStatus.Stale or MeterStatus.Exhausted
+        )
         {
             return "";
         }
@@ -1370,38 +1816,48 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         if (projected >= 100.0)
         {
             DateTimeOffset exhaustAt = windowStart + TimeSpan.FromSeconds(elapsed.TotalSeconds * (100.0 / used));
-            return exhaustAt <= now ? L("Meter_PaceExhaustNow") : F("Meter_PaceExhaustBeforeReset", Countdown(exhaustAt - now));
+            return exhaustAt <= now
+                ? L("Meter_PaceExhaustNow")
+                : F("Meter_PaceExhaustBeforeReset", Countdown(exhaustAt - now));
         }
         return F("Meter_PaceByReset", projected);
     }
 
-        /*
-    private static string Health(ProviderAccount account, ProviderSnapshot? snapshot, DateTimeOffset now)
+    /*
+private static string Health(ProviderAccount account, ProviderSnapshot? snapshot, DateTimeOffset now)
+{
+    if (snapshot is not null)
     {
-        if (snapshot is not null)
+        TimeSpan timeSpan = now - snapshot.ObservedAt;
+        if (!(timeSpan < TimeSpan.FromMinutes(2L)))
         {
-            TimeSpan timeSpan = now - snapshot.ObservedAt;
-            if (!(timeSpan < TimeSpan.FromMinutes(2L)))
-            {
-                return "Cached ú " + Age(timeSpan);
-            }
-            return "Fresh ú " + account.AuthSource;
+            return "Cached ú " + Age(timeSpan);
         }
-        if (!account.IsConnected)
-        {
-            return "Not connected";
-        }
-        return "Connected ú no quota data";
+        return "Fresh ú " + account.AuthSource;
     }
+    if (!account.IsConnected)
+    {
+        return "Not connected";
+    }
+    return "Connected ú no quota data";
+}
 
-        */
+    */
 
-    private static (string Label, CardStatusKind Kind) HealthStatus(ProviderAccount account, ProviderSnapshot? snapshot, DateTimeOffset now, FetchFailureKind latestFailure = FetchFailureKind.None)
+    private static (string Label, CardStatusKind Kind) HealthStatus(
+        ProviderAccount account,
+        ProviderSnapshot? snapshot,
+        DateTimeOffset now,
+        FetchFailureKind latestFailure = FetchFailureKind.None
+    )
     {
         TimeSpan? age = snapshot is null ? null : now - snapshot.ObservedAt;
         return AccountHealthPolicy.Decide(account.IsConnected, age, latestFailure) switch
         {
-            AccountHealth.Live => (F("Data_FreshVia", RuntimeText.AuthSource(account.Key.Provider.Value, account.AuthSource)), CardStatusKind.Live),
+            AccountHealth.Live => (
+                F("Data_FreshVia", RuntimeText.AuthSource(account.Key.Provider.Value, account.AuthSource)),
+                CardStatusKind.Live
+            ),
             AccountHealth.SignInRequired => age is { } signInAge
                 ? (F("Data_SignInRequiredAge", Age(signInAge)), CardStatusKind.SignInRequired)
                 : (L("Data_SignInRequired"), CardStatusKind.SignInRequired),
@@ -1422,29 +1878,37 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             // Cached always carries an age; NoQuota only occurs with no snapshot.
             _ => age is { } cachedAge
                 ? (F("Data_CachedAge", Age(cachedAge)), CardStatusKind.Stale)
-                : (L("Data_ConnectedNoQuota"), CardStatusKind.NoQuota)
+                : (L("Data_ConnectedNoQuota"), CardStatusKind.NoQuota),
         };
     }
 
-    private async Task<IReadOnlyList<FetchAttemptViewModel>> ReadRecentAttemptsAsync(CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<FetchAttemptViewModel>> ReadRecentAttemptsAsync(
+        CancellationToken cancellationToken
+    )
     {
         List<FetchAttemptViewModel> attempts = [];
         await using (SqliteConnection connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false))
         {
             await using SqliteCommand command = connection.CreateCommand();
-            command.CommandText = "SELECT provider_id, strategy_id, duration_ms, failure_kind\nFROM fetch_attempts\nORDER BY started_at DESC\nLIMIT 8;";
-            await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            command.CommandText =
+                "SELECT provider_id, strategy_id, duration_ms, failure_kind\nFROM fetch_attempts\nORDER BY started_at DESC\nLIMIT 8;";
+            await using SqliteDataReader reader = await command
+                .ExecuteReaderAsync(cancellationToken)
+                .ConfigureAwait(false);
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
                 long durationMs = reader.GetInt64(2);
                 FetchFailureKind kind = (FetchFailureKind)reader.GetInt32(3);
-                attempts.Add(new FetchAttemptViewModel(
-                    ProviderName(reader.GetString(0)),
-                    reader.GetString(1),
-                    durationMs < 1000 ? $"{durationMs} ms" : $"{durationMs / 1000.0:0.0} s",
-                    RuntimeText.FetchFailure(kind),
-                    RuntimeText.FetchFailureMeaning(kind),
-                    RuntimeText.FetchOutcome(kind)));
+                attempts.Add(
+                    new FetchAttemptViewModel(
+                        ProviderName(reader.GetString(0)),
+                        reader.GetString(1),
+                        durationMs < 1000 ? $"{durationMs} ms" : $"{durationMs / 1000.0:0.0} s",
+                        RuntimeText.FetchFailure(kind),
+                        RuntimeText.FetchFailureMeaning(kind),
+                        RuntimeText.FetchOutcome(kind)
+                    )
+                );
             }
         }
         return attempts;
@@ -1485,33 +1949,45 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
 
     private static string FormatBalance(BalanceMetric balance)
     {
-        return balance.FormattedValue ?? (RuntimeText.MeterDisplayName(balance.Key, balance.DisplayName) + ": " + FormatMeasure(balance.Value.GetValueOrDefault(), balance.Unit));
+        return balance.FormattedValue
+            ?? (
+                RuntimeText.MeterDisplayName(balance.Key, balance.DisplayName)
+                + ": "
+                + FormatMeasure(balance.Value.GetValueOrDefault(), balance.Unit)
+            );
     }
 
     private static string FormatMeasure(decimal value, MeterUnit unit)
     {
         return unit switch
         {
-            MeterUnit.Usd => CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals("tr", StringComparison.OrdinalIgnoreCase)
+            MeterUnit.Usd => CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals(
+                "tr",
+                StringComparison.OrdinalIgnoreCase
+            )
                 ? value.ToString("0.##", CultureInfo.CurrentCulture) + "$"
                 : value.ToString("$0.##", CultureInfo.InvariantCulture),
             MeterUnit.Credits => F("Data_Credits", value),
-            MeterUnit.Requests => $"{value:0.##}", 
-            MeterUnit.Tokens => FormatTokens(decimal.ToInt64(value)), 
-            MeterUnit.Percent => $"{value:0.#}%", 
-            _ => value.ToString("0.##", CultureInfo.InvariantCulture), 
+            MeterUnit.Requests => $"{value:0.##}",
+            MeterUnit.Tokens => FormatTokens(decimal.ToInt64(value)),
+            MeterUnit.Percent => $"{value:0.#}%",
+            _ => value.ToString("0.##", CultureInfo.InvariantCulture),
         };
     }
 
-    private static IReadOnlyDictionary<string, string> DetectPlans(IReadOnlyDictionary<AccountKey, ProviderSnapshot> latest)
+    private static IReadOnlyDictionary<string, string> DetectPlans(
+        IReadOnlyDictionary<AccountKey, ProviderSnapshot> latest
+    )
     {
         Dictionary<string, string> plans = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (KeyValuePair<AccountKey, ProviderSnapshot> pair in latest)
         {
-            if (pair.Value is { Extensions: { } extensions }
+            if (
+                pair.Value is { Extensions: { } extensions }
                 && extensions.TryGetValue("plan_type", out JsonElement element)
                 && element.ValueKind == JsonValueKind.String
-                && !string.IsNullOrWhiteSpace(element.GetString()))
+                && !string.IsNullOrWhiteSpace(element.GetString())
+            )
             {
                 plans[pair.Key.Provider.Value] = element.GetString()!;
             }
@@ -1532,7 +2008,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             ("codex", "pro") => 200,
             ("codex", "team") or ("codex", "business") => 25,
             ("claude", "pro") => 20,
-            _ => double.NaN
+            _ => double.NaN,
         };
         return (label, suggested);
     }
@@ -1550,7 +2026,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             "claude" => row.ViewModel.AuthProvider is "Anthropic (Claude Code)",
             "droid" => row.ViewModel.Source == "Droid",
             "copilot" => row.ViewModel.AuthProvider == "GitHub Copilot",
-            _ => false
+            _ => false,
         };
     }
 
@@ -1558,14 +2034,14 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
     {
         return id.ToLowerInvariant() switch
         {
-            "codex" => "Codex", 
-            "claude" => "Claude Code", 
-            "opencode" => "OpenCode", 
+            "codex" => "Codex",
+            "claude" => "Claude Code",
+            "opencode" => "OpenCode",
             "copilot" => "GitHub Copilot",
             "amp" => "Amp",
             "droid" => "Droid",
             "cursor" => "Cursor",
-            _ => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(id), 
+            _ => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(id),
         };
     }
 
@@ -1599,29 +2075,31 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         return $"{(int)age.TotalDays}d";
     }
 
-    private static string LocalizedCapabilities(string providerId) => providerId switch
-    {
-        "codex" => L("Data_AuthCodex"),
-        "claude" => L("Data_AuthClaude"),
-        "opencode" => L("Data_AuthOpenCode"),
-        "droid" => L("Data_AuthDroid"),
-        "copilot" => L("Data_AuthCopilot"),
-        "amp" => L("Data_AuthAmp"),
-        "cursor" => L("Data_AuthCursor"),
-        _ => string.Empty
-    };
+    private static string LocalizedCapabilities(string providerId) =>
+        providerId switch
+        {
+            "codex" => L("Data_AuthCodex"),
+            "claude" => L("Data_AuthClaude"),
+            "opencode" => L("Data_AuthOpenCode"),
+            "droid" => L("Data_AuthDroid"),
+            "copilot" => L("Data_AuthCopilot"),
+            "amp" => L("Data_AuthAmp"),
+            "cursor" => L("Data_AuthCursor"),
+            _ => string.Empty,
+        };
 
-    private static string LocalizedCoverage(string providerId) => providerId switch
-    {
-        "codex" => L("Data_CoverageCodex"),
-        "claude" => L("Data_CoverageClaude"),
-        "opencode" => L("Data_CoverageOpenCode"),
-        "droid" => L("Data_CoverageDroid"),
-        "copilot" => L("Data_CoverageCopilot"),
-        "amp" => L("Data_CoverageAmp"),
-        "cursor" => L("Data_CoverageCursor"),
-        _ => string.Empty
-    };
+    private static string LocalizedCoverage(string providerId) =>
+        providerId switch
+        {
+            "codex" => L("Data_CoverageCodex"),
+            "claude" => L("Data_CoverageClaude"),
+            "opencode" => L("Data_CoverageOpenCode"),
+            "droid" => L("Data_CoverageDroid"),
+            "copilot" => L("Data_CoverageCopilot"),
+            "amp" => L("Data_CoverageAmp"),
+            "cursor" => L("Data_CoverageCursor"),
+            _ => string.Empty,
+        };
 
     private static string L(string key) => LocalizationService.GetString(key);
 
@@ -1672,9 +2150,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         {
             _loadGate.Wait(TimeSpan.FromSeconds(10));
         }
-        catch (ObjectDisposedException)
-        {
-        }
+        catch (ObjectDisposedException) { }
         _quotaAlerts.Dispose();
         _refresh.Dispose();
         _catalog.Dispose();

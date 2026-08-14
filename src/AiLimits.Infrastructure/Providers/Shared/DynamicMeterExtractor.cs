@@ -10,32 +10,114 @@ namespace AiLimits.Infrastructure.Providers.Shared;
 
 public sealed partial class DynamicMeterExtractor
 {
-    private static readonly string[] IdFields = new string[] { "id", "key", "meter_id", "meterId", "slug", "rate_limit_id" };
+    private static readonly string[] IdFields = new string[]
+    {
+        "id",
+        "key",
+        "meter_id",
+        "meterId",
+        "slug",
+        "rate_limit_id",
+    };
 
-    private static readonly string[] ModelFields = new string[] { "model", "model_id", "modelId", "model_name", "modelName" };
+    private static readonly string[] ModelFields = new string[]
+    {
+        "model",
+        "model_id",
+        "modelId",
+        "model_name",
+        "modelName",
+    };
 
     private static readonly string[] UsedFields = new string[] { "used", "usage", "current", "consumed", "spent" };
 
     private static readonly string[] LimitFields = new string[] { "limit", "total", "quota", "maximum", "max", "cap" };
 
-    private static readonly string[] PercentFields = new string[] { "used_percent", "usedPercent", "percent_used", "percentUsed", "usage_percent", "utilization" };
+    private static readonly string[] PercentFields = new string[]
+    {
+        "used_percent",
+        "usedPercent",
+        "percent_used",
+        "percentUsed",
+        "usage_percent",
+        "utilization",
+    };
 
-    private static readonly string[] ResetFields = new string[] { "resets_at", "resetsAt", "reset_at", "resetAt", "reset_time", "next_reset_at", "nextResetAt", "windowEnd", "window_end" };
+    private static readonly string[] ResetFields = new string[]
+    {
+        "resets_at",
+        "resetsAt",
+        "reset_at",
+        "resetAt",
+        "reset_time",
+        "next_reset_at",
+        "nextResetAt",
+        "windowEnd",
+        "window_end",
+    };
 
-    private static readonly string[] DurationFields = new string[] { "window_seconds", "windowSeconds", "window_minutes", "windowMinutes", "window_duration", "windowDuration", "limit_window_seconds", "limitWindowSeconds", "limit_window_minutes", "limitWindowMinutes" };
+    private static readonly string[] DurationFields = new string[]
+    {
+        "window_seconds",
+        "windowSeconds",
+        "window_minutes",
+        "windowMinutes",
+        "window_duration",
+        "windowDuration",
+        "limit_window_seconds",
+        "limitWindowSeconds",
+        "limit_window_minutes",
+        "limitWindowMinutes",
+    };
 
-    public IReadOnlyList<UsageMeter> Extract(ProviderId provider, JsonElement root, string strategyId, DateTimeOffset observedAt, bool authoritative, IReadOnlyDictionary<string, MeterAlias>? aliases = null)
+    public IReadOnlyList<UsageMeter> Extract(
+        ProviderId provider,
+        JsonElement root,
+        string strategyId,
+        DateTimeOffset observedAt,
+        bool authoritative,
+        IReadOnlyDictionary<string, MeterAlias>? aliases = null
+    )
     {
         Dictionary<MeterKey, UsageMeter> dictionary = new Dictionary<MeterKey, UsageMeter>();
-        Visit(provider, root, "$", strategyId, observedAt, authoritative, aliases ?? new Dictionary<string, MeterAlias>(), dictionary);
+        Visit(
+            provider,
+            root,
+            "$",
+            strategyId,
+            observedAt,
+            authoritative,
+            aliases ?? new Dictionary<string, MeterAlias>(),
+            dictionary
+        );
         return dictionary.Values.ToArray();
     }
 
-    private static void Visit(ProviderId provider, JsonElement element, string path, string strategyId, DateTimeOffset observedAt, bool authoritative, IReadOnlyDictionary<string, MeterAlias> aliases, IDictionary<MeterKey, UsageMeter> meters)
+    private static void Visit(
+        ProviderId provider,
+        JsonElement element,
+        string path,
+        string strategyId,
+        DateTimeOffset observedAt,
+        bool authoritative,
+        IReadOnlyDictionary<string, MeterAlias> aliases,
+        IDictionary<MeterKey, UsageMeter> meters
+    )
     {
         if (element.ValueKind == JsonValueKind.Object)
         {
-            if (TryCreateMeter(provider, element, path, strategyId, observedAt, authoritative, aliases, out UsageMeter meter))
+            if (
+                TryCreateMeter(
+                    provider,
+                    element,
+                    path,
+                    strategyId,
+                    observedAt,
+                    authoritative,
+                    aliases,
+                    out UsageMeter meter
+                )
+            )
             {
                 meters[meter.Key] = meter;
             }
@@ -45,7 +127,16 @@ public sealed partial class DynamicMeterExtractor
                     JsonValueKind valueKind = item.Value.ValueKind;
                     if (valueKind - 1 <= JsonValueKind.Object)
                     {
-                        Visit(provider, item.Value, path + "." + item.Name, strategyId, observedAt, authoritative, aliases, meters);
+                        Visit(
+                            provider,
+                            item.Value,
+                            path + "." + item.Name,
+                            strategyId,
+                            observedAt,
+                            authoritative,
+                            aliases,
+                            meters
+                        );
                     }
                 }
                 return;
@@ -61,7 +152,16 @@ public sealed partial class DynamicMeterExtractor
         }
     }
 
-    private static bool TryCreateMeter(ProviderId provider, JsonElement element, string path, string strategyId, DateTimeOffset observedAt, bool authoritative, IReadOnlyDictionary<string, MeterAlias> aliases, out UsageMeter meter)
+    private static bool TryCreateMeter(
+        ProviderId provider,
+        JsonElement element,
+        string path,
+        string strategyId,
+        DateTimeOffset observedAt,
+        bool authoritative,
+        IReadOnlyDictionary<string, MeterAlias> aliases,
+        out UsageMeter meter
+    )
     {
         meter = null;
         decimal value;
@@ -86,7 +186,12 @@ public sealed partial class DynamicMeterExtractor
         aliases.TryGetValue(key, out MeterAlias value4);
         if (value4 is null)
         {
-            value4 = aliases.FirstOrDefault<KeyValuePair<string, MeterAlias>>((KeyValuePair<string, MeterAlias> pair) => path.EndsWith(pair.Key, StringComparison.OrdinalIgnoreCase)).Value;
+            value4 = aliases
+                .FirstOrDefault<KeyValuePair<string, MeterAlias>>(
+                    (KeyValuePair<string, MeterAlias> pair) =>
+                        path.EndsWith(pair.Key, StringComparison.OrdinalIgnoreCase)
+                )
+                .Value;
         }
         if (!flag && value3 > 0m)
         {
@@ -100,14 +205,33 @@ public sealed partial class DynamicMeterExtractor
         // declaring PercentIsAbsolute pins the field to the 0..100 scale:
         // Claude's five_hour/seven_day "utilization" is a percent, and a real
         // 1% reading must not be inflated to 100%.
-        else if (flag && value >= 0m && value <= 1m && string.Equals(matched, "utilization", StringComparison.OrdinalIgnoreCase) && value4?.PercentIsAbsolute != true)
+        else if (
+            flag
+            && value >= 0m
+            && value <= 1m
+            && string.Equals(matched, "utilization", StringComparison.OrdinalIgnoreCase)
+            && value4?.PercentIsAbsolute != true
+        )
         {
             value *= 100m;
         }
         meterScope = value4?.Scope ?? meterScope;
         string value5 = ((text != null) ? ("issued:" + text) : $"derived:{path}|{meterScope}|{text2 ?? string.Empty}");
         double? num = (flag ? Math.Clamp((double)value, 0.0, 100.0) : null);
-        meter = new UsageMeter(new MeterKey(provider.Value + ":" + StableHash(value5)), value4?.DisplayName ?? FriendlyName(text ?? LastPathSegment(path)), meterScope, value4?.Unit ?? InferUnit(path, matched2, matched3), flag2 ? value2 : null, flag3 ? value3 : null, num, ReadDuration(element), flag4 ? reset : null, text2, StatusFrom(num), new MeterProvenance(strategyId, path, observedAt, authoritative));
+        meter = new UsageMeter(
+            new MeterKey(provider.Value + ":" + StableHash(value5)),
+            value4?.DisplayName ?? FriendlyName(text ?? LastPathSegment(path)),
+            meterScope,
+            value4?.Unit ?? InferUnit(path, matched2, matched3),
+            flag2 ? value2 : null,
+            flag3 ? value3 : null,
+            num,
+            ReadDuration(element),
+            flag4 ? reset : null,
+            text2,
+            StatusFrom(num),
+            new MeterProvenance(strategyId, path, observedAt, authoritative)
+        );
         return true;
     }
 
@@ -117,11 +241,18 @@ public sealed partial class DynamicMeterExtractor
         {
             return MeterScope.Model;
         }
-        if (path.Contains("organization", StringComparison.OrdinalIgnoreCase) || path.Contains("org", StringComparison.OrdinalIgnoreCase))
+        if (
+            path.Contains("organization", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("org", StringComparison.OrdinalIgnoreCase)
+        )
         {
             return MeterScope.Organization;
         }
-        if (path.Contains("offering", StringComparison.OrdinalIgnoreCase) || path.Contains("zen", StringComparison.OrdinalIgnoreCase) || path.Contains("go", StringComparison.OrdinalIgnoreCase))
+        if (
+            path.Contains("offering", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("zen", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("go", StringComparison.OrdinalIgnoreCase)
+        )
         {
             return MeterScope.Offering;
         }
@@ -139,7 +270,11 @@ public sealed partial class DynamicMeterExtractor
         {
             return MeterUnit.Tokens;
         }
-        if (text.Contains("dollar", StringComparison.OrdinalIgnoreCase) || text.Contains("usd", StringComparison.OrdinalIgnoreCase) || text.Contains("spend", StringComparison.OrdinalIgnoreCase))
+        if (
+            text.Contains("dollar", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("usd", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("spend", StringComparison.OrdinalIgnoreCase)
+        )
         {
             return MeterUnit.Usd;
         }
@@ -156,7 +291,15 @@ public sealed partial class DynamicMeterExtractor
         if (percent.HasValue)
         {
             double valueOrDefault = percent.GetValueOrDefault();
-            result = ((valueOrDefault >= 100.0) ? MeterStatus.Exhausted : ((valueOrDefault >= 95.0) ? MeterStatus.Critical : ((!(valueOrDefault >= 80.0)) ? MeterStatus.Healthy : MeterStatus.Approaching)));
+            result = (
+                (valueOrDefault >= 100.0)
+                    ? MeterStatus.Exhausted
+                    : (
+                        (valueOrDefault >= 95.0)
+                            ? MeterStatus.Critical
+                            : ((!(valueOrDefault >= 80.0)) ? MeterStatus.Healthy : MeterStatus.Approaching)
+                    )
+            );
         }
         else
         {
@@ -165,7 +308,12 @@ public sealed partial class DynamicMeterExtractor
         return result;
     }
 
-    private static bool TryReadDecimal(JsonElement element, IReadOnlyList<string> names, out decimal value, out string? matched)
+    private static bool TryReadDecimal(
+        JsonElement element,
+        IReadOnlyList<string> names,
+        out decimal value,
+        out string? matched
+    )
     {
         foreach (string name in names)
         {
@@ -176,7 +324,15 @@ public sealed partial class DynamicMeterExtractor
                     matched = name;
                     return true;
                 }
-                if (value2.ValueKind == JsonValueKind.String && decimal.TryParse(value2.GetString()?.TrimEnd('%'), NumberStyles.Number, CultureInfo.InvariantCulture, out value))
+                if (
+                    value2.ValueKind == JsonValueKind.String
+                    && decimal.TryParse(
+                        value2.GetString()?.TrimEnd('%'),
+                        NumberStyles.Number,
+                        CultureInfo.InvariantCulture,
+                        out value
+                    )
+                )
                 {
                     matched = name;
                     return true;
@@ -192,7 +348,11 @@ public sealed partial class DynamicMeterExtractor
     {
         foreach (string name in names)
         {
-            if (TryGetProperty(element, name, out var value) && value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString()))
+            if (
+                TryGetProperty(element, name, out var value)
+                && value.ValueKind == JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(value.GetString())
+            )
             {
                 return value.GetString().Trim();
             }
@@ -207,7 +367,15 @@ public sealed partial class DynamicMeterExtractor
         {
             if (TryGetProperty(element, name, out var value))
             {
-                if (value.ValueKind == JsonValueKind.String && DateTimeOffset.TryParse(value.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out reset))
+                if (
+                    value.ValueKind == JsonValueKind.String
+                    && DateTimeOffset.TryParse(
+                        value.GetString(),
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal,
+                        out reset
+                    )
+                )
                 {
                     return true;
                 }
@@ -218,12 +386,14 @@ public sealed partial class DynamicMeterExtractor
                     // not fail the whole provider extraction.
                     try
                     {
-                        reset = ((value2 > 10000000000L) ? DateTimeOffset.FromUnixTimeMilliseconds(value2) : DateTimeOffset.FromUnixTimeSeconds(value2));
+                        reset = (
+                            (value2 > 10000000000L)
+                                ? DateTimeOffset.FromUnixTimeMilliseconds(value2)
+                                : DateTimeOffset.FromUnixTimeSeconds(value2)
+                        );
                         return true;
                     }
-                    catch (ArgumentOutOfRangeException)
-                    {
-                    }
+                    catch (ArgumentOutOfRangeException) { }
                 }
             }
         }
@@ -242,7 +412,9 @@ public sealed partial class DynamicMeterExtractor
             }
             if (value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var value2))
             {
-                return text.Contains("minute", StringComparison.OrdinalIgnoreCase) ? TimeSpan.FromMinutes(value2) : TimeSpan.FromSeconds(value2);
+                return text.Contains("minute", StringComparison.OrdinalIgnoreCase)
+                    ? TimeSpan.FromMinutes(value2)
+                    : TimeSpan.FromSeconds(value2);
             }
             if (value.ValueKind != JsonValueKind.String)
             {
@@ -259,10 +431,10 @@ public sealed partial class DynamicMeterExtractor
                 string text3 = match.Groups[2].Value.ToLowerInvariant();
                 TimeSpan value3 = text3 switch
                 {
-                    "m" => TimeSpan.FromMinutes(value2), 
-                    "h" => TimeSpan.FromHours(value2), 
-                    "d" => TimeSpan.FromDays(value2), 
-                    _ => TimeSpan.FromSeconds(value2), 
+                    "m" => TimeSpan.FromMinutes(value2),
+                    "h" => TimeSpan.FromHours(value2),
+                    "d" => TimeSpan.FromDays(value2),
+                    _ => TimeSpan.FromSeconds(value2),
                 };
                 return value3;
             }
@@ -290,7 +462,11 @@ public sealed partial class DynamicMeterExtractor
 
     private static string LastPathSegment(string path)
     {
-        return (path.Split('.', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? "usage").Replace("[]", string.Empty, StringComparison.Ordinal);
+        return (path.Split('.', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? "usage").Replace(
+            "[]",
+            string.Empty,
+            StringComparison.Ordinal
+        );
     }
 
     private static string FriendlyName(string value)
@@ -301,7 +477,9 @@ public sealed partial class DynamicMeterExtractor
 
     private static string StableHash(string value)
     {
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value.Normalize(NormalizationForm.FormKC)))[..12]).ToLowerInvariant();
+        return Convert
+            .ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value.Normalize(NormalizationForm.FormKC)))[..12])
+            .ToLowerInvariant();
     }
 
     /// <summary>Matches a whole-string duration such as "30m", "1.5 h" or "45S".</summary>

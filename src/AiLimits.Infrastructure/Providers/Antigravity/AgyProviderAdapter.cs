@@ -11,9 +11,7 @@ public sealed class AgyProviderAdapter : IProviderAdapter
     private readonly AgyProcessDiscovery _processDiscovery;
 
     public AgyProviderAdapter(IClock clock)
-        : this(clock, new AgyProcessDiscovery())
-    {
-    }
+        : this(clock, new AgyProcessDiscovery()) { }
 
     internal AgyProviderAdapter(IClock clock, AgyProcessDiscovery processDiscovery)
     {
@@ -29,13 +27,7 @@ public sealed class AgyProviderAdapter : IProviderAdapter
         bool connected = _processDiscovery.FindListeningPorts().Count > 0;
         IReadOnlyList<ProviderAccount> accounts = new[]
         {
-            new ProviderAccount(
-                DefaultAccount,
-                "Google Antigravity",
-                null,
-                "Existing agy session",
-                1,
-                connected)
+            new ProviderAccount(DefaultAccount, "Google Antigravity", null, "Existing agy session", 1, connected),
         };
         return Task.FromResult(accounts);
     }

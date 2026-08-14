@@ -10,7 +10,8 @@ namespace AiLimits.Tests;
 public sealed class FactoryCredentialReaderTests
 {
     private const string Key = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=";
-    private const string Envelope = "CQkJCQkJCQkJCQkJCQkJCQ==:Zy0oxukNWUlRKdRsZERo1g==:uajsVgwTRwQITCbS1kwMVv4i072iHVxrvH1CtrIos/fnBZx4JAcul5hZYuSeqMoS6byLJdUOJdFClAWkW1QJbED05j6cMw1GDK/E2knhaiuVO/u7S44zvmWxkGhULnGSuiEZRjUd0Q6W4sSDhw==";
+    private const string Envelope =
+        "CQkJCQkJCQkJCQkJCQkJCQ==:Zy0oxukNWUlRKdRsZERo1g==:uajsVgwTRwQITCbS1kwMVv4i072iHVxrvH1CtrIos/fnBZx4JAcul5hZYuSeqMoS6byLJdUOJdFClAWkW1QJbED05j6cMw1GDK/E2knhaiuVO/u7S44zvmWxkGhULnGSuiEZRjUd0Q6W4sSDhw==";
 
     [Fact]
     public async Task ReaderReusesTheFactoryCliOAuthSession()
@@ -67,12 +68,14 @@ public sealed class FactoryCredentialReaderTests
         var key = RandomNumberGenerator.GetBytes(32);
         var nonce = RandomNumberGenerator.GetBytes(12);
         var tag = new byte[16];
-        var cleartext = JsonSerializer.SerializeToUtf8Bytes(new
-        {
-            access_token = accessToken,
-            refresh_token = "refresh-token",
-            active_organization_id = "org_test"
-        });
+        var cleartext = JsonSerializer.SerializeToUtf8Bytes(
+            new
+            {
+                access_token = accessToken,
+                refresh_token = "refresh-token",
+                active_organization_id = "org_test",
+            }
+        );
         var ciphertext = new byte[cleartext.Length];
         using (var aes = new AesGcm(key, tag.Length))
         {
@@ -82,7 +85,13 @@ public sealed class FactoryCredentialReaderTests
         await File.WriteAllTextAsync(Path.Combine(path, "auth.v2.key"), Convert.ToBase64String(key));
         await File.WriteAllTextAsync(
             Path.Combine(path, "auth.v2.file"),
-            string.Join(':', Convert.ToBase64String(nonce), Convert.ToBase64String(tag), Convert.ToBase64String(ciphertext)));
+            string.Join(
+                ':',
+                Convert.ToBase64String(nonce),
+                Convert.ToBase64String(tag),
+                Convert.ToBase64String(ciphertext)
+            )
+        );
     }
 
     private static string CreateJwt(string email)
@@ -92,10 +101,8 @@ public sealed class FactoryCredentialReaderTests
         return $"{header}.{payload}.display-only";
     }
 
-    private static string Base64Url(byte[] value) => Convert.ToBase64String(value)
-        .TrimEnd('=')
-        .Replace('+', '-')
-        .Replace('/', '_');
+    private static string Base64Url(byte[] value) =>
+        Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
     private sealed class FixedClock : IClock
     {

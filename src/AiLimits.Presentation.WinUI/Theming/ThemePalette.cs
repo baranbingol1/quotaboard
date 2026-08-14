@@ -35,4 +35,5 @@ public sealed record ThemePalette(
     ThemeColor Info,
     IReadOnlyList<ThemeColor> ChartSeries,
     string ContentFontId = FontCatalog.DefaultContentFontId,
-    string MetricFontId = FontCatalog.DefaultMetricFontId);
+    string MetricFontId = FontCatalog.DefaultMetricFontId
+);

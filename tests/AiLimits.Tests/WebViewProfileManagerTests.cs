@@ -13,8 +13,7 @@ public sealed class WebViewProfileManagerTests
         Directory.CreateDirectory(root);
         var manager = new WebViewProfileManager(root);
 
-        var ex = Assert.Throws<InvalidOperationException>(
-            () => manager.GetProfileDirectory("..", ".."));
+        var ex = Assert.Throws<InvalidOperationException>(() => manager.GetProfileDirectory("..", ".."));
 
         Assert.Contains("escaped", ex.Message, StringComparison.OrdinalIgnoreCase);
 
@@ -46,10 +45,13 @@ public sealed class WebViewProfileManagerTests
             Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AiLimits.Tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(Path);
         }
+
         public string Path { get; }
+
         public void Dispose()
         {
-            if (Directory.Exists(Path)) Directory.Delete(Path, true);
+            if (Directory.Exists(Path))
+                Directory.Delete(Path, true);
         }
     }
 }

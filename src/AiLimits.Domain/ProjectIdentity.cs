@@ -15,10 +15,7 @@ namespace AiLimits.Domain;
 /// The normalized root of the shared Git repository. This differs from
 /// <paramref name="ProjectPath"/> for linked worktrees.
 /// </param>
-public sealed record ProjectIdentity(
-    string ProjectKey,
-    string ProjectPath,
-    string? RepositoryRootPath)
+public sealed record ProjectIdentity(string ProjectKey, string ProjectPath, string? RepositoryRootPath)
 {
     public static ProjectIdentity Unknown { get; } = new("unknown", "Unknown", null);
 

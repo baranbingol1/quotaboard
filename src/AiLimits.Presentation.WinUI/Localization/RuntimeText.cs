@@ -11,17 +11,18 @@ namespace AiLimits.Presentation.WinUI.Localization;
 /// </summary>
 public static class RuntimeText
 {
-    public static string AccountFallback(string providerId) => providerId.ToLowerInvariant() switch
-    {
-        "codex" => L("Runtime_AccountCodex"),
-        "claude" => L("Runtime_AccountClaude"),
-        "opencode" => L("Runtime_AccountOpenCode"),
-        "droid" => L("Runtime_AccountDroid"),
-        "copilot" => L("Runtime_AccountCopilot"),
-        "amp" => L("Runtime_AccountAmp"),
-        "cursor" => L("Runtime_AccountCursor"),
-        _ => L("Common_Unknown")
-    };
+    public static string AccountFallback(string providerId) =>
+        providerId.ToLowerInvariant() switch
+        {
+            "codex" => L("Runtime_AccountCodex"),
+            "claude" => L("Runtime_AccountClaude"),
+            "opencode" => L("Runtime_AccountOpenCode"),
+            "droid" => L("Runtime_AccountDroid"),
+            "copilot" => L("Runtime_AccountCopilot"),
+            "amp" => L("Runtime_AccountAmp"),
+            "cursor" => L("Runtime_AccountCursor"),
+            _ => L("Common_Unknown"),
+        };
 
     public static string AuthSource(string providerId, string? source = null)
     {
@@ -33,7 +34,7 @@ public static class RuntimeText
             "factory cli session" => "Runtime_AuthDroidSession",
             "optional api key" => "Runtime_AuthDroidApiKey",
             "cursor app session" => "Runtime_AuthCursor",
-            _ => null
+            _ => null,
         };
         if (sourceKey is not null)
         {
@@ -49,7 +50,7 @@ public static class RuntimeText
             "copilot" => L("Runtime_AuthCopilot"),
             "amp" => L("Runtime_AuthAmp"),
             "cursor" => L("Runtime_AuthCursor"),
-            _ => L("Common_Unknown")
+            _ => L("Common_Unknown"),
         };
     }
 
@@ -72,7 +73,7 @@ public static class RuntimeText
             "extra usage balance" => "Runtime_MeterExtraUsageBalance",
             "credits" => "Runtime_MeterCredits",
             "codex extra limit" => "Runtime_MeterCodexExtraLimit",
-            _ => null
+            _ => null,
         };
         if (exactKey is not null)
         {
@@ -82,19 +83,19 @@ public static class RuntimeText
         const string secondaryPrefix = "Secondary ";
         if (name.StartsWith(secondaryPrefix, StringComparison.OrdinalIgnoreCase))
         {
-            return F(
-                "Runtime_SecondaryMeter",
-                MeterDisplayName(meterKey, name[secondaryPrefix.Length..]));
+            return F("Runtime_SecondaryMeter", MeterDisplayName(meterKey, name[secondaryPrefix.Length..]));
         }
 
-        foreach ((string suffix, string key) in new[]
-        {
-            (" weekly limit", "Runtime_WeeklyLimitFor"),
-            (" 5-hour limit", "Runtime_FiveHourLimitFor"),
-            (" monthly limit", "Runtime_MonthlyLimitFor"),
-            (" limit", "Runtime_LimitFor"),
-            (" tokens", "Runtime_TokensFor")
-        })
+        foreach (
+            (string suffix, string key) in new[]
+            {
+                (" weekly limit", "Runtime_WeeklyLimitFor"),
+                (" 5-hour limit", "Runtime_FiveHourLimitFor"),
+                (" monthly limit", "Runtime_MonthlyLimitFor"),
+                (" limit", "Runtime_LimitFor"),
+                (" tokens", "Runtime_TokensFor"),
+            }
+        )
         {
             if (name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
             {
@@ -105,56 +106,59 @@ public static class RuntimeText
         return string.IsNullOrWhiteSpace(name) ? meterKey : name;
     }
 
-    public static string FetchFailure(FetchFailureKind kind) => kind switch
-    {
-        FetchFailureKind.Authentication => L("Runtime_FailureAuthentication"),
-        FetchFailureKind.Authorization => L("Runtime_FailureAuthorization"),
-        FetchFailureKind.AccountMismatch => L("Runtime_FailureAccountMismatch"),
-        FetchFailureKind.RateLimited => L("Runtime_FailureRateLimited"),
-        FetchFailureKind.Network => L("Runtime_FailureNetwork"),
-        FetchFailureKind.Timeout => L("Runtime_FailureTimeout"),
-        FetchFailureKind.MalformedResponse => L("Runtime_FailureMalformed"),
-        FetchFailureKind.ProviderChanged => L("Runtime_FailureProviderChanged"),
-        FetchFailureKind.Cancelled => L("Runtime_FailureCancelled"),
-        FetchFailureKind.Unsupported => L("Runtime_FailureUnsupported"),
-        FetchFailureKind.TemporarilyUnavailable => L("Runtime_FailureTemporarilyUnavailable"),
-        FetchFailureKind.None => L("Data_Success"),
-        _ => L("Runtime_FailureUnknown")
-    };
+    public static string FetchFailure(FetchFailureKind kind) =>
+        kind switch
+        {
+            FetchFailureKind.Authentication => L("Runtime_FailureAuthentication"),
+            FetchFailureKind.Authorization => L("Runtime_FailureAuthorization"),
+            FetchFailureKind.AccountMismatch => L("Runtime_FailureAccountMismatch"),
+            FetchFailureKind.RateLimited => L("Runtime_FailureRateLimited"),
+            FetchFailureKind.Network => L("Runtime_FailureNetwork"),
+            FetchFailureKind.Timeout => L("Runtime_FailureTimeout"),
+            FetchFailureKind.MalformedResponse => L("Runtime_FailureMalformed"),
+            FetchFailureKind.ProviderChanged => L("Runtime_FailureProviderChanged"),
+            FetchFailureKind.Cancelled => L("Runtime_FailureCancelled"),
+            FetchFailureKind.Unsupported => L("Runtime_FailureUnsupported"),
+            FetchFailureKind.TemporarilyUnavailable => L("Runtime_FailureTemporarilyUnavailable"),
+            FetchFailureKind.None => L("Data_Success"),
+            _ => L("Runtime_FailureUnknown"),
+        };
 
     // FetchFailure names the outcome; this says what it means for the person
     // reading it. "Not supported" next to a 0 ms duration told nobody whether
     // something was broken, so every outcome now carries a plain sentence.
-    public static string FetchFailureMeaning(FetchFailureKind kind) => kind switch
-    {
-        FetchFailureKind.Authentication => L("Runtime_MeaningAuthentication"),
-        FetchFailureKind.Authorization => L("Runtime_MeaningAuthorization"),
-        FetchFailureKind.AccountMismatch => L("Runtime_MeaningAccountMismatch"),
-        FetchFailureKind.RateLimited => L("Runtime_MeaningRateLimited"),
-        FetchFailureKind.Network => L("Runtime_MeaningNetwork"),
-        FetchFailureKind.Timeout => L("Runtime_MeaningTimeout"),
-        FetchFailureKind.MalformedResponse => L("Runtime_MeaningMalformed"),
-        FetchFailureKind.ProviderChanged => L("Runtime_MeaningProviderChanged"),
-        FetchFailureKind.Cancelled => L("Runtime_MeaningCancelled"),
-        FetchFailureKind.Unsupported => L("Runtime_MeaningUnsupported"),
-        FetchFailureKind.TemporarilyUnavailable => L("Runtime_MeaningTemporarilyUnavailable"),
-        FetchFailureKind.None => L("Runtime_MeaningSuccess"),
-        _ => L("Runtime_MeaningUnknown")
-    };
+    public static string FetchFailureMeaning(FetchFailureKind kind) =>
+        kind switch
+        {
+            FetchFailureKind.Authentication => L("Runtime_MeaningAuthentication"),
+            FetchFailureKind.Authorization => L("Runtime_MeaningAuthorization"),
+            FetchFailureKind.AccountMismatch => L("Runtime_MeaningAccountMismatch"),
+            FetchFailureKind.RateLimited => L("Runtime_MeaningRateLimited"),
+            FetchFailureKind.Network => L("Runtime_MeaningNetwork"),
+            FetchFailureKind.Timeout => L("Runtime_MeaningTimeout"),
+            FetchFailureKind.MalformedResponse => L("Runtime_MeaningMalformed"),
+            FetchFailureKind.ProviderChanged => L("Runtime_MeaningProviderChanged"),
+            FetchFailureKind.Cancelled => L("Runtime_MeaningCancelled"),
+            FetchFailureKind.Unsupported => L("Runtime_MeaningUnsupported"),
+            FetchFailureKind.TemporarilyUnavailable => L("Runtime_MeaningTemporarilyUnavailable"),
+            FetchFailureKind.None => L("Runtime_MeaningSuccess"),
+            _ => L("Runtime_MeaningUnknown"),
+        };
 
     // Reuses the card palette so a red dot means the same thing on every page.
-    public static CardStatusKind FetchOutcome(FetchFailureKind kind) => kind switch
-    {
-        FetchFailureKind.None => CardStatusKind.Live,
-        FetchFailureKind.Authentication or FetchFailureKind.Authorization => CardStatusKind.SignInRequired,
-        FetchFailureKind.RateLimited => CardStatusKind.RateLimited,
-        FetchFailureKind.Network or FetchFailureKind.Timeout => CardStatusKind.Offline,
-        // Transient, self-recovering: shown as retrying, never as sign-in.
-        FetchFailureKind.TemporarilyUnavailable => CardStatusKind.Stale,
-        // Neither broken nor answered: this source simply does not apply here.
-        FetchFailureKind.Unsupported or FetchFailureKind.Cancelled => CardStatusKind.NoQuota,
-        _ => CardStatusKind.Error
-    };
+    public static CardStatusKind FetchOutcome(FetchFailureKind kind) =>
+        kind switch
+        {
+            FetchFailureKind.None => CardStatusKind.Live,
+            FetchFailureKind.Authentication or FetchFailureKind.Authorization => CardStatusKind.SignInRequired,
+            FetchFailureKind.RateLimited => CardStatusKind.RateLimited,
+            FetchFailureKind.Network or FetchFailureKind.Timeout => CardStatusKind.Offline,
+            // Transient, self-recovering: shown as retrying, never as sign-in.
+            FetchFailureKind.TemporarilyUnavailable => CardStatusKind.Stale,
+            // Neither broken nor answered: this source simply does not apply here.
+            FetchFailureKind.Unsupported or FetchFailureKind.Cancelled => CardStatusKind.NoQuota,
+            _ => CardStatusKind.Error,
+        };
 
     public static string AuthorizationProvider(string displayName) =>
         displayName.EndsWith("(API key)", StringComparison.Ordinal)
@@ -169,7 +173,7 @@ public static class RuntimeText
             "critical" => L("Runtime_StatusCritical"),
             "maintenance" => L("Runtime_StatusMaintenance"),
             _ when !string.IsNullOrWhiteSpace(fallback) => fallback,
-            _ => L("Runtime_StatusUnknown")
+            _ => L("Runtime_StatusUnknown"),
         };
 
     private static string L(string key) => LocalizationService.GetString(key);

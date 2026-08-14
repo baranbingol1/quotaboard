@@ -24,10 +24,10 @@ public static class LocalizationService
     private static readonly string PreferencePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "QuotaBoard",
-        "language.txt");
+        "language.txt"
+    );
 
-    public static IReadOnlyList<string> SupportedLanguageTags { get; } =
-        [EnglishLanguageTag, TurkishLanguageTag];
+    public static IReadOnlyList<string> SupportedLanguageTags { get; } = [EnglishLanguageTag, TurkishLanguageTag];
 
     public static string AppliedLanguageTag { get; private set; } = SystemLanguageTag;
 
@@ -66,12 +66,13 @@ public static class LocalizationService
         return true;
     }
 
-    public static string GetLanguageDisplayName(string? languageTag) => Normalize(languageTag) switch
-    {
-        EnglishLanguageTag => GetString("Language_English"),
-        TurkishLanguageTag => GetString("Language_Turkish"),
-        _ => GetString("Language_SystemDefault"),
-    };
+    public static string GetLanguageDisplayName(string? languageTag) =>
+        Normalize(languageTag) switch
+        {
+            EnglishLanguageTag => GetString("Language_English"),
+            TurkishLanguageTag => GetString("Language_Turkish"),
+            _ => GetString("Language_SystemDefault"),
+        };
 
     /// <summary>Looks up a string in the active Resources.resw resource map.</summary>
     public static string GetString(string resourceId)
@@ -83,9 +84,9 @@ public static class LocalizationService
             // into the executable PRI under a named subtree. Windows App SDK
             // 2.x needs both the active PRI path and that subtree here; the
             // one-argument overload treats its value as a resource file name.
-            string value = new ResourceLoader(
-                ResourceLoader.GetDefaultResourceFilePath(),
-                ResourceMapName).GetString(resourceId);
+            string value = new ResourceLoader(ResourceLoader.GetDefaultResourceFilePath(), ResourceMapName).GetString(
+                resourceId
+            );
             return string.IsNullOrWhiteSpace(value) ? resourceId : value;
         }
         catch
@@ -125,12 +126,8 @@ public static class LocalizationService
             ApplicationLanguages.PrimaryLanguageOverride = languageTag;
         }
 
-        CultureInfo culture = languageTag.Length == 0
-            ? SystemCulture
-            : CultureInfo.GetCultureInfo(languageTag);
-        CultureInfo uiCulture = languageTag.Length == 0
-            ? SystemUiCulture
-            : culture;
+        CultureInfo culture = languageTag.Length == 0 ? SystemCulture : CultureInfo.GetCultureInfo(languageTag);
+        CultureInfo uiCulture = languageTag.Length == 0 ? SystemUiCulture : culture;
 
         CultureInfo.DefaultThreadCurrentCulture = culture;
         CultureInfo.DefaultThreadCurrentUICulture = uiCulture;
@@ -143,9 +140,7 @@ public static class LocalizationService
     {
         try
         {
-            return File.Exists(PreferencePath)
-                ? Normalize(File.ReadAllText(PreferencePath))
-                : SystemLanguageTag;
+            return File.Exists(PreferencePath) ? Normalize(File.ReadAllText(PreferencePath)) : SystemLanguageTag;
         }
         catch
         {
@@ -156,30 +151,35 @@ public static class LocalizationService
     private static void PersistOverride(string languageTag)
     {
         string? directory = Path.GetDirectoryName(PreferencePath);
-        if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
-        File.WriteAllText(
-            PreferencePath,
-            languageTag.Length == 0 ? SystemPreferenceValue : languageTag);
+        if (!string.IsNullOrEmpty(directory))
+            Directory.CreateDirectory(directory);
+        File.WriteAllText(PreferencePath, languageTag.Length == 0 ? SystemPreferenceValue : languageTag);
     }
 
     private static string Normalize(string? languageTag)
     {
         string candidate = languageTag?.Trim() ?? SystemLanguageTag;
-        if (candidate.Length == 0 ||
-            candidate.Equals(SystemPreferenceValue, StringComparison.OrdinalIgnoreCase) ||
-            candidate.Equals("default", StringComparison.OrdinalIgnoreCase))
+        if (
+            candidate.Length == 0
+            || candidate.Equals(SystemPreferenceValue, StringComparison.OrdinalIgnoreCase)
+            || candidate.Equals("default", StringComparison.OrdinalIgnoreCase)
+        )
         {
             return SystemLanguageTag;
         }
 
-        if (candidate.Equals(EnglishLanguageTag, StringComparison.OrdinalIgnoreCase) ||
-            candidate.Equals("en", StringComparison.OrdinalIgnoreCase))
+        if (
+            candidate.Equals(EnglishLanguageTag, StringComparison.OrdinalIgnoreCase)
+            || candidate.Equals("en", StringComparison.OrdinalIgnoreCase)
+        )
         {
             return EnglishLanguageTag;
         }
 
-        if (candidate.Equals(TurkishLanguageTag, StringComparison.OrdinalIgnoreCase) ||
-            candidate.Equals("tr", StringComparison.OrdinalIgnoreCase))
+        if (
+            candidate.Equals(TurkishLanguageTag, StringComparison.OrdinalIgnoreCase)
+            || candidate.Equals("tr", StringComparison.OrdinalIgnoreCase)
+        )
         {
             return TurkishLanguageTag;
         }
@@ -187,6 +187,7 @@ public static class LocalizationService
         throw new ArgumentOutOfRangeException(
             nameof(languageTag),
             languageTag,
-            "Only the system default, en-US, and tr-TR languages are supported.");
+            "Only the system default, en-US, and tr-TR languages are supported."
+        );
     }
 }

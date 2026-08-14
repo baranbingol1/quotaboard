@@ -20,7 +20,8 @@ public sealed class DroidProviderAdapter : IProviderAdapter
     {
         _httpClient = httpClient;
         _clock = clock;
-        _factoryHome = factoryHome ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".factory");
+        _factoryHome =
+            factoryHome ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".factory");
         _credentialReader = new FactoryCredentialReader(_factoryHome);
     }
 
@@ -28,7 +29,17 @@ public sealed class DroidProviderAdapter : IProviderAdapter
     {
         FactoryCredential credential = await _credentialReader.ReadAsync(cancellationToken).ConfigureAwait(false);
         bool hasApiKey = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("FACTORY_API_KEY"));
-        return new ProviderAccount[] { new ProviderAccount(IsConnected: credential is not null || hasApiKey, Key: new AccountKey(Descriptor.Id, "default"), DisplayName: "Factory / Droid", Login: credential?.Email, AuthSource: (credential is not null) ? "Factory CLI session" : "Optional API key", ConfigurationRevision: 1L) };
+        return new ProviderAccount[]
+        {
+            new ProviderAccount(
+                IsConnected: credential is not null || hasApiKey,
+                Key: new AccountKey(Descriptor.Id, "default"),
+                DisplayName: "Factory / Droid",
+                Login: credential?.Email,
+                AuthSource: (credential is not null) ? "Factory CLI session" : "Optional API key",
+                ConfigurationRevision: 1L
+            ),
+        };
     }
 
     public IReadOnlyList<ILimitFetchStrategy> CreateLimitStrategies(ProviderAccount account)
@@ -36,7 +47,7 @@ public sealed class DroidProviderAdapter : IProviderAdapter
         return new ILimitFetchStrategy[]
         {
             new DroidSessionLimitStrategy(_httpClient, _clock, _credentialReader),
-            new DroidApiLimitStrategy(_httpClient, _clock)
+            new DroidApiLimitStrategy(_httpClient, _clock),
         };
     }
 

@@ -27,10 +27,9 @@ public sealed class ModelVendorClassifierTests
     public void GetDisplayName_recognizes_vendor_independently_of_pricing_resolution(
         string service,
         string rawModelId,
-        string expected)
+        string expected
+    )
     {
-        Assert.Equal(
-            expected,
-            ModelVendorClassifier.GetDisplayName(service, rawModelId));
+        Assert.Equal(expected, ModelVendorClassifier.GetDisplayName(service, rawModelId));
     }
 }

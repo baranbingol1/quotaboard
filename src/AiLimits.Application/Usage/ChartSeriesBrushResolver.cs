@@ -35,7 +35,5 @@ public static class ChartSeriesBrushResolver
     /// <c>ChartSeriesOthersBrush</c>.
     /// </summary>
     public static string ResolveResourceKey(int legendIndex, bool isOthers) =>
-        isOthers || legendIndex >= SeriesKeys.Length
-            ? "ChartSeriesOthersBrush"
-            : SeriesKeys[legendIndex];
+        isOthers || legendIndex >= SeriesKeys.Length ? "ChartSeriesOthersBrush" : SeriesKeys[legendIndex];
 }

@@ -12,11 +12,15 @@ public static class ThemeService
 {
     private static readonly string PreferencePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard", "theme.json");
+        "QuotaBoard",
+        "theme.json"
+    );
 
     private static readonly string LegacyPreferencePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard", "theme.preference");
+        "QuotaBoard",
+        "theme.preference"
+    );
 
     private static ResourceDictionary? _injected;
     private static ThemePalette _palette = ThemeCatalog.Default;
@@ -43,14 +47,16 @@ public static class ThemeService
             if (File.Exists(PreferencePath))
             {
                 using JsonDocument document = JsonDocument.Parse(File.ReadAllText(PreferencePath));
-                string themeId = document.RootElement.TryGetProperty("theme", out JsonElement themeElement)
+                string themeId =
+                    document.RootElement.TryGetProperty("theme", out JsonElement themeElement)
                     && themeElement.ValueKind == JsonValueKind.String
-                    ? themeElement.GetString() ?? ThemeCatalog.Default.Id
-                    : ThemeCatalog.Default.Id;
-                ElementTheme mode = document.RootElement.TryGetProperty("mode", out JsonElement modeElement)
+                        ? themeElement.GetString() ?? ThemeCatalog.Default.Id
+                        : ThemeCatalog.Default.Id;
+                ElementTheme mode =
+                    document.RootElement.TryGetProperty("mode", out JsonElement modeElement)
                     && modeElement.ValueKind == JsonValueKind.String
-                    ? ParseMode(modeElement.GetString())
-                    : ElementTheme.Default;
+                        ? ParseMode(modeElement.GetString())
+                        : ElementTheme.Default;
                 return new ThemePreference(ThemeCatalog.Resolve(themeId).Id, mode);
             }
             // One-time migration from the legacy mode-only file.
@@ -59,13 +65,15 @@ public static class ThemeService
                 ElementTheme mode = ParseMode(File.ReadAllText(LegacyPreferencePath).Trim());
                 var migrated = new ThemePreference(ThemeCatalog.Default.Id, mode);
                 Save(migrated);
-                try { File.Delete(LegacyPreferencePath); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+                try
+                {
+                    File.Delete(LegacyPreferencePath);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
                 return migrated;
             }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { }
         return new ThemePreference(ThemeCatalog.Default.Id, ElementTheme.Default);
     }
 
@@ -82,7 +90,10 @@ public static class ThemeService
             if (app is not null)
             {
                 ResourceDictionary generated = ThemeDictionaryBuilder.Build(
-                    _palette, FontPreference.ContentSource(_palette), FontPreference.MetricSource(_palette));
+                    _palette,
+                    FontPreference.ContentSource(_palette),
+                    FontPreference.MetricSource(_palette)
+                );
                 if (_injected is not null)
                 {
                     app.Resources.MergedDictionaries.Remove(_injected);
@@ -149,9 +160,10 @@ public static class ThemeService
         ElementTheme effective = Current;
         if (effective == ElementTheme.Default)
         {
-            effective = _root is not null && _root.TryGetTarget(out FrameworkElement? root)
-                ? (root.ActualTheme == ElementTheme.Dark ? ElementTheme.Dark : ElementTheme.Light)
-                : (app.RequestedTheme == ApplicationTheme.Dark ? ElementTheme.Dark : ElementTheme.Light);
+            effective =
+                _root is not null && _root.TryGetTarget(out FrameworkElement? root)
+                    ? (root.ActualTheme == ElementTheme.Dark ? ElementTheme.Dark : ElementTheme.Light)
+                    : (app.RequestedTheme == ApplicationTheme.Dark ? ElementTheme.Dark : ElementTheme.Light);
         }
         string themeKey = effective == ElementTheme.Dark ? "Dark" : "Light";
         if (ResolveThemed(app.Resources, key, themeKey) is { } themedValue)
@@ -161,41 +173,48 @@ public static class ThemeService
         return app.Resources.TryGetValue(key, out var value) ? value : null;
     }
 
-    private static bool IsEffectivelyDark(FrameworkElement root, ElementTheme mode) => mode switch
-    {
-        ElementTheme.Dark => true,
-        ElementTheme.Light => false,
-        _ => root.ActualTheme == ElementTheme.Dark
-    };
+    private static bool IsEffectivelyDark(FrameworkElement root, ElementTheme mode) =>
+        mode switch
+        {
+            ElementTheme.Dark => true,
+            ElementTheme.Light => false,
+            _ => root.ActualTheme == ElementTheme.Dark,
+        };
 
-    private static ElementTheme ParseMode(string? value) => value switch
-    {
-        "Light" => ElementTheme.Light,
-        "Dark" => ElementTheme.Dark,
-        _ => ElementTheme.Default
-    };
+    private static ElementTheme ParseMode(string? value) =>
+        value switch
+        {
+            "Light" => ElementTheme.Light,
+            "Dark" => ElementTheme.Dark,
+            _ => ElementTheme.Default,
+        };
 
     private static void Save(ThemePreference preference)
     {
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(PreferencePath)!);
-            File.WriteAllText(PreferencePath, JsonSerializer.Serialize(new Dictionary<string, string>
-            {
-                ["theme"] = preference.ThemeId,
-                ["mode"] = preference.Mode.ToString()
-            }));
+            File.WriteAllText(
+                PreferencePath,
+                JsonSerializer.Serialize(
+                    new Dictionary<string, string>
+                    {
+                        ["theme"] = preference.ThemeId,
+                        ["mode"] = preference.Mode.ToString(),
+                    }
+                )
+            );
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
     private static object? ResolveThemed(ResourceDictionary dictionary, string key, string themeKey)
     {
-        if (dictionary.ThemeDictionaries.TryGetValue(themeKey, out var scoped)
+        if (
+            dictionary.ThemeDictionaries.TryGetValue(themeKey, out var scoped)
             && scoped is ResourceDictionary themed
-            && themed.TryGetValue(key, out var themedValue))
+            && themed.TryGetValue(key, out var themedValue)
+        )
         {
             return themedValue;
         }

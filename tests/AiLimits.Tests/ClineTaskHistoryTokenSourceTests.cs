@@ -22,15 +22,19 @@ public sealed class ClineTaskHistoryTokenSourceTests
         long pendingTs = Base.AddMinutes(2).ToUnixTimeMilliseconds();
         long fallbackTs = Base.AddMinutes(3).ToUnixTimeMilliseconds();
         WriteTaskHistory(temp.Path, ("task1", project, "gpt-5.3-codex"));
-        WriteUiMessages(temp.Path, "task1",
+        WriteUiMessages(
+            temp.Path,
+            "task1",
             Say(sayTs, "task", "analyze the diffs"),
             ApiReq(taskTs, Tokens(14363, 1512, cacheReads: 256), ModelInfo("cline-pass", "cline-pass/kimi-k3")),
             ApiReq(codexTs, Tokens(100, 10), ModelInfo("openai-codex", "gpt-5.3-codex")),
             ApiReq(pendingTs, "{\"request\":\"still running\"}", ModelInfo("cline-pass", "cline-pass/kimi-k3")),
-            ApiReq(fallbackTs, Tokens(7, 3)));
+            ApiReq(fallbackTs, Tokens(7, 3))
+        );
 
         var events = await CollectAsync(
-            new ClineTaskHistoryTokenSource([temp.Path]).ReadAsync(Account(), null, default));
+            new ClineTaskHistoryTokenSource([temp.Path]).ReadAsync(Account(), null, default)
+        );
 
         Assert.Equal(3, events.Count);
         TokenUsageEvent first = events[0];
@@ -70,19 +74,33 @@ public sealed class ClineTaskHistoryTokenSourceTests
         long firstTs = Base.ToUnixTimeMilliseconds();
         long secondTs = Base.AddMinutes(1).ToUnixTimeMilliseconds();
         long fallbackTs = Base.AddMinutes(2).ToUnixTimeMilliseconds();
-        WriteSession(temp.Path, "sess1",
+        WriteSession(
+            temp.Path,
+            "sess1",
             SessionMessages(
                 User(firstTs),
                 Assistant("m_a1", firstTs, Metrics(4969, 371), SessionModelInfo("cline-pass", "cline-pass/kimi-k3")),
-                Assistant("m_a2", secondTs, null, SessionModelInfo("cline-pass", "cline-pass/kimi-k3"))),
-            Sibling(cwd: project));
-        WriteSession(temp.Path, "sess2",
+                Assistant("m_a2", secondTs, null, SessionModelInfo("cline-pass", "cline-pass/kimi-k3"))
+            ),
+            Sibling(cwd: project)
+        );
+        WriteSession(
+            temp.Path,
+            "sess2",
             SessionMessages(
-                Assistant(null, fallbackTs, Metrics(10, 2, cacheRead: 4), SessionModelInfo("cline-pass", "cline-pass/kimi-k3"))),
-            Sibling(workspaceRoot: project.Replace('\\', '/')));
+                Assistant(
+                    null,
+                    fallbackTs,
+                    Metrics(10, 2, cacheRead: 4),
+                    SessionModelInfo("cline-pass", "cline-pass/kimi-k3")
+                )
+            ),
+            Sibling(workspaceRoot: project.Replace('\\', '/'))
+        );
 
         var events = await CollectAsync(
-            new ClineTaskHistoryTokenSource([temp.Path]).ReadAsync(Account(), null, default));
+            new ClineTaskHistoryTokenSource([temp.Path]).ReadAsync(Account(), null, default)
+        );
 
         Assert.Equal(2, events.Count);
         TokenUsageEvent first = events[0];
@@ -109,12 +127,16 @@ public sealed class ClineTaskHistoryTokenSourceTests
     {
         using var temp = new TempDir();
         long ts = Base.ToUnixTimeMilliseconds();
-        WriteUiMessages(temp.Path, "task1",
+        WriteUiMessages(
+            temp.Path,
+            "task1",
             ApiReq(ts, Tokens(100, 10), ModelInfo("cline-pass", "cline-pass/kimi-k3")),
-            ApiReq(ts, Tokens(250, 25, cacheReads: 40), ModelInfo("cline-pass", "cline-pass/kimi-k3")));
+            ApiReq(ts, Tokens(250, 25, cacheReads: 40), ModelInfo("cline-pass", "cline-pass/kimi-k3"))
+        );
 
         var events = await CollectAsync(
-            new ClineTaskHistoryTokenSource([temp.Path]).ReadAsync(Account(), null, default));
+            new ClineTaskHistoryTokenSource([temp.Path]).ReadAsync(Account(), null, default)
+        );
 
         Assert.Equal(2, events.Count);
         Assert.Equal(100, events[0].InputTokens);
@@ -135,10 +157,13 @@ public sealed class ClineTaskHistoryTokenSourceTests
         long oldTs = Base.AddMinutes(-6).ToUnixTimeMilliseconds();
         long overlapTs = Base.AddMinutes(-4).ToUnixTimeMilliseconds();
         long newTs = Base.AddMinutes(1).ToUnixTimeMilliseconds();
-        WriteUiMessages(temp.Path, "task1",
+        WriteUiMessages(
+            temp.Path,
+            "task1",
             ApiReq(oldTs, Tokens(1, 1), ModelInfo("cline-pass", "cline-pass/kimi-k3")),
             ApiReq(overlapTs, Tokens(2, 2), ModelInfo("cline-pass", "cline-pass/kimi-k3")),
-            ApiReq(newTs, Tokens(3, 3), ModelInfo("cline-pass", "cline-pass/kimi-k3")));
+            ApiReq(newTs, Tokens(3, 3), ModelInfo("cline-pass", "cline-pass/kimi-k3"))
+        );
 
         var source = new ClineTaskHistoryTokenSource([temp.Path]);
         var full = await CollectAsync(source.ReadAsync(Account(), null, default));
@@ -147,12 +172,11 @@ public sealed class ClineTaskHistoryTokenSourceTests
 
         Assert.Equal(3, full.Count);
         Assert.Equal(2, incremental.Count);
-        Assert.Equal(
-            full.Skip(1).Select(e => e.SourceEventId),
-            incremental.Select(e => e.SourceEventId));
+        Assert.Equal(full.Skip(1).Select(e => e.SourceEventId), incremental.Select(e => e.SourceEventId));
         Assert.Equal(
             [$"cline:task:task1:{overlapTs}", $"cline:task:task1:{newTs}"],
-            incremental.Select(e => e.SourceEventId).ToArray());
+            incremental.Select(e => e.SourceEventId).ToArray()
+        );
     }
 
     [Fact]
@@ -163,14 +187,19 @@ public sealed class ClineTaskHistoryTokenSourceTests
         string editorRoot = temp.Dir("editor");
         long taskTs = Base.ToUnixTimeMilliseconds();
         long sessionTs = Base.AddMinutes(1).ToUnixTimeMilliseconds();
-        WriteUiMessages(cliRoot, "task1",
-            ApiReq(taskTs, Tokens(5, 1), ModelInfo("openai-codex", "gpt-5.3-codex")));
-        WriteSession(editorRoot, "sess1",
-            SessionMessages(Assistant("m1", sessionTs, Metrics(9, 4), SessionModelInfo("cline-pass", "cline-pass/kimi-k3"))),
-            null);
+        WriteUiMessages(cliRoot, "task1", ApiReq(taskTs, Tokens(5, 1), ModelInfo("openai-codex", "gpt-5.3-codex")));
+        WriteSession(
+            editorRoot,
+            "sess1",
+            SessionMessages(
+                Assistant("m1", sessionTs, Metrics(9, 4), SessionModelInfo("cline-pass", "cline-pass/kimi-k3"))
+            ),
+            null
+        );
 
         var events = await CollectAsync(
-            new ClineTaskHistoryTokenSource([cliRoot, editorRoot]).ReadAsync(Account(), null, default));
+            new ClineTaskHistoryTokenSource([cliRoot, editorRoot]).ReadAsync(Account(), null, default)
+        );
 
         Assert.Equal(2, events.Count);
         Assert.Equal(2, events.Select(e => e.SourceEventId).Distinct().Count());
@@ -189,30 +218,36 @@ public sealed class ClineTaskHistoryTokenSourceTests
         long ts = Base.ToUnixTimeMilliseconds();
         string brokenFile = WriteUiMessages(temp.Path, "a-broken", ApiReq(ts, Tokens(999, 999)));
         await File.WriteAllTextAsync(brokenFile, "{not json");
-        WriteUiMessages(temp.Path, "b-good",
-            ApiReq(ts, Tokens(42, 7), ModelInfo("cline-pass", "cline-pass/kimi-k3")));
+        WriteUiMessages(temp.Path, "b-good", ApiReq(ts, Tokens(42, 7), ModelInfo("cline-pass", "cline-pass/kimi-k3")));
         string lockedFile = WriteUiMessages(temp.Path, "c-locked", ApiReq(ts, Tokens(999, 999)));
         WriteSession(temp.Path, "z-broken", "{also not json", null);
 
         await using var lockStream = new FileStream(lockedFile, FileMode.Open, FileAccess.Write, FileShare.None);
         var events = await CollectAsync(
-            new ClineTaskHistoryTokenSource([temp.Path]).ReadAsync(Account(), null, default));
+            new ClineTaskHistoryTokenSource([temp.Path]).ReadAsync(Account(), null, default)
+        );
 
         TokenUsageEvent good = Assert.Single(events);
         Assert.Equal(42, good.InputTokens);
         Assert.Equal(7, good.OutputTokens);
         Assert.Equal($"cline:task:b-good:{ts}", good.SourceEventId);
     }
+
     private static string Normalize(string path) => new ProjectIdentityResolver().Resolve(path).ProjectPath;
 
-    private static ProviderAccount Account() => new(
-        new AccountKey(new ProviderId("cline"), "default"), "Cline", null, "fixture", 1, true);
+    private static ProviderAccount Account() =>
+        new(new AccountKey(new ProviderId("cline"), "default"), "Cline", null, "fixture", 1, true);
 
     private static string Say(long ts, string say, string text) =>
-        JsonSerializer.Serialize(new Dictionary<string, object?>
-        {
-            ["ts"] = ts, ["type"] = "say", ["say"] = say, ["text"] = text
-        });
+        JsonSerializer.Serialize(
+            new Dictionary<string, object?>
+            {
+                ["ts"] = ts,
+                ["type"] = "say",
+                ["say"] = say,
+                ["text"] = text,
+            }
+        );
 
     private static string ApiReq(long ts, string payload, string? modelInfo = null)
     {
@@ -221,22 +256,31 @@ public sealed class ClineTaskHistoryTokenSourceTests
             ["ts"] = ts,
             ["type"] = "say",
             ["say"] = "api_req_started",
-            ["text"] = payload
+            ["text"] = payload,
         };
-        if (modelInfo is not null) entry["modelInfo"] = JsonSerializer.Deserialize<JsonElement>(modelInfo);
+        if (modelInfo is not null)
+            entry["modelInfo"] = JsonSerializer.Deserialize<JsonElement>(modelInfo);
         return JsonSerializer.Serialize(entry);
     }
 
     private static string Tokens(long input, long output, long cacheReads = 0, long cacheWrites = 0) =>
-        "{\"request\":\"x\",\"tokensIn\":" + input + ",\"tokensOut\":" + output +
-        ",\"cacheReads\":" + cacheReads + ",\"cacheWrites\":" + cacheWrites + ",\"cost\":0}";
+        "{\"request\":\"x\",\"tokensIn\":"
+        + input
+        + ",\"tokensOut\":"
+        + output
+        + ",\"cacheReads\":"
+        + cacheReads
+        + ",\"cacheWrites\":"
+        + cacheWrites
+        + ",\"cost\":0}";
 
     private static string ModelInfo(string providerId, string modelId) =>
         "{\"providerId\":\"" + providerId + "\",\"modelId\":\"" + modelId + "\",\"mode\":\"act\"}";
 
     private static string SessionMessages(params string[] messages) =>
-        "{\"version\":1,\"sessionId\":\"s\",\"updated_at\":1,\"agent\":\"cline\",\"messages\":[" +
-        string.Join(",", messages) + "]}";
+        "{\"version\":1,\"sessionId\":\"s\",\"updated_at\":1,\"agent\":\"cline\",\"messages\":["
+        + string.Join(",", messages)
+        + "]}";
 
     private static string User(long ts) =>
         "{\"id\":\"u" + ts + "\",\"role\":\"user\",\"ts\":" + ts + ",\"content\":[]}";
@@ -247,17 +291,27 @@ public sealed class ClineTaskHistoryTokenSourceTests
         {
             ["role"] = "assistant",
             ["ts"] = ts,
-            ["content"] = Array.Empty<object>()
+            ["content"] = Array.Empty<object>(),
         };
-        if (id is not null) message["id"] = id;
-        if (modelInfo is not null) message["modelInfo"] = JsonSerializer.Deserialize<JsonElement>(modelInfo);
-        if (metrics is not null) message["metrics"] = JsonSerializer.Deserialize<JsonElement>(metrics);
+        if (id is not null)
+            message["id"] = id;
+        if (modelInfo is not null)
+            message["modelInfo"] = JsonSerializer.Deserialize<JsonElement>(modelInfo);
+        if (metrics is not null)
+            message["metrics"] = JsonSerializer.Deserialize<JsonElement>(metrics);
         return JsonSerializer.Serialize(message);
     }
 
     private static string Metrics(long input, long output, long cacheRead = 0, long cacheWrite = 0) =>
-        "{\"inputTokens\":" + input + ",\"outputTokens\":" + output +
-        ",\"cacheReadTokens\":" + cacheRead + ",\"cacheWriteTokens\":" + cacheWrite + ",\"cost\":0.01}";
+        "{\"inputTokens\":"
+        + input
+        + ",\"outputTokens\":"
+        + output
+        + ",\"cacheReadTokens\":"
+        + cacheRead
+        + ",\"cacheWriteTokens\":"
+        + cacheWrite
+        + ",\"cost\":0.01}";
 
     private static string SessionModelInfo(string provider, string id) =>
         "{\"id\":\"" + id + "\",\"provider\":\"" + provider + "\"}";
@@ -265,8 +319,10 @@ public sealed class ClineTaskHistoryTokenSourceTests
     private static string Sibling(string? cwd = null, string? workspaceRoot = null)
     {
         var sibling = new Dictionary<string, object?> { ["provider"] = "cline-pass", ["model"] = "cline-pass/kimi-k3" };
-        if (cwd is not null) sibling["cwd"] = cwd;
-        if (workspaceRoot is not null) sibling["workspace_root"] = workspaceRoot;
+        if (cwd is not null)
+            sibling["cwd"] = cwd;
+        if (workspaceRoot is not null)
+            sibling["workspace_root"] = workspaceRoot;
         return JsonSerializer.Serialize(sibling);
     }
 
@@ -276,8 +332,10 @@ public sealed class ClineTaskHistoryTokenSourceTests
         var rows = tasks.Select(task =>
         {
             var row = new Dictionary<string, object?> { ["id"] = task.Id };
-            if (task.Cwd is not null) row["cwdOnTaskInitialization"] = task.Cwd;
-            if (task.ModelId is not null) row["modelId"] = task.ModelId;
+            if (task.Cwd is not null)
+                row["cwdOnTaskInitialization"] = task.Cwd;
+            if (task.ModelId is not null)
+                row["modelId"] = task.ModelId;
             return row;
         });
         File.WriteAllText(Path.Combine(root, "state", "taskHistory.json"), JsonSerializer.Serialize(rows));
@@ -304,7 +362,8 @@ public sealed class ClineTaskHistoryTokenSourceTests
     private static async Task<List<T>> CollectAsync<T>(IAsyncEnumerable<T> source)
     {
         var items = new List<T>();
-        await foreach (T item in source) items.Add(item);
+        await foreach (T item in source)
+            items.Add(item);
         return items;
     }
 
@@ -318,11 +377,13 @@ public sealed class ClineTaskHistoryTokenSourceTests
 
         public string Path { get; }
 
-        public string Dir(string relative) => Directory.CreateDirectory(System.IO.Path.Combine(Path, relative)).FullName;
+        public string Dir(string relative) =>
+            Directory.CreateDirectory(System.IO.Path.Combine(Path, relative)).FullName;
 
         public void Dispose()
         {
-            if (Directory.Exists(Path)) Directory.Delete(Path, true);
+            if (Directory.Exists(Path))
+                Directory.Delete(Path, true);
         }
     }
 }

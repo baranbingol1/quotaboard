@@ -9,7 +9,13 @@ public sealed class PricingEngine
 
     public ApiEquivalentQuote? Quote(TokenUsageEvent usage, ModelResolution? resolution, PricingCatalogSnapshot catalog)
     {
-        if (resolution is null || !catalog.ExactIndex.TryGetValue((resolution.PricingProviderId, resolution.CanonicalModelId), out ModelPrice value))
+        if (
+            resolution is null
+            || !catalog.ExactIndex.TryGetValue(
+                (resolution.PricingProviderId, resolution.CanonicalModelId),
+                out ModelPrice value
+            )
+        )
         {
             return null;
         }
@@ -18,11 +24,25 @@ public sealed class PricingEngine
         // models.dev omits cache_write for them; an explicit 0 still means free.
         // Cache reads get no such fallback: the discount cannot be guessed.
         decimal? cacheWriteRate = value.CacheWritePerMillion ?? value.InputPerMillion;
-        if (!CanPrice(usage.InputTokens, value.InputPerMillion) || !CanPrice(usage.OutputTokens, value.OutputPerMillion) || !CanPrice(usage.CacheReadTokens, value.CacheReadPerMillion) || !CanPrice(usage.CacheWriteTokens, cacheWriteRate) || !CanPrice(usage.ReasoningTokens, rate))
+        if (
+            !CanPrice(usage.InputTokens, value.InputPerMillion)
+            || !CanPrice(usage.OutputTokens, value.OutputPerMillion)
+            || !CanPrice(usage.CacheReadTokens, value.CacheReadPerMillion)
+            || !CanPrice(usage.CacheWriteTokens, cacheWriteRate)
+            || !CanPrice(usage.ReasoningTokens, rate)
+        )
         {
             return null;
         }
-        decimal costUsd = resolution.RateMultiplier * (Lane(usage.InputTokens, value.InputPerMillion) + Lane(usage.OutputTokens, value.OutputPerMillion) + Lane(usage.CacheReadTokens, value.CacheReadPerMillion) + Lane(usage.CacheWriteTokens, cacheWriteRate) + Lane(usage.ReasoningTokens, rate));
+        decimal costUsd =
+            resolution.RateMultiplier
+            * (
+                Lane(usage.InputTokens, value.InputPerMillion)
+                + Lane(usage.OutputTokens, value.OutputPerMillion)
+                + Lane(usage.CacheReadTokens, value.CacheReadPerMillion)
+                + Lane(usage.CacheWriteTokens, cacheWriteRate)
+                + Lane(usage.ReasoningTokens, rate)
+            );
         return new ApiEquivalentQuote(costUsd, catalog.Hash, catalog.FetchedAt, resolution.Confidence);
     }
 

@@ -7,10 +7,7 @@ namespace AiLimits.Application.Alerts;
 
 public interface IAlertStateStore
 {
-    Task<bool> TryClaimAsync(
-        AlertCandidate candidate,
-        DateTimeOffset claimedAt,
-        CancellationToken cancellationToken);
+    Task<bool> TryClaimAsync(AlertCandidate candidate, DateTimeOffset claimedAt, CancellationToken cancellationToken);
 
     Task ReleaseAsync(AlertCandidate candidate, CancellationToken cancellationToken);
 }
@@ -30,14 +27,17 @@ public sealed class AlertProcessor(
     AlertEvaluator evaluator,
     IAlertStateStore stateStore,
     IAlertNotificationSink notificationSink,
-    ILogger<AlertProcessor>? logger = null)
+    ILogger<AlertProcessor>? logger = null
+)
 {
     private readonly ILogger<AlertProcessor> _logger = logger ?? NullLogger<AlertProcessor>.Instance;
+
     public async Task<int> ProcessAsync(
         IEnumerable<ProviderSnapshot> snapshots,
         AlertPolicy policy,
         DateTimeOffset now,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         if (!policy.Enabled)
         {
@@ -56,8 +56,7 @@ public sealed class AlertProcessor(
             bool claimed;
             try
             {
-                claimed = await stateStore.TryClaimAsync(candidate, now, cancellationToken)
-                    .ConfigureAwait(false);
+                claimed = await stateStore.TryClaimAsync(candidate, now, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -65,7 +64,11 @@ public sealed class AlertProcessor(
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Alert state claim failed for {DeduplicationKey}; skipping.", candidate.DeduplicationKey);
+                _logger.LogWarning(
+                    ex,
+                    "Alert state claim failed for {DeduplicationKey}; skipping.",
+                    candidate.DeduplicationKey
+                );
                 continue;
             }
 
@@ -77,8 +80,7 @@ public sealed class AlertProcessor(
             bool shown = false;
             try
             {
-                shown = await notificationSink.TryShowAsync(candidate, cancellationToken)
-                    .ConfigureAwait(false);
+                shown = await notificationSink.TryShowAsync(candidate, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -89,7 +91,11 @@ public sealed class AlertProcessor(
             {
                 // The claim is released below so an unavailable notification
                 // platform does not permanently swallow the event.
-                _logger.LogWarning(ex, "Alert notification delivery failed for {DeduplicationKey}.", candidate.DeduplicationKey);
+                _logger.LogWarning(
+                    ex,
+                    "Alert notification delivery failed for {DeduplicationKey}.",
+                    candidate.DeduplicationKey
+                );
             }
 
             if (shown)
@@ -111,9 +117,7 @@ public sealed class AlertProcessor(
         {
             await stateStore.ReleaseAsync(candidate, cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Alert state release failed for {DeduplicationKey}.", candidate.DeduplicationKey);

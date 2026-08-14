@@ -12,7 +12,9 @@ public static class ModelPricingOverridePreference
 {
     private static readonly string PreferencePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard", "model-pricing-overrides.json");
+        "QuotaBoard",
+        "model-pricing-overrides.json"
+    );
 
     public static ManualPriceOverrideSet LoadAll()
     {
@@ -34,8 +36,6 @@ public static class ModelPricingOverridePreference
         {
             PreferenceFile.WriteAtomic(PreferencePath, LoadAll().With(serviceId, rawModelId, price).Serialize());
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 }

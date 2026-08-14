@@ -16,17 +16,41 @@ public sealed class SqlitePersistenceTests
         await database.InitializeAsync();
         var accounts = new SqliteAccountRepository(database);
         var snapshots = new SqliteSnapshotRepository(database);
-        var account = new ProviderAccount(new AccountKey(new ProviderId("future-provider"), "a"),
-            "Future account", null, "fixture", 3, true);
+        var account = new ProviderAccount(
+            new AccountKey(new ProviderId("future-provider"), "a"),
+            "Future account",
+            null,
+            "fixture",
+            3,
+            true
+        );
         await accounts.UpsertAsync(account, default);
         var at = new DateTimeOffset(2026, 7, 13, 12, 0, 0, TimeSpan.Zero);
-        var meter = new UsageMeter(new MeterKey("future:m1"), "Never Seen Before", MeterScope.Feature,
-            MeterUnit.Credits, 4, 10, 40, TimeSpan.FromDays(3), at.AddDays(1), "new-model",
-            MeterStatus.Healthy, new MeterProvenance("future.fixture", "$.limits.new", at, true), at, true);
-        var snapshot = new ProviderSnapshot(account.Key, [meter],
+        var meter = new UsageMeter(
+            new MeterKey("future:m1"),
+            "Never Seen Before",
+            MeterScope.Feature,
+            MeterUnit.Credits,
+            4,
+            10,
+            40,
+            TimeSpan.FromDays(3),
+            at.AddDays(1),
+            "new-model",
+            MeterStatus.Healthy,
+            new MeterProvenance("future.fixture", "$.limits.new", at, true),
+            at,
+            true
+        );
+        var snapshot = new ProviderSnapshot(
+            account.Key,
+            [meter],
             [new BalanceMetric("balance", "Balance", 12.5m, MeterUnit.Usd)],
-            SnapshotCompleteness.Authoritative, at, DataConfidence.Exact,
-            new Dictionary<string, JsonElement> { ["source"] = JsonSerializer.SerializeToElement("fixture") });
+            SnapshotCompleteness.Authoritative,
+            at,
+            DataConfidence.Exact,
+            new Dictionary<string, JsonElement> { ["source"] = JsonSerializer.SerializeToElement("fixture") }
+        );
         await snapshots.SaveAsync(snapshot, 7, default);
 
         var loaded = await snapshots.GetLatestAsync(account.Key, default);
@@ -45,8 +69,18 @@ public sealed class SqlitePersistenceTests
         await database.InitializeAsync();
         var repository = new SqliteUsageAggregateRepository(database);
         var account = new AccountKey(new ProviderId("codex"), "a");
-        var usage = new TokenUsageEvent(account, new ServiceProviderId("codex"), "gpt-5",
-            new DateTimeOffset(2026, 7, 13, 12, 0, 0, TimeSpan.Zero), 100, 50, 20, 0, 10, "same-event");
+        var usage = new TokenUsageEvent(
+            account,
+            new ServiceProviderId("codex"),
+            "gpt-5",
+            new DateTimeOffset(2026, 7, 13, 12, 0, 0, TimeSpan.Zero),
+            100,
+            50,
+            20,
+            0,
+            10,
+            "same-event"
+        );
         await repository.AddEventsAsync([usage, usage], default);
         await repository.AddEventsAsync([usage], default);
         var rows = await repository.QueryAsync(new DateOnly(2026, 7, 13), new DateOnly(2026, 7, 13), null, default);
@@ -69,29 +103,59 @@ public sealed class SqlitePersistenceTests
         var projectOne = new ProjectIdentity(
             "project:one",
             Path.Combine(temporary.Path, "çalışma-ağacı", "bir"),
-            repositoryRoot);
+            repositoryRoot
+        );
         var projectTwo = new ProjectIdentity(
             "project:two",
             Path.Combine(temporary.Path, "çalışma-ağacı", "iki"),
-            repositoryRoot);
+            repositoryRoot
+        );
         var occurredAt = new DateTimeOffset(2026, 7, 13, 12, 0, 0, TimeSpan.Zero);
         await repository.AddEventsAsync(
-        [
-            new TokenUsageEvent(account, new ServiceProviderId("codex"), "gpt-5", occurredAt,
-                100, 50, 20, 0, 10, "event-one", projectOne),
-            new TokenUsageEvent(account, new ServiceProviderId("codex"), "gpt-5", occurredAt,
-                200, 75, 30, 0, 15, "event-two", projectTwo)
-        ], default);
+            [
+                new TokenUsageEvent(
+                    account,
+                    new ServiceProviderId("codex"),
+                    "gpt-5",
+                    occurredAt,
+                    100,
+                    50,
+                    20,
+                    0,
+                    10,
+                    "event-one",
+                    projectOne
+                ),
+                new TokenUsageEvent(
+                    account,
+                    new ServiceProviderId("codex"),
+                    "gpt-5",
+                    occurredAt,
+                    200,
+                    75,
+                    30,
+                    0,
+                    15,
+                    "event-two",
+                    projectTwo
+                ),
+            ],
+            default
+        );
 
-        var rows = await repository.QueryAsync(
-            new DateOnly(2026, 7, 13), new DateOnly(2026, 7, 13), null, default);
+        var rows = await repository.QueryAsync(new DateOnly(2026, 7, 13), new DateOnly(2026, 7, 13), null, default);
 
         Assert.Equal(2, rows.Count);
-        Assert.Equal(500, rows.Sum(row =>
-            row.InputTokens + row.OutputTokens + row.CacheReadTokens +
-            row.CacheWriteTokens + row.ReasoningTokens));
-        Assert.Equal(new[] { "project:one", "project:two" },
-            rows.Select(row => row.Project.ProjectKey).Order(StringComparer.Ordinal).ToArray());
+        Assert.Equal(
+            500,
+            rows.Sum(row =>
+                row.InputTokens + row.OutputTokens + row.CacheReadTokens + row.CacheWriteTokens + row.ReasoningTokens
+            )
+        );
+        Assert.Equal(
+            new[] { "project:one", "project:two" },
+            rows.Select(row => row.Project.ProjectKey).Order(StringComparer.Ordinal).ToArray()
+        );
         Assert.All(rows, row => Assert.Equal(repositoryRoot, row.Project.RepositoryRootPath));
         Assert.Contains(rows, row => row.Project.ProjectPath.Contains("çalışma-ağacı", StringComparison.Ordinal));
     }
@@ -105,12 +169,14 @@ public sealed class SqlitePersistenceTests
         }
 
         public string Path { get; }
+
         public string File(string name) => System.IO.Path.Combine(Path, name);
 
         public void Dispose()
         {
             SqliteConnection.ClearAllPools();
-            if (Directory.Exists(Path)) Directory.Delete(Path, recursive: true);
+            if (Directory.Exists(Path))
+                Directory.Delete(Path, recursive: true);
         }
     }
 }

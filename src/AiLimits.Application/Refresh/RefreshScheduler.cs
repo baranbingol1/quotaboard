@@ -13,7 +13,7 @@ public enum RefreshOutcome
 {
     Completed,
     TransientFailure,
-    Skipped
+    Skipped,
 }
 
 /// <summary>
@@ -53,7 +53,13 @@ public sealed class RefreshScheduler : IDisposable
 
     private Task? _loop;
 
-    public RefreshScheduler(Func<CancellationToken, Task<RefreshOutcome>> refresh, Func<bool> energySaverEnabled, IClock clock, AdaptiveRefreshPolicy? policy = null, ILogger<RefreshScheduler>? logger = null)
+    public RefreshScheduler(
+        Func<CancellationToken, Task<RefreshOutcome>> refresh,
+        Func<bool> energySaverEnabled,
+        IClock clock,
+        AdaptiveRefreshPolicy? policy = null,
+        ILogger<RefreshScheduler>? logger = null
+    )
     {
         _refresh = refresh ?? throw new ArgumentNullException(nameof(refresh));
         _energySaverEnabled = energySaverEnabled ?? throw new ArgumentNullException(nameof(energySaverEnabled));
@@ -141,12 +147,8 @@ public sealed class RefreshScheduler : IDisposable
         {
             _wake.Release();
         }
-        catch (SemaphoreFullException)
-        {
-        }
-        catch (ObjectDisposedException)
-        {
-        }
+        catch (SemaphoreFullException) { }
+        catch (ObjectDisposedException) { }
     }
 
     private TimeSpan CurrentDelay(DateTimeOffset now)
@@ -250,7 +252,7 @@ public sealed class RefreshScheduler : IDisposable
                     {
                         RefreshOutcome.Completed => 0,
                         RefreshOutcome.TransientFailure => Math.Min(_transientRetryAttempt + 1, 5),
-                        _ => _transientRetryAttempt
+                        _ => _transientRetryAttempt,
                     };
                 }
             }
@@ -284,9 +286,7 @@ public sealed class RefreshScheduler : IDisposable
         {
             _lifetime.Cancel();
         }
-        catch (ObjectDisposedException)
-        {
-        }
+        catch (ObjectDisposedException) { }
         Task? loop;
         lock (_gate)
         {
@@ -312,9 +312,7 @@ public sealed class RefreshScheduler : IDisposable
         {
             _lifetime.Cancel();
         }
-        catch (ObjectDisposedException)
-        {
-        }
+        catch (ObjectDisposedException) { }
         _lifetime.Dispose();
         _wake.Dispose();
     }

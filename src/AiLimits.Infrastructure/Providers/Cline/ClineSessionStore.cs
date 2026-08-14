@@ -53,9 +53,11 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
     private const string StagingAccessTokenKey = "session.access-token.staging";
     private const string StagingExpiresAtKey = "session.expires-at.staging";
     private const string StagingRefreshTokenKey = "session.refresh-token.staging";
+
     // "1" = the live refresh key should be deleted during promotion;
     // "0" = the staging refresh value should be copied to the live key.
     private const string StagingClearRefreshKey = "session.clear-refresh.staging";
+
     // Present only between "all staging writes succeeded" and "promotion to
     // live keys finished." Its presence tells LoadAsync to finish the
     // promotion before reading.
@@ -112,9 +114,16 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
     {
         string? accessToken = await secrets.GetAsync(Scope, AccessTokenKey, cancellationToken).ConfigureAwait(false);
         string? expires = await secrets.GetAsync(Scope, ExpiresAtKey, cancellationToken).ConfigureAwait(false);
-        if (string.IsNullOrWhiteSpace(accessToken) || expires is null ||
-            !DateTimeOffset.TryParse(expires, CultureInfo.InvariantCulture,
-                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out DateTimeOffset expiresAt))
+        if (
+            string.IsNullOrWhiteSpace(accessToken)
+            || expires is null
+            || !DateTimeOffset.TryParse(
+                expires,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out DateTimeOffset expiresAt
+            )
+        )
         {
             return null;
         }
@@ -137,12 +146,22 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
         // staging was written and leave the live keys untouched.
         try
         {
-            await secrets.SetAsync(Scope, StagingAccessTokenKey, session.AccessToken, cancellationToken).ConfigureAwait(false);
-            await secrets.SetAsync(Scope, StagingExpiresAtKey,
-                session.ExpiresAt.ToString("o", CultureInfo.InvariantCulture), cancellationToken).ConfigureAwait(false);
+            await secrets
+                .SetAsync(Scope, StagingAccessTokenKey, session.AccessToken, cancellationToken)
+                .ConfigureAwait(false);
+            await secrets
+                .SetAsync(
+                    Scope,
+                    StagingExpiresAtKey,
+                    session.ExpiresAt.ToString("o", CultureInfo.InvariantCulture),
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
             if (session.RefreshToken is { } refreshToken)
             {
-                await secrets.SetAsync(Scope, StagingRefreshTokenKey, refreshToken, cancellationToken).ConfigureAwait(false);
+                await secrets
+                    .SetAsync(Scope, StagingRefreshTokenKey, refreshToken, cancellationToken)
+                    .ConfigureAwait(false);
             }
             else
             {
@@ -150,8 +169,9 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
                 // promotion step does not re-stage a stale value.
                 await secrets.DeleteAsync(Scope, StagingRefreshTokenKey, cancellationToken).ConfigureAwait(false);
             }
-            await secrets.SetAsync(Scope, StagingClearRefreshKey,
-                session.RefreshToken is null ? "1" : "0", cancellationToken).ConfigureAwait(false);
+            await secrets
+                .SetAsync(Scope, StagingClearRefreshKey, session.RefreshToken is null ? "1" : "0", cancellationToken)
+                .ConfigureAwait(false);
         }
         catch (Exception ex) when (IsRecoverable(ex))
         {
@@ -229,8 +249,7 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
             {
                 return;
             }
-            if (session is not null &&
-                !await TrySaveAsync(session, cancellationToken).ConfigureAwait(false))
+            if (session is not null && !await TrySaveAsync(session, cancellationToken).ConfigureAwait(false))
             {
                 // The vault is unavailable right now; keep the plaintext copy
                 // and retry on the next load instead of deleting the only
@@ -317,14 +336,25 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
 
     private async Task<bool> PromoteStagingAsync(CancellationToken cancellationToken)
     {
-        string? stagingAccess = await secrets.GetAsync(Scope, StagingAccessTokenKey, cancellationToken).ConfigureAwait(false);
-        string? stagingExpires = await secrets.GetAsync(Scope, StagingExpiresAtKey, cancellationToken).ConfigureAwait(false);
-        string? stagingRefresh = await secrets.GetAsync(Scope, StagingRefreshTokenKey, cancellationToken).ConfigureAwait(false);
-        string? clearFlag = await secrets.GetAsync(Scope, StagingClearRefreshKey, cancellationToken).ConfigureAwait(false);
+        string? stagingAccess = await secrets
+            .GetAsync(Scope, StagingAccessTokenKey, cancellationToken)
+            .ConfigureAwait(false);
+        string? stagingExpires = await secrets
+            .GetAsync(Scope, StagingExpiresAtKey, cancellationToken)
+            .ConfigureAwait(false);
+        string? stagingRefresh = await secrets
+            .GetAsync(Scope, StagingRefreshTokenKey, cancellationToken)
+            .ConfigureAwait(false);
+        string? clearFlag = await secrets
+            .GetAsync(Scope, StagingClearRefreshKey, cancellationToken)
+            .ConfigureAwait(false);
 
-        if (stagingAccess is null || stagingExpires is null ||
-            clearFlag is not ("0" or "1") ||
-            (clearFlag == "0" && stagingRefresh is null))
+        if (
+            stagingAccess is null
+            || stagingExpires is null
+            || clearFlag is not ("0" or "1")
+            || (clearFlag == "0" && stagingRefresh is null)
+        )
         {
             return false;
         }
@@ -356,9 +386,7 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
         {
             await secrets.DeleteAsync(Scope, key, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception ex) when (IsRecoverable(ex))
-        {
-        }
+        catch (Exception ex) when (IsRecoverable(ex)) { }
     }
 
     private static ClineSession? ReadLegacyFile(string path)
@@ -366,21 +394,27 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
         using FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         using JsonDocument document = JsonDocument.Parse(stream);
         JsonElement root = document.RootElement;
-        if (root.ValueKind != JsonValueKind.Object ||
-            !root.TryGetProperty("accessToken", out JsonElement token) ||
-            token.ValueKind != JsonValueKind.String ||
-            string.IsNullOrWhiteSpace(token.GetString()) ||
-            !root.TryGetProperty("expiresAt", out JsonElement expires) ||
-            expires.ValueKind != JsonValueKind.String ||
-            !DateTimeOffset.TryParse(expires.GetString(), CultureInfo.InvariantCulture,
-                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out DateTimeOffset expiresAt))
+        if (
+            root.ValueKind != JsonValueKind.Object
+            || !root.TryGetProperty("accessToken", out JsonElement token)
+            || token.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(token.GetString())
+            || !root.TryGetProperty("expiresAt", out JsonElement expires)
+            || expires.ValueKind != JsonValueKind.String
+            || !DateTimeOffset.TryParse(
+                expires.GetString(),
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out DateTimeOffset expiresAt
+            )
+        )
         {
             return null;
         }
         string? refreshToken =
-            root.TryGetProperty("refreshToken", out JsonElement refresh) &&
-            refresh.ValueKind == JsonValueKind.String &&
-            !string.IsNullOrWhiteSpace(refresh.GetString())
+            root.TryGetProperty("refreshToken", out JsonElement refresh)
+            && refresh.ValueKind == JsonValueKind.String
+            && !string.IsNullOrWhiteSpace(refresh.GetString())
                 ? refresh.GetString()
                 : null;
         return new ClineSession(token.GetString()!, refreshToken, expiresAt);
@@ -392,6 +426,10 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
     /// raises for a token past Credential Manager's per-entry size cap.
     /// </summary>
     private static bool IsRecoverable(Exception ex) =>
-        ex is IOException or UnauthorizedAccessException or JsonException
-            or ArgumentOutOfRangeException or System.ComponentModel.Win32Exception;
+        ex
+            is IOException
+                or UnauthorizedAccessException
+                or JsonException
+                or ArgumentOutOfRangeException
+                or System.ComponentModel.Win32Exception;
 }

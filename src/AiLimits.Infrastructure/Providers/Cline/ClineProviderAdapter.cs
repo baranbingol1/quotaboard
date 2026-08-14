@@ -15,13 +15,14 @@ public sealed class ClineProviderAdapter(
     IReadOnlyList<string>? roots = null,
     Func<ClineCredential?>? credentialProbe = null,
     ISecretStore? secrets = null,
-    string? legacySessionCachePath = null) : IProviderAdapter
+    string? legacySessionCachePath = null
+) : IProviderAdapter
 {
     // Built once so the one-time migration off the old plaintext cache file
     // does not re-run on every fetch.
-    private readonly ClineSessionStore? _sessionStore =
-        secrets is null ? null : new ClineSessionStore(secrets, legacySessionCachePath);
-
+    private readonly ClineSessionStore? _sessionStore = secrets is null
+        ? null
+        : new ClineSessionStore(secrets, legacySessionCachePath);
 
     public ProviderDescriptor Descriptor => BuiltInProviderDescriptors.Cline;
 
@@ -31,9 +32,14 @@ public sealed class ClineProviderAdapter(
         ClineCredential? credential = ResolveCredential();
         IReadOnlyList<ProviderAccount> result =
         [
-            new ProviderAccount(new AccountKey(Descriptor.Id, "default"), "Cline", credential?.Email,
+            new ProviderAccount(
+                new AccountKey(Descriptor.Id, "default"),
+                "Cline",
+                credential?.Email,
                 credential is not null ? credential.SourceLabel : "Local logs",
-                1, credential is not null || hasLogs)
+                1,
+                credential is not null || hasLogs
+            ),
         ];
         return Task.FromResult(result);
     }

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
+using System.ComponentModel;
+using System.Text.Json;
 using AiLimits.Application.Abstractions;
 using AiLimits.Domain;
 using AiLimits.Infrastructure.Providers.Common;
-using System.ComponentModel;
-using System.Text.Json;
 
 namespace AiLimits.Infrastructure.Providers.Claude;
 
@@ -21,24 +21,43 @@ public sealed class ClaudeProviderAdapter : IProviderAdapter
 
     public ProviderDescriptor Descriptor => BuiltInProviderDescriptors.Claude;
 
-    public ClaudeProviderAdapter(HttpClient httpClient, IClock clock, string? claudeHome = null, IProcessRunner? processRunner = null, string? claudeExecutable = null)
+    public ClaudeProviderAdapter(
+        HttpClient httpClient,
+        IClock clock,
+        string? claudeHome = null,
+        IProcessRunner? processRunner = null,
+        string? claudeExecutable = null
+    )
     {
         _httpClient = httpClient;
         _clock = clock;
-        _claudeHome = claudeHome ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude");
+        _claudeHome =
+            claudeHome ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude");
         _processRunner = processRunner;
         _claudeExecutable = claudeExecutable ?? FindClaudeExecutable();
     }
 
     public async Task<IReadOnlyList<ProviderAccount>> DiscoverAccountsAsync(CancellationToken cancellationToken)
     {
-        CliCredential credential = await CliCredentialReader.ReadClaudeAsync(Path.Combine(_claudeHome, ".credentials.json"), cancellationToken).ConfigureAwait(false);
+        CliCredential credential = await CliCredentialReader
+            .ReadClaudeAsync(Path.Combine(_claudeHome, ".credentials.json"), cancellationToken)
+            .ConfigureAwait(false);
         IReadOnlyList<ProviderAccount> result;
         if (credential is not null)
         {
             string? statusEmail = await ReadAuthStatusEmailAsync(cancellationToken).ConfigureAwait(false);
             string? login = statusEmail ?? credential.Login;
-            IReadOnlyList<ProviderAccount> readOnlyList = new ProviderAccount[] { new ProviderAccount(new AccountKey(Descriptor.Id, credential.AccountId), login ?? "Claude Code account", login, "Claude Code OAuth", 1L, IsConnected: true) };
+            IReadOnlyList<ProviderAccount> readOnlyList = new ProviderAccount[]
+            {
+                new ProviderAccount(
+                    new AccountKey(Descriptor.Id, credential.AccountId),
+                    login ?? "Claude Code account",
+                    login,
+                    "Claude Code OAuth",
+                    1L,
+                    IsConnected: true
+                ),
+            };
             result = readOnlyList;
         }
         else
@@ -57,7 +76,14 @@ public sealed class ClaudeProviderAdapter : IProviderAdapter
         }
         try
         {
-            ProcessResult result = await _processRunner.RunAsync(_claudeExecutable, new[] { "auth", "status", "--json" }, TimeSpan.FromSeconds(5), cancellationToken).ConfigureAwait(false);
+            ProcessResult result = await _processRunner
+                .RunAsync(
+                    _claudeExecutable,
+                    new[] { "auth", "status", "--json" },
+                    TimeSpan.FromSeconds(5),
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
             if (result.ExitCode != 0 || result.OutputTruncated)
             {
                 return null;
@@ -70,7 +96,8 @@ public sealed class ClaudeProviderAdapter : IProviderAdapter
                 return null;
             }
             using JsonDocument document = JsonDocument.Parse(output.Substring(start, end - start + 1));
-            return document.RootElement.TryGetProperty("email", out JsonElement email)
+            return
+                document.RootElement.TryGetProperty("email", out JsonElement email)
                 && email.ValueKind == JsonValueKind.String
                 && !string.IsNullOrWhiteSpace(email.GetString())
                 ? email.GetString()!.Trim()
@@ -96,7 +123,12 @@ public sealed class ClaudeProviderAdapter : IProviderAdapter
         // .cmd/.bat shims are deliberately absent: ProcessRunner starts the
         // process with UseShellExecute = false, which cannot launch them.
         string[] names = OperatingSystem.IsWindows() ? new[] { "claude.exe" } : new[] { "claude" };
-        foreach (string directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (
+            string directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(
+                Path.PathSeparator,
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+            )
+        )
         {
             foreach (string name in names)
             {
@@ -112,7 +144,10 @@ public sealed class ClaudeProviderAdapter : IProviderAdapter
 
     public IReadOnlyList<ILimitFetchStrategy> CreateLimitStrategies(ProviderAccount account)
     {
-        return new ILimitFetchStrategy[] { new ClaudeOAuthLimitStrategy(_httpClient, _clock, account, Path.Combine(_claudeHome, ".credentials.json")) };
+        return new ILimitFetchStrategy[]
+        {
+            new ClaudeOAuthLimitStrategy(_httpClient, _clock, account, Path.Combine(_claudeHome, ".credentials.json")),
+        };
     }
 
     public IReadOnlyList<ITokenUsageSource> CreateTokenSources(ProviderAccount account)

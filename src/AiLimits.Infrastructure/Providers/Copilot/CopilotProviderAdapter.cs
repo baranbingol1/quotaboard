@@ -11,7 +11,17 @@ public sealed class CopilotProviderAdapter(HttpClient httpClient, IClock clock) 
     public Task<IReadOnlyList<ProviderAccount>> DiscoverAccountsAsync(CancellationToken cancellationToken)
     {
         bool isConnected = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AILIMITS_GITHUB_TOKEN"));
-        IReadOnlyList<ProviderAccount> result = new ProviderAccount[] { new ProviderAccount(new AccountKey(Descriptor.Id, "github"), "GitHub Copilot", null, "GitHub device authorization", 1L, isConnected) };
+        IReadOnlyList<ProviderAccount> result = new ProviderAccount[]
+        {
+            new ProviderAccount(
+                new AccountKey(Descriptor.Id, "github"),
+                "GitHub Copilot",
+                null,
+                "GitHub device authorization",
+                1L,
+                isConnected
+            ),
+        };
         return Task.FromResult(result);
     }
 

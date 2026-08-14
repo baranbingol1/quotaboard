@@ -12,7 +12,8 @@ public sealed class RefreshSchedulerDisposeTests
         var scheduler = new RefreshScheduler(
             _ => Task.FromResult(RefreshOutcome.Completed),
             () => false,
-            new FixedClock());
+            new FixedClock()
+        );
 
         scheduler.Start();
         // Allow the loop to start.

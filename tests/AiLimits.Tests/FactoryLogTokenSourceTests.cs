@@ -8,8 +8,7 @@ namespace AiLimits.Tests;
 
 public sealed class FactoryLogTokenSourceTests
 {
-    private static readonly DateTimeOffset FirstTimestamp =
-        new(2026, 7, 14, 10, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset FirstTimestamp = new(2026, 7, 14, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
     public async Task ReadsOnlyStructuredStreamingResultsAndKeepsTokenLanesSeparate()
@@ -18,20 +17,16 @@ public sealed class FactoryLogTokenSourceTests
         var projectPath = Directory.CreateDirectory(Path.Combine(temp.Path, "projects", "factory-demo")).FullName;
         await WriteSessionIndexAsync(temp.Path, "session-1", projectPath);
         var logDirectory = Directory.CreateDirectory(Path.Combine(temp.Path, "logs"));
-        var valid = StreamingLine(
-            FirstTimestamp,
-            input: 101,
-            totalInput: 141,
-            cacheRead: 40,
-            output: 23,
-            reasoning: 7);
-        await File.WriteAllLinesAsync(Path.Combine(logDirectory.FullName, "droid-log-single.log"),
-        [
-            "ordinary log text that must be ignored",
-            $"[{FirstTimestamp:O}] [Session] Saving session settings | Context: {{\"tokenUsage\":{{\"inputTokens\":99999}}}}",
-            $"[{FirstTimestamp:O}] [Agent] Streaming result | Context: not-json",
-            valid
-        ]);
+        var valid = StreamingLine(FirstTimestamp, input: 101, totalInput: 141, cacheRead: 40, output: 23, reasoning: 7);
+        await File.WriteAllLinesAsync(
+            Path.Combine(logDirectory.FullName, "droid-log-single.log"),
+            [
+                "ordinary log text that must be ignored",
+                $"[{FirstTimestamp:O}] [Session] Saving session settings | Context: {{\"tokenUsage\":{{\"inputTokens\":99999}}}}",
+                $"[{FirstTimestamp:O}] [Agent] Streaming result | Context: not-json",
+                valid,
+            ]
+        );
 
         var source = new FactoryLogTokenSource(temp.Path);
         var usage = Assert.Single(await CollectAsync(source.ReadAsync(Account(), null, default)));
@@ -60,10 +55,21 @@ public sealed class FactoryLogTokenSourceTests
     // Unknown/custom models cannot be classified: keep the raw lanes.
     [InlineData("custom:GPT-5.5-Proxy", 100, 40, 100)]
     public void ReasoningLaneIsMadeDisjointOnlyForVendorsThatNestItInOutput(
-        string modelId, long output, long reasoning, long expectedOutput)
+        string modelId,
+        long output,
+        long reasoning,
+        long expectedOutput
+    )
     {
-        var line = StreamingLine(FirstTimestamp, input: 10, totalInput: 10, cacheRead: 0,
-            output: output, reasoning: reasoning, modelId: modelId);
+        var line = StreamingLine(
+            FirstTimestamp,
+            input: 10,
+            totalInput: 10,
+            cacheRead: 0,
+            output: output,
+            reasoning: reasoning,
+            modelId: modelId
+        );
 
         Assert.True(FactoryLogTokenSource.TryParseLine(line, out var usage));
 
@@ -76,15 +82,31 @@ public sealed class FactoryLogTokenSourceTests
     {
         using var temp = new TemporaryDirectory();
         var logs = Directory.CreateDirectory(Path.Combine(temp.Path, "logs"));
-        await File.WriteAllLinesAsync(Path.Combine(logs.FullName, "droid-log-single.log"),
-        [
-            // Well behind the overlap window: covered by the previous scan.
-            StreamingLine(FirstTimestamp.AddMinutes(-10), input: 10, totalInput: 12, cacheRead: 2, output: 3, reasoning: 1),
-            // Inside the overlap window behind the cursor: replayed so a
-            // same-timestamp late write can never be lost (fingerprints dedupe).
-            StreamingLine(FirstTimestamp, input: 15, totalInput: 15, cacheRead: 0, output: 4, reasoning: 1),
-            StreamingLine(FirstTimestamp.AddMinutes(1), input: 20, totalInput: 24, cacheRead: 4, output: 6, reasoning: 2)
-        ]);
+        await File.WriteAllLinesAsync(
+            Path.Combine(logs.FullName, "droid-log-single.log"),
+            [
+                // Well behind the overlap window: covered by the previous scan.
+                StreamingLine(
+                    FirstTimestamp.AddMinutes(-10),
+                    input: 10,
+                    totalInput: 12,
+                    cacheRead: 2,
+                    output: 3,
+                    reasoning: 1
+                ),
+                // Inside the overlap window behind the cursor: replayed so a
+                // same-timestamp late write can never be lost (fingerprints dedupe).
+                StreamingLine(FirstTimestamp, input: 15, totalInput: 15, cacheRead: 0, output: 4, reasoning: 1),
+                StreamingLine(
+                    FirstTimestamp.AddMinutes(1),
+                    input: 20,
+                    totalInput: 24,
+                    cacheRead: 4,
+                    output: 6,
+                    reasoning: 2
+                ),
+            ]
+        );
         var source = new FactoryLogTokenSource(temp.Path);
         var cursor = new ScannerCursor(source.Id, null, FirstTimestamp, null);
 
@@ -100,7 +122,14 @@ public sealed class FactoryLogTokenSourceTests
     public void EventIdentityIsStableAcrossRotatedCopiesButDoesNotCollapseSeparateResults()
     {
         var first = StreamingLine(FirstTimestamp, input: 10, totalInput: 12, cacheRead: 2, output: 3, reasoning: 1);
-        var later = StreamingLine(FirstTimestamp.AddSeconds(1), input: 10, totalInput: 12, cacheRead: 2, output: 3, reasoning: 1);
+        var later = StreamingLine(
+            FirstTimestamp.AddSeconds(1),
+            input: 10,
+            totalInput: 12,
+            cacheRead: 2,
+            output: 3,
+            reasoning: 1
+        );
 
         Assert.True(FactoryLogTokenSource.TryParseLine(first, out var original));
         Assert.True(FactoryLogTokenSource.TryParseLine(first, out var rotatedCopy));
@@ -118,50 +147,45 @@ public sealed class FactoryLogTokenSourceTests
         long cacheRead,
         long output,
         long reasoning,
-        string modelId = "claude-sonnet-4")
+        string modelId = "claude-sonnet-4"
+    )
     {
-        var context = JsonSerializer.Serialize(new
-        {
-            inputTokens = input,
-            totalInputTokens = totalInput,
-            cacheReadInputTokens = cacheRead,
-            outputTokens = output,
-            reasoningTokens = reasoning,
-            count = 2,
-            contextCount = 8,
-            tags = new
+        var context = JsonSerializer.Serialize(
+            new
             {
-                traceId = "trace-1",
-                spanId = "span-1",
-                sessionId = "session-1",
-                modelId
+                inputTokens = input,
+                totalInputTokens = totalInput,
+                cacheReadInputTokens = cacheRead,
+                outputTokens = output,
+                reasoningTokens = reasoning,
+                count = 2,
+                contextCount = 8,
+                tags = new
+                {
+                    traceId = "trace-1",
+                    spanId = "span-1",
+                    sessionId = "session-1",
+                    modelId,
+                },
             }
-        });
+        );
         return $"[{timestamp:O}] [INFO] [Agent] Streaming result | Context: {context}";
     }
 
     private static async Task WriteSessionIndexAsync(string factoryHome, string sessionId, string cwd)
     {
-        var index = JsonSerializer.Serialize(new
-        {
-            version = 1,
-            entries = new[] { new { sessionId, cwd } }
-        });
+        var index = JsonSerializer.Serialize(new { version = 1, entries = new[] { new { sessionId, cwd } } });
         await File.WriteAllTextAsync(Path.Combine(factoryHome, "sessions-index.json"), index);
     }
 
-    private static ProviderAccount Account() => new(
-        new AccountKey(new ProviderId("droid"), "default"),
-        "Factory / Droid",
-        null,
-        "fixture",
-        1,
-        true);
+    private static ProviderAccount Account() =>
+        new(new AccountKey(new ProviderId("droid"), "default"), "Factory / Droid", null, "fixture", 1, true);
 
     private static async Task<List<T>> CollectAsync<T>(IAsyncEnumerable<T> source)
     {
         var items = new List<T>();
-        await foreach (var item in source) items.Add(item);
+        await foreach (var item in source)
+            items.Add(item);
         return items;
     }
 
@@ -169,10 +193,7 @@ public sealed class FactoryLogTokenSourceTests
     {
         public TemporaryDirectory()
         {
-            Path = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                "AiLimits.Tests",
-                Guid.NewGuid().ToString("N"));
+            Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AiLimits.Tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(Path);
         }
 
@@ -180,7 +201,8 @@ public sealed class FactoryLogTokenSourceTests
 
         public void Dispose()
         {
-            if (Directory.Exists(Path)) Directory.Delete(Path, true);
+            if (Directory.Exists(Path))
+                Directory.Delete(Path, true);
         }
     }
 }

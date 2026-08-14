@@ -3,9 +3,9 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using AiLimits.Application.Pricing;
 using AiLimits.Application.Usage;
+using AiLimits.Presentation.WinUI.Localization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using AiLimits.Presentation.WinUI.Localization;
 
 namespace AiLimits.Presentation.WinUI.ViewModels;
 
@@ -44,52 +44,124 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
     public ObservableCollection<HeatmapCellViewModel> HeatmapCells { get; } = [];
     public ObservableCollection<ResetCycleViewModel> ResetCycles { get; } = [];
     public ObservableCollection<ModelUsageRowViewModel> ModelRows { get; } = [];
+
     /// <summary>Every observed model row (unpaged); used by the manual-pricing settings.</summary>
     public IReadOnlyList<ModelUsageRowViewModel> AllModelRows => _allModelRows;
     public ObservableCollection<ProviderConnectionViewModel> Connections { get; } = [];
     public ObservableCollection<FetchAttemptViewModel> RecentAttempts { get; } = [];
     public ObservableCollection<ProjectUsageViewModel> ProjectUsage { get; } = [];
 
-    [ObservableProperty] public partial string TotalTokens { get; set; } = "-";
-    [ObservableProperty] public partial string ApiEquivalentCost { get; set; } = "-";
-    [ObservableProperty] public partial string Coverage { get; set; } = L("Dashboard_Discovering");
-    [ObservableProperty] public partial string PlanValueLabel { get; set; } = "-";
-    [ObservableProperty] public partial string PlanValueDetail { get; set; } = L("Dashboard_SetPlanSpend");
-    [ObservableProperty] public partial string CacheSavingsLabel { get; set; } = "-";
-    [ObservableProperty] public partial string WeekDeltaLabel { get; set; } = "";
-    [ObservableProperty] public partial string CatalogCaption { get; set; } = L("Dashboard_CatalogNotLoaded");
-    [ObservableProperty] public partial string UsageTotal { get; set; } = "-";
-    [ObservableProperty] public partial string InputTokens { get; set; } = "-";
-    [ObservableProperty] public partial string OutputTokens { get; set; } = "-";
-    [ObservableProperty] public partial string CacheReadTokens { get; set; } = "-";
-    [ObservableProperty] public partial string CacheWriteTokens { get; set; } = "-";
-    [ObservableProperty] public partial string ReasoningTokens { get; set; } = "-";
-    [ObservableProperty] public partial string ReportedServiceCost { get; set; } = "-";
-    [ObservableProperty] public partial string PricingCatalogStatus { get; set; } = L("Dashboard_LoadingUpper");
-    [ObservableProperty] public partial string PricingCatalogDetail { get; set; } = L("Dashboard_CheckingCache");
-    [ObservableProperty] public partial string ScannerStatus { get; set; } = "0 / 0";
-    [ObservableProperty] public partial string ScannerDetail { get; set; } = L("Dashboard_DiscoveringTelemetry");
-    [ObservableProperty] public partial string DatabaseStatus { get; set; } = L("Dashboard_OpeningUpper");
-    [ObservableProperty] public partial string DatabaseDetail { get; set; } = L("Dashboard_InitializingDatabase");
-    [ObservableProperty] public partial string StatusMessage { get; set; } = L("Dashboard_LoadingProviderData");
-    [ObservableProperty] public partial string LastUpdated { get; set; } = L("Dashboard_NotLoaded");
+    [ObservableProperty]
+    public partial string TotalTokens { get; set; } = "-";
+
+    [ObservableProperty]
+    public partial string ApiEquivalentCost { get; set; } = "-";
+
+    [ObservableProperty]
+    public partial string Coverage { get; set; } = L("Dashboard_Discovering");
+
+    [ObservableProperty]
+    public partial string PlanValueLabel { get; set; } = "-";
+
+    [ObservableProperty]
+    public partial string PlanValueDetail { get; set; } = L("Dashboard_SetPlanSpend");
+
+    [ObservableProperty]
+    public partial string CacheSavingsLabel { get; set; } = "-";
+
+    [ObservableProperty]
+    public partial string WeekDeltaLabel { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string CatalogCaption { get; set; } = L("Dashboard_CatalogNotLoaded");
+
+    [ObservableProperty]
+    public partial string UsageTotal { get; set; } = "-";
+
+    [ObservableProperty]
+    public partial string InputTokens { get; set; } = "-";
+
+    [ObservableProperty]
+    public partial string OutputTokens { get; set; } = "-";
+
+    [ObservableProperty]
+    public partial string CacheReadTokens { get; set; } = "-";
+
+    [ObservableProperty]
+    public partial string CacheWriteTokens { get; set; } = "-";
+
+    [ObservableProperty]
+    public partial string ReasoningTokens { get; set; } = "-";
+
+    [ObservableProperty]
+    public partial string ReportedServiceCost { get; set; } = "-";
+
+    [ObservableProperty]
+    public partial string PricingCatalogStatus { get; set; } = L("Dashboard_LoadingUpper");
+
+    [ObservableProperty]
+    public partial string PricingCatalogDetail { get; set; } = L("Dashboard_CheckingCache");
+
+    [ObservableProperty]
+    public partial string ScannerStatus { get; set; } = "0 / 0";
+
+    [ObservableProperty]
+    public partial string ScannerDetail { get; set; } = L("Dashboard_DiscoveringTelemetry");
+
+    [ObservableProperty]
+    public partial string DatabaseStatus { get; set; } = L("Dashboard_OpeningUpper");
+
+    [ObservableProperty]
+    public partial string DatabaseDetail { get; set; } = L("Dashboard_InitializingDatabase");
+
+    [ObservableProperty]
+    public partial string StatusMessage { get; set; } = L("Dashboard_LoadingProviderData");
+
+    [ObservableProperty]
+    public partial string LastUpdated { get; set; } = L("Dashboard_NotLoaded");
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ActiveUsageGrouping))]
     public partial bool UsageByProvider { get; set; } = true;
 
-    public ObservableCollection<ProviderUsageViewModel> ActiveUsageGrouping => UsageByProvider ? ProviderUsage : HarnessUsage;
-    [ObservableProperty] public partial string UsageWindowTitle { get; set; } = F("UsageWindow_LastDays", 30);
-    [ObservableProperty] public partial string UsageWindowSummary { get; set; } = "-";
-    [ObservableProperty] public partial string PeriodDeltaLabel { get; set; } = "";
-    [ObservableProperty] public partial string ThirtyDayDeltaLabel { get; set; } = "";
-    [ObservableProperty] public partial string NinetyDayDeltaLabel { get; set; } = "";
-    [ObservableProperty] public partial string ProjectReconciliationLabel { get; set; } = "";
-    [ObservableProperty] public partial bool HasMoreProjects { get; set; }
-    [ObservableProperty] public partial bool HasMoreModels { get; set; }
-    [ObservableProperty] public partial bool CanShowLessProjects { get; set; }
-    [ObservableProperty] public partial bool CanShowLessModels { get; set; }
-    [ObservableProperty] public partial string ShowMoreProjectsLabel { get; set; } = "";
-    [ObservableProperty] public partial string ShowMoreModelsLabel { get; set; } = "";
+    public ObservableCollection<ProviderUsageViewModel> ActiveUsageGrouping =>
+        UsageByProvider ? ProviderUsage : HarnessUsage;
+
+    [ObservableProperty]
+    public partial string UsageWindowTitle { get; set; } = F("UsageWindow_LastDays", 30);
+
+    [ObservableProperty]
+    public partial string UsageWindowSummary { get; set; } = "-";
+
+    [ObservableProperty]
+    public partial string PeriodDeltaLabel { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string ThirtyDayDeltaLabel { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string NinetyDayDeltaLabel { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string ProjectReconciliationLabel { get; set; } = "";
+
+    [ObservableProperty]
+    public partial bool HasMoreProjects { get; set; }
+
+    [ObservableProperty]
+    public partial bool HasMoreModels { get; set; }
+
+    [ObservableProperty]
+    public partial bool CanShowLessProjects { get; set; }
+
+    [ObservableProperty]
+    public partial bool CanShowLessModels { get; set; }
+
+    [ObservableProperty]
+    public partial string ShowMoreProjectsLabel { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string ShowMoreModelsLabel { get; set; } = "";
 
     public string ShowLessLabel => L("Usage_ShowLess");
 
@@ -100,18 +172,25 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
     [NotifyCanExecuteChangedFor(nameof(RefreshCommand))]
     public partial bool IsRefreshing { get; set; }
 
-    [ObservableProperty] public partial double RefreshProgressFraction { get; set; }
-    [ObservableProperty] public partial string RefreshProgressLabel { get; set; } = string.Empty;
-    [ObservableProperty] public partial string RefreshProgressDetail { get; set; } = string.Empty;
+    [ObservableProperty]
+    public partial double RefreshProgressFraction { get; set; }
+
+    [ObservableProperty]
+    public partial string RefreshProgressLabel { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string RefreshProgressDetail { get; set; } = string.Empty;
 
     // True while the bar has no meaningful fraction to fill: the local pre-fetch
     // phases (account discovery, telemetry scan) animate indeterminately with a
     // stage label; the per-provider network fetch flips this to determinate.
-    [ObservableProperty] public partial bool RefreshIsIndeterminate { get; set; }
+    [ObservableProperty]
+    public partial bool RefreshIsIndeterminate { get; set; }
 
     public async Task InitializeAsync()
     {
-        if (_initialized) return;
+        if (_initialized)
+            return;
         _initialized = true;
         await LoadAndApplyAsync(false).ConfigureAwait(true);
         await LoadAndApplyAsync(true).ConfigureAwait(true);
@@ -119,17 +198,27 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
 
     [RelayCommand(CanExecute = nameof(CanRefresh))]
     private Task RefreshAsync() => LoadAndApplyAsync(true);
+
     private bool CanRefresh() => !IsRefreshing;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RefreshModelCatalogCommand))]
     public partial bool IsRefreshingModelCatalog { get; set; }
 
-    [ObservableProperty] public partial string ModelCatalogStatusLabel { get; set; } = L("Catalog_Checking");
-    [ObservableProperty] public partial string ModelCatalogDetail { get; set; } = string.Empty;
-    [ObservableProperty] public partial string ModelCatalogSchedule { get; set; } = string.Empty;
-    [ObservableProperty] public partial string ModelCatalogError { get; set; } = string.Empty;
-    [ObservableProperty] public partial bool ModelCatalogHasError { get; set; }
+    [ObservableProperty]
+    public partial string ModelCatalogStatusLabel { get; set; } = L("Catalog_Checking");
+
+    [ObservableProperty]
+    public partial string ModelCatalogDetail { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string ModelCatalogSchedule { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string ModelCatalogError { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool ModelCatalogHasError { get; set; }
 
     /// <summary>
     /// Reads catalog state without touching the network, so opening Settings
@@ -141,9 +230,7 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
         {
             ApplyCatalogStatus(await _dataSource.GetModelCatalogStatusAsync(_lifetime.Token).ConfigureAwait(true));
         }
-        catch (OperationCanceledException)
-        {
-        }
+        catch (OperationCanceledException) { }
     }
 
     [RelayCommand(CanExecute = nameof(CanRefreshModelCatalog))]
@@ -153,7 +240,8 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
         try
         {
             PricingCatalogRefresh result = await _dataSource
-                .RefreshModelCatalogAsync(_lifetime.Token).ConfigureAwait(true);
+                .RefreshModelCatalogAsync(_lifetime.Token)
+                .ConfigureAwait(true);
             ApplyCatalogStatus(await _dataSource.GetModelCatalogStatusAsync(_lifetime.Token).ConfigureAwait(true));
             if (result.IsFailure)
             {
@@ -167,9 +255,7 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
                 await LoadAndApplyAsync(false).ConfigureAwait(true);
             }
         }
-        catch (OperationCanceledException)
-        {
-        }
+        catch (OperationCanceledException) { }
         finally
         {
             IsRefreshingModelCatalog = false;
@@ -182,10 +268,12 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
     {
         ModelCatalogStatusLabel = status.IsAvailable ? L("Catalog_Loaded") : L("Catalog_Unavailable");
         ModelCatalogDetail = status.IsAvailable
-            ? F("Catalog_Detail",
+            ? F(
+                "Catalog_Detail",
                 status.ModelCount.ToString("N0", CultureInfo.CurrentCulture),
                 status.FetchedAt?.ToLocalTime().ToString("d MMM HH:mm", CultureInfo.CurrentCulture) ?? "—",
-                status.ShortHash)
+                status.ShortHash
+            )
             : L("Catalog_NoCache");
         ModelCatalogSchedule = status.NextDue is { } due
             ? F("Catalog_NextDue", due.ToLocalTime().ToString("d MMM HH:mm", CultureInfo.CurrentCulture))
@@ -206,7 +294,8 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
     /// </summary>
     public async Task<bool> RefreshFromSchedulerAsync()
     {
-        if (IsRefreshing) return false;
+        if (IsRefreshing)
+            return false;
         await LoadAndApplyAsync(true).ConfigureAwait(true);
         return true;
     }
@@ -231,7 +320,10 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
             Apply(await _dataSource.LoadAsync(forceRefresh, progress, interim, _lifetime.Token).ConfigureAwait(true));
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
-        catch (Exception) { StatusMessage = L("Dashboard_RefreshFailed"); }
+        catch (Exception)
+        {
+            StatusMessage = L("Dashboard_RefreshFailed");
+        }
         finally
         {
             IsRefreshing = false;
@@ -259,11 +351,12 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
             : F("Data_RefreshProgressDetail", update.CurrentProvider);
     }
 
-    private static string StageLabel(RefreshStage stage) => stage switch
-    {
-        RefreshStage.ScanningHistory => L("Data_RefreshStageScanning"),
-        _ => L("Data_RefreshStageDiscovering"),
-    };
+    private static string StageLabel(RefreshStage stage) =>
+        stage switch
+        {
+            RefreshStage.ScanningHistory => L("Data_RefreshStageScanning"),
+            _ => L("Data_RefreshStageDiscovering"),
+        };
 
     private void Apply(DashboardData data)
     {
@@ -321,16 +414,19 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
     private static void Replace<T>(ObservableCollection<T> target, IEnumerable<T> values)
     {
         target.Clear();
-        foreach (var value in values) target.Add(value);
+        foreach (var value in values)
+            target.Add(value);
     }
 
     private void OnDisplayPreferenceChanged(DashboardDisplayOptions options)
     {
         ProviderCardViewModel[] refreshed = Providers
-            .Select(provider => provider with
-            {
-                AllMeters = provider.AllMeters.Select(meter => meter with { }).ToArray()
-            })
+            .Select(provider =>
+                provider with
+                {
+                    AllMeters = provider.AllMeters.Select(meter => meter with { }).ToArray(),
+                }
+            )
             .ToArray();
         Replace(Providers, refreshed);
     }
@@ -364,7 +460,8 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
         through = range.Through;
         _usageWindowFrom = from;
         _usageWindowThrough = through;
-        UsageWindowTitle = $"{from.ToString("d", CultureInfo.CurrentCulture)} – {through.ToString("d", CultureInfo.CurrentCulture)}";
+        UsageWindowTitle =
+            $"{from.ToString("d", CultureInfo.CurrentCulture)} – {through.ToString("d", CultureInfo.CurrentCulture)}";
         RebuildUsageWindow();
     }
 
@@ -405,20 +502,22 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
             <= 14 => 1,
             <= 45 => 3,
             <= 120 => 7,
-            _ => 14
+            _ => 14,
         };
         var history = _usageHistory.ToDictionary(day => day.Day);
         var buckets = new List<(DateOnly From, DateOnly Through, long Tokens, decimal? Cost)>();
         for (DateOnly start = from; start <= through; start = start.AddDays(bucketDays))
         {
             DateOnly end = start.AddDays(bucketDays - 1);
-            if (end > through) end = through;
+            if (end > through)
+                end = through;
             long tokens = 0;
             decimal cost = 0m;
             bool hasCost = false;
             for (DateOnly day = start; day <= end; day = day.AddDays(1))
             {
-                if (!history.TryGetValue(day, out UsageHistoryDayViewModel? item)) continue;
+                if (!history.TryGetValue(day, out UsageHistoryDayViewModel? item))
+                    continue;
                 tokens += item.Tokens;
                 if (item.ApiEquivalentCostUsd.HasValue)
                 {
@@ -430,23 +529,31 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
         }
 
         long maxTokens = Math.Max(1, buckets.Max(bucket => bucket.Tokens));
-        decimal maxCost = Math.Max(0.000001m, buckets.Where(bucket => bucket.Cost.HasValue).Select(bucket => bucket.Cost!.Value).DefaultIfEmpty().Max());
-        return buckets.Select(bucket =>
-        {
-            string label = bucketDays == 1
-                ? bucket.From.ToString("ddd", CultureInfo.CurrentCulture).ToUpper(CultureInfo.CurrentCulture)
-                : bucket.From.ToString("dd MMM", CultureInfo.CurrentCulture);
-            string range = bucket.From == bucket.Through
-                ? bucket.From.ToString("D", CultureInfo.CurrentCulture)
-                : $"{bucket.From.ToString("d", CultureInfo.CurrentCulture)} – {bucket.Through.ToString("d", CultureInfo.CurrentCulture)}";
-            return new UsageDayViewModel(
-                label,
-                bucket.Tokens == 0 ? 4 : 24 + 116.0 * bucket.Tokens / maxTokens,
-                FormatTokens(bucket.Tokens),
-                BuildTrendBreakdown(bucket.From, bucket.Through, range, bucket.Tokens, bucket.Cost),
-                bucket.Cost is null or 0m ? 4 : 24 + 116.0 * (double)(bucket.Cost.Value / maxCost),
-                FormatUsd(bucket.Cost));
-        }).ToArray();
+        decimal maxCost = Math.Max(
+            0.000001m,
+            buckets.Where(bucket => bucket.Cost.HasValue).Select(bucket => bucket.Cost!.Value).DefaultIfEmpty().Max()
+        );
+        return buckets
+            .Select(bucket =>
+            {
+                string label =
+                    bucketDays == 1
+                        ? bucket.From.ToString("ddd", CultureInfo.CurrentCulture).ToUpper(CultureInfo.CurrentCulture)
+                        : bucket.From.ToString("dd MMM", CultureInfo.CurrentCulture);
+                string range =
+                    bucket.From == bucket.Through
+                        ? bucket.From.ToString("D", CultureInfo.CurrentCulture)
+                        : $"{bucket.From.ToString("d", CultureInfo.CurrentCulture)} – {bucket.Through.ToString("d", CultureInfo.CurrentCulture)}";
+                return new UsageDayViewModel(
+                    label,
+                    bucket.Tokens == 0 ? 4 : 24 + 116.0 * bucket.Tokens / maxTokens,
+                    FormatTokens(bucket.Tokens),
+                    BuildTrendBreakdown(bucket.From, bucket.Through, range, bucket.Tokens, bucket.Cost),
+                    bucket.Cost is null or 0m ? 4 : 24 + 116.0 * (double)(bucket.Cost.Value / maxCost),
+                    FormatUsd(bucket.Cost)
+                );
+            })
+            .ToArray();
     }
 
     private string BuildTrendBreakdown(DateOnly from, DateOnly through, string range, long tokens, decimal? cost)
@@ -485,12 +592,16 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
                 ProjectUsageSliceViewModel first = group.First();
                 long tokens = group.Sum(slice => slice.Tokens);
                 decimal? cost = group.Any(slice => slice.ApiEquivalentCostUsd.HasValue)
-                    ? group.Where(slice => slice.ApiEquivalentCostUsd.HasValue).Sum(slice => slice.ApiEquivalentCostUsd.GetValueOrDefault())
+                    ? group
+                        .Where(slice => slice.ApiEquivalentCostUsd.HasValue)
+                        .Sum(slice => slice.ApiEquivalentCostUsd.GetValueOrDefault())
                     : null;
                 string name = ProjectName(first.ProjectPath);
-                bool worktree = !string.IsNullOrWhiteSpace(first.RepositoryRootPath)
+                bool worktree =
+                    !string.IsNullOrWhiteSpace(first.RepositoryRootPath)
                     && !string.Equals(first.RepositoryRootPath, first.ProjectPath, StringComparison.OrdinalIgnoreCase);
-                if (worktree) name += L("UsageWindow_WorktreeSuffix");
+                if (worktree)
+                    name += L("UsageWindow_WorktreeSuffix");
                 return new ProjectUsageViewModel(
                     first.ProjectKey,
                     name,
@@ -499,16 +610,21 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
                     FormatTokens(tokens),
                     FormatUsd(cost),
                     tokens,
-                    cost);
+                    cost
+                );
             })
             .Where(project => project.RawTokens > 0)
             .ToArray();
 
         IEnumerable<ProjectUsageViewModel> sorted = _projectSort switch
         {
-            "cost" => projects.OrderByDescending(project => project.RawCost ?? -1m).ThenByDescending(project => project.RawTokens),
+            "cost" => projects
+                .OrderByDescending(project => project.RawCost ?? -1m)
+                .ThenByDescending(project => project.RawTokens),
             "project" => projects.OrderBy(project => project.Name, StringComparer.CurrentCultureIgnoreCase),
-            _ => projects.OrderByDescending(project => project.RawTokens).ThenByDescending(project => project.RawCost ?? -1m)
+            _ => projects
+                .OrderByDescending(project => project.RawTokens)
+                .ThenByDescending(project => project.RawCost ?? -1m),
         };
         _allProjectRows = sorted.ToArray();
         Replace(ProjectUsage, _allProjectRows.Take(_visibleProjectCount));
@@ -518,9 +634,10 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
             .Where(day => day.Day >= _usageWindowFrom && day.Day <= _usageWindowThrough)
             .Sum(day => day.Tokens);
         long projectTokens = projects.Sum(project => project.RawTokens);
-        ProjectReconciliationLabel = historyTokens == projectTokens
-            ? F("UsageWindow_ProjectReconciled", FormatTokens(historyTokens))
-            : F("UsageWindow_ProjectMismatch", FormatTokens(projectTokens), FormatTokens(historyTokens));
+        ProjectReconciliationLabel =
+            historyTokens == projectTokens
+                ? F("UsageWindow_ProjectReconciled", FormatTokens(historyTokens))
+                : F("UsageWindow_ProjectMismatch", FormatTokens(projectTokens), FormatTokens(historyTokens));
     }
 
     public void ShowMoreProjects()
@@ -571,21 +688,35 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
         DateOnly currentFrom = through.AddDays(1 - days);
         DateOnly previousThrough = currentFrom.AddDays(-1);
         DateOnly previousFrom = previousThrough.AddDays(1 - days);
-        UsageHistoryDayViewModel[] current = _usageHistory.Where(day => day.Day >= currentFrom && day.Day <= through).ToArray();
-        UsageHistoryDayViewModel[] previous = _usageHistory.Where(day => day.Day >= previousFrom && day.Day <= previousThrough).ToArray();
+        UsageHistoryDayViewModel[] current = _usageHistory
+            .Where(day => day.Day >= currentFrom && day.Day <= through)
+            .ToArray();
+        UsageHistoryDayViewModel[] previous = _usageHistory
+            .Where(day => day.Day >= previousFrom && day.Day <= previousThrough)
+            .ToArray();
         long currentTokens = current.Sum(day => day.Tokens);
         long previousTokens = previous.Sum(day => day.Tokens);
-        return F("UsageWindow_Comparison", label, Delta(currentTokens, previousTokens), Delta(SumCost(current), SumCost(previous)));
+        return F(
+            "UsageWindow_Comparison",
+            label,
+            Delta(currentTokens, previousTokens),
+            Delta(SumCost(current), SumCost(previous))
+        );
     }
 
-    private static string Delta(long current, long previous) => previous == 0
-        ? current == 0 ? L("Delta_NoChange") : L("Delta_New")
-        : $"{(100.0 * (current - previous) / previous):+0.#;-0.#;0}%";
+    private static string Delta(long current, long previous) =>
+        previous == 0
+            ? current == 0
+                ? L("Delta_NoChange")
+                : L("Delta_New")
+            : $"{(100.0 * (current - previous) / previous):+0.#;-0.#;0}%";
 
     private static string Delta(decimal? current, decimal? previous)
     {
-        if (!current.HasValue || !previous.HasValue) return L("Delta_Unavailable");
-        if (previous.Value == 0m) return current.Value == 0m ? L("Delta_NoChange") : L("Delta_New");
+        if (!current.HasValue || !previous.HasValue)
+            return L("Delta_Unavailable");
+        if (previous.Value == 0m)
+            return current.Value == 0m ? L("Delta_NoChange") : L("Delta_New");
         return $"{(100m * (current.Value - previous.Value) / previous.Value):+0.#;-0.#;0}%";
     }
 
@@ -593,31 +724,35 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
     {
         UsageHistoryDayViewModel[] values = days.ToArray();
         return values.Any(day => day.ApiEquivalentCostUsd.HasValue)
-            ? values.Where(day => day.ApiEquivalentCostUsd.HasValue).Sum(day => day.ApiEquivalentCostUsd.GetValueOrDefault())
+            ? values
+                .Where(day => day.ApiEquivalentCostUsd.HasValue)
+                .Sum(day => day.ApiEquivalentCostUsd.GetValueOrDefault())
             : null;
     }
 
     private static string ProjectName(string path)
     {
-        if (string.Equals(path, "Unknown", StringComparison.OrdinalIgnoreCase)) return L("Common_Unknown");
+        if (string.Equals(path, "Unknown", StringComparison.OrdinalIgnoreCase))
+            return L("Common_Unknown");
         string trimmed = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         string name = Path.GetFileName(trimmed);
         return string.IsNullOrWhiteSpace(name) ? path : name;
     }
 
-    private static string FormatTokens(long value) => Math.Abs(value) switch
-    {
-        >= 1_000_000_000 => $"{value / 1_000_000_000d:0.##}B",
-        >= 1_000_000 => $"{value / 1_000_000d:0.##}M",
-        >= 1_000 => $"{value / 1_000d:0.#}K",
-        _ => value.ToString("N0", CultureInfo.CurrentCulture)
-    };
+    private static string FormatTokens(long value) =>
+        Math.Abs(value) switch
+        {
+            >= 1_000_000_000 => $"{value / 1_000_000_000d:0.##}B",
+            >= 1_000_000 => $"{value / 1_000_000d:0.##}M",
+            >= 1_000 => $"{value / 1_000d:0.#}K",
+            _ => value.ToString("N0", CultureInfo.CurrentCulture),
+        };
 
-    private static string FormatUsd(decimal? value) => value.HasValue
-        ? value.Value.ToString("$0.00", CultureInfo.InvariantCulture)
-        : "-";
+    private static string FormatUsd(decimal? value) =>
+        value.HasValue ? value.Value.ToString("$0.00", CultureInfo.InvariantCulture) : "-";
 
     private static string L(string key) => LocalizationService.GetString(key);
+
     private static string F(string key, params object[] values) =>
         string.Format(CultureInfo.CurrentCulture, L(key), values);
 

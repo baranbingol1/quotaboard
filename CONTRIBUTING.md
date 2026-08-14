@@ -8,9 +8,36 @@
 ## Build and test
 
 ```powershell
-dotnet restore tests/AiLimits.Tests/AiLimits.Tests.csproj
+dotnet restore
 dotnet test tests/AiLimits.Tests/AiLimits.Tests.csproj --configuration Release
+dotnet test tests/AiLimits.IntegrationTests/AiLimits.IntegrationTests.csproj --configuration Release
 ```
+
+Unit tests live in `tests/AiLimits.Tests`. Integration tests in
+`tests/AiLimits.IntegrationTests` exercise SQLite and the refresh pipeline on
+a real on-disk database.
+
+## Quality gates
+
+Formatting, naming, complexity, file size, dead-code, duplication, and
+TODO tracking are enforced locally and in CI:
+
+```powershell
+dotnet tool restore
+dotnet csharpier check src tests
+./scripts/invoke-quality-gates.ps1
+./scripts/install-git-hooks.ps1   # one-time; points this clone at .githooks
+```
+
+`.editorconfig` is the naming and formatting contract. CSharpier is the
+formatter. Pre-commit (`.githooks/pre-commit` and `.pre-commit-config.yaml`)
+runs the same scripts CI runs. Architecture boundaries are locked by
+ArchUnitNET in `tests/AiLimits.Tests/Architecture`. Snapshot history has an
+N+1 query budget in `SqliteHistoryQueryBudgetTests`.
+
+Coverage is collected with Coverlet. CI fails the suite under 40% line
+coverage, prints the slowest tests from the TRX, and retries the known
+timing-sensitive refresh-coalescing test via xRetry.
 
 ## Run the app
 

@@ -19,7 +19,8 @@ public sealed record ResolvedThemeColors(
     Color Healthy,
     Color Warning,
     Color Critical,
-    bool IsDarkBackground);
+    bool IsDarkBackground
+);
 
 /// <summary>
 /// Materializes a <see cref="ThemePalette"/> into a WinUI ResourceDictionary with
@@ -55,10 +56,16 @@ public static class ThemeDictionaryBuilder
             Healthy: Pick(palette.Success, dark),
             Warning: Pick(palette.Warning, dark),
             Critical: Pick(palette.Error, dark),
-            IsDarkBackground: IsDark(background));
+            IsDarkBackground: IsDark(background)
+        );
     }
 
-    private static ResourceDictionary BuildVariant(ThemePalette palette, bool dark, string contentFontSource, string metricFontSource)
+    private static ResourceDictionary BuildVariant(
+        ThemePalette palette,
+        bool dark,
+        string contentFontSource,
+        string metricFontSource
+    )
     {
         Color background = Pick(palette.Background, dark);
         Color panel = Pick(palette.BackgroundPanel, dark);
@@ -143,7 +150,8 @@ public static class ThemeDictionaryBuilder
             0xFF,
             (byte)Math.Round(from.R * (1 - t) + to.R * t),
             (byte)Math.Round(from.G * (1 - t) + to.G * t),
-            (byte)Math.Round(from.B * (1 - t) + to.B * t));
+            (byte)Math.Round(from.B * (1 - t) + to.B * t)
+        );
     }
 
     internal static Color WithAlpha(Color color, byte alpha) => Color.FromArgb(alpha, color.R, color.G, color.B);
@@ -159,7 +167,11 @@ public static class ThemeDictionaryBuilder
 
     private static LinearGradientBrush VerticalGradient(Color top, Color bottom)
     {
-        var brush = new LinearGradientBrush { StartPoint = new Windows.Foundation.Point(0, 0), EndPoint = new Windows.Foundation.Point(0, 1) };
+        var brush = new LinearGradientBrush
+        {
+            StartPoint = new Windows.Foundation.Point(0, 0),
+            EndPoint = new Windows.Foundation.Point(0, 1),
+        };
         brush.GradientStops.Add(new GradientStop { Color = top, Offset = 0 });
         brush.GradientStops.Add(new GradientStop { Color = bottom, Offset = 1 });
         return brush;

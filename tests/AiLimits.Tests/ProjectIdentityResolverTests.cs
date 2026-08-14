@@ -33,7 +33,8 @@ public sealed class ProjectIdentityResolverTests
         File.WriteAllText(Path.Combine(worktree.FullName, ".git"), $"gitdir: {worktreeGit.FullName}");
         File.WriteAllText(
             Path.Combine(worktreeGit.FullName, "commondir"),
-            Path.GetRelativePath(worktreeGit.FullName, commonGit.FullName));
+            Path.GetRelativePath(worktreeGit.FullName, commonGit.FullName)
+        );
 
         var identity = new ProjectIdentityResolver().Resolve(nested.FullName);
 
@@ -64,7 +65,8 @@ public sealed class ProjectIdentityResolverTests
         public void Dispose()
         {
             SqliteConnection.ClearAllPools();
-            if (Directory.Exists(Path)) Directory.Delete(Path, recursive: true);
+            if (Directory.Exists(Path))
+                Directory.Delete(Path, recursive: true);
         }
     }
 }

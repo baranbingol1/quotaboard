@@ -14,10 +14,10 @@ public sealed class SqliteAlertStateRepository(SqliteDatabase database) : IAlert
     public async Task<bool> TryClaimAsync(
         AlertCandidate candidate,
         DateTimeOffset claimedAt,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
-        await using SqliteConnection connection = await database.OpenAsync(cancellationToken)
-            .ConfigureAwait(false);
+        await using SqliteConnection connection = await database.OpenAsync(cancellationToken).ConfigureAwait(false);
         await using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT OR IGNORE INTO alert_state(
@@ -31,8 +31,7 @@ public sealed class SqliteAlertStateRepository(SqliteDatabase database) : IAlert
 
     public async Task ReleaseAsync(AlertCandidate candidate, CancellationToken cancellationToken)
     {
-        await using SqliteConnection connection = await database.OpenAsync(cancellationToken)
-            .ConfigureAwait(false);
+        await using SqliteConnection connection = await database.OpenAsync(cancellationToken).ConfigureAwait(false);
         await using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
             DELETE FROM alert_state
@@ -52,9 +51,10 @@ public sealed class SqliteAlertStateRepository(SqliteDatabase database) : IAlert
         command.Parameters.AddWithValue("$account", candidate.Account.Value);
         command.Parameters.AddWithValue("$meter", candidate.Meter.Value);
         command.Parameters.AddWithValue("$event", candidate.DeduplicationKey);
-        command.Parameters.AddWithValue("$cycle", candidate.ResetCycle is DateTimeOffset cycle
-            ? Format(cycle)
-            : "open");
+        command.Parameters.AddWithValue(
+            "$cycle",
+            candidate.ResetCycle is DateTimeOffset cycle ? Format(cycle) : "open"
+        );
     }
 
     private static string Format(DateTimeOffset value) =>

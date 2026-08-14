@@ -26,19 +26,19 @@ public sealed class FactoryLogTokenSource(string factoryHome) : ITokenUsageSourc
     public async IAsyncEnumerable<TokenUsageEvent> ReadAsync(
         ProviderAccount account,
         ScannerCursor? cursor,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+        [EnumeratorCancellation] CancellationToken cancellationToken
+    )
     {
         var logDirectory = Path.Combine(factoryHome, "logs");
-        if (!SafeFileEnumeration.IsSafeDirectory(logDirectory)) yield break;
+        if (!SafeFileEnumeration.IsSafeDirectory(logDirectory))
+            yield break;
 
         var sessions = await ReadSessionDirectoriesAsync(cancellationToken).ConfigureAwait(false);
         string[] files;
         try
         {
-            files = Directory.EnumerateFiles(
-                    logDirectory,
-                    "droid-log-single.log*",
-                    SafeFileEnumeration.TopLevel)
+            files = Directory
+                .EnumerateFiles(logDirectory, "droid-log-single.log*", SafeFileEnumeration.TopLevel)
                 .OrderBy(SafeLastWriteTimeUtc)
                 .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -54,13 +54,16 @@ public sealed class FactoryLogTokenSource(string factoryHome) : ITokenUsageSourc
             StreamReader? reader;
             try
             {
-                reader = new StreamReader(new FileStream(
-                    file,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.ReadWrite | FileShare.Delete,
-                    16384,
-                    FileOptions.Asynchronous | FileOptions.SequentialScan));
+                reader = new StreamReader(
+                    new FileStream(
+                        file,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.ReadWrite | FileShare.Delete,
+                        16384,
+                        FileOptions.Asynchronous | FileOptions.SequentialScan
+                    )
+                );
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
@@ -81,9 +84,12 @@ public sealed class FactoryLogTokenSource(string factoryHome) : ITokenUsageSourc
                         break;
                     }
 
-                    if (line is null) break;
-                    if (!TryParseLine(line, out var usage)) continue;
-                    if (ScannerBoundary.AlreadyCovered(cursor, usage.OccurredAt)) continue;
+                    if (line is null)
+                        break;
+                    if (!TryParseLine(line, out var usage))
+                        continue;
+                    if (ScannerBoundary.AlreadyCovered(cursor, usage.OccurredAt))
+                        continue;
 
                     var project = sessions.TryGetValue(usage.SessionId, out var workingDirectory)
                         ? projectIdentityResolver.Resolve(workingDirectory)
@@ -99,7 +105,8 @@ public sealed class FactoryLogTokenSource(string factoryHome) : ITokenUsageSourc
                         0,
                         usage.ReasoningTokens,
                         usage.SourceEventId,
-                        project);
+                        project
+                    );
                 }
             }
         }
@@ -108,32 +115,39 @@ public sealed class FactoryLogTokenSource(string factoryHome) : ITokenUsageSourc
     internal static bool TryParseLine(string? line, out FactoryLogUsage usage)
     {
         usage = default;
-        if (string.IsNullOrWhiteSpace(line)) return false;
+        if (string.IsNullOrWhiteSpace(line))
+            return false;
 
         var marker = line.IndexOf(LogMarker, StringComparison.Ordinal);
-        if (marker < 0) return false;
+        if (marker < 0)
+            return false;
         var jsonStart = line.IndexOf('{', marker + LogMarker.Length);
-        if (jsonStart < 0 || !TryReadTimestamp(line, out var occurredAt)) return false;
+        if (jsonStart < 0 || !TryReadTimestamp(line, out var occurredAt))
+            return false;
 
         try
         {
             using var document = JsonDocument.Parse(line[jsonStart..]);
             var root = document.RootElement;
-            if (root.ValueKind != JsonValueKind.Object ||
-                !root.TryGetProperty("tags", out var tags) ||
-                tags.ValueKind != JsonValueKind.Object)
+            if (
+                root.ValueKind != JsonValueKind.Object
+                || !root.TryGetProperty("tags", out var tags)
+                || tags.ValueKind != JsonValueKind.Object
+            )
             {
                 return false;
             }
 
             var sessionId = ReadString(tags, "sessionId");
-            if (string.IsNullOrWhiteSpace(sessionId)) return false;
+            if (string.IsNullOrWhiteSpace(sessionId))
+                return false;
 
             var input = ReadLong(root, "inputTokens");
             var cacheRead = ReadLong(root, "cacheReadInputTokens");
             var output = ReadLong(root, "outputTokens");
             var reasoning = ReadLong(root, "reasoningTokens");
-            if (input == 0 && cacheRead == 0 && output == 0 && reasoning == 0) return false;
+            if (input == 0 && cacheRead == 0 && output == 0 && reasoning == 0)
+                return false;
 
             var model = ReadString(tags, "modelId") ?? ReadString(root, "modelId") ?? "unknown";
             // Anthropic and OpenAI count thinking/reasoning inside outputTokens
@@ -141,8 +155,7 @@ public sealed class FactoryLogTokenSource(string factoryHome) : ITokenUsageSourc
             // output for those vendors, while MiniMax reports the lanes
             // disjointly). Subtract so the pricing engine's separate reasoning
             // lane does not bill those tokens twice, mirroring the Codex source.
-            if (reasoning > 0
-                && ModelVendorClassifier.GetPricingProviderId("droid", model) is "anthropic" or "openai")
+            if (reasoning > 0 && ModelVendorClassifier.GetPricingProviderId("droid", model) is "anthropic" or "openai")
             {
                 output = Math.Max(0, output - reasoning);
             }
@@ -167,7 +180,9 @@ public sealed class FactoryLogTokenSource(string factoryHome) : ITokenUsageSourc
                     cacheRead,
                     reasoning,
                     ReadLong(root, "count"),
-                    ReadLong(root, "contextCount")));
+                    ReadLong(root, "contextCount")
+                )
+            );
             return true;
         }
         catch (JsonException)
@@ -177,11 +192,13 @@ public sealed class FactoryLogTokenSource(string factoryHome) : ITokenUsageSourc
     }
 
     private async Task<IReadOnlyDictionary<string, string>> ReadSessionDirectoriesAsync(
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         var sessions = new Dictionary<string, string>(StringComparer.Ordinal);
         var indexPath = Path.Combine(factoryHome, "sessions-index.json");
-        if (!File.Exists(indexPath)) return sessions;
+        if (!File.Exists(indexPath))
+            return sessions;
 
         try
         {
@@ -191,24 +208,28 @@ public sealed class FactoryLogTokenSource(string factoryHome) : ITokenUsageSourc
                 FileAccess.Read,
                 FileShare.ReadWrite | FileShare.Delete,
                 16384,
-                FileOptions.Asynchronous | FileOptions.SequentialScan);
-            using var document = await JsonDocument.ParseAsync(
-                stream,
-                default,
-                cancellationToken).ConfigureAwait(false);
-            if (document.RootElement.ValueKind != JsonValueKind.Object ||
-                !document.RootElement.TryGetProperty("entries", out var entries))
+                FileOptions.Asynchronous | FileOptions.SequentialScan
+            );
+            using var document = await JsonDocument
+                .ParseAsync(stream, default, cancellationToken)
+                .ConfigureAwait(false);
+            if (
+                document.RootElement.ValueKind != JsonValueKind.Object
+                || !document.RootElement.TryGetProperty("entries", out var entries)
+            )
             {
                 return sessions;
             }
 
             if (entries.ValueKind == JsonValueKind.Array)
             {
-                foreach (var entry in entries.EnumerateArray()) AddSessionDirectory(entry, sessions);
+                foreach (var entry in entries.EnumerateArray())
+                    AddSessionDirectory(entry, sessions);
             }
             else if (entries.ValueKind == JsonValueKind.Object)
             {
-                foreach (var entry in entries.EnumerateObject()) AddSessionDirectory(entry.Value, sessions);
+                foreach (var entry in entries.EnumerateObject())
+                    AddSessionDirectory(entry.Value, sessions);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -223,11 +244,10 @@ public sealed class FactoryLogTokenSource(string factoryHome) : ITokenUsageSourc
         return sessions;
     }
 
-    private static void AddSessionDirectory(
-        JsonElement entry,
-        IDictionary<string, string> sessions)
+    private static void AddSessionDirectory(JsonElement entry, IDictionary<string, string> sessions)
     {
-        if (entry.ValueKind != JsonValueKind.Object) return;
+        if (entry.ValueKind != JsonValueKind.Object)
+            return;
         var sessionId = ReadString(entry, "sessionId") ?? ReadString(entry, "id");
         var workingDirectory = ReadString(entry, "cwd");
         if (!string.IsNullOrWhiteSpace(sessionId) && !string.IsNullOrWhiteSpace(workingDirectory))
@@ -238,13 +258,16 @@ public sealed class FactoryLogTokenSource(string factoryHome) : ITokenUsageSourc
     {
         timestamp = default;
         var open = line.IndexOf('[');
-        if (open < 0) return false;
+        if (open < 0)
+            return false;
         var close = line.IndexOf(']', open + 1);
-        return close > open + 1 && DateTimeOffset.TryParse(
-            line.AsSpan(open + 1, close - open - 1),
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
-            out timestamp);
+        return close > open + 1
+            && DateTimeOffset.TryParse(
+                line.AsSpan(open + 1, close - open - 1),
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out timestamp
+            );
     }
 
     private static string CreateSourceEventId(
@@ -258,7 +281,8 @@ public sealed class FactoryLogTokenSource(string factoryHome) : ITokenUsageSourc
         long cacheRead,
         long reasoning,
         long count,
-        long contextCount)
+        long contextCount
+    )
     {
         var canonical = string.Join(
             '|',
@@ -272,38 +296,39 @@ public sealed class FactoryLogTokenSource(string factoryHome) : ITokenUsageSourc
             cacheRead.ToString(CultureInfo.InvariantCulture),
             reasoning.ToString(CultureInfo.InvariantCulture),
             count.ToString(CultureInfo.InvariantCulture),
-            contextCount.ToString(CultureInfo.InvariantCulture));
+            contextCount.ToString(CultureInfo.InvariantCulture)
+        );
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
         return $"factory:{EventIdPart(traceId, "no-trace")}:{EventIdPart(spanId, "no-span")}:{hash[..24]}";
     }
 
     private static string EventIdPart(string? value, string fallback)
     {
-        if (string.IsNullOrWhiteSpace(value)) return fallback;
-        var safe = new string(value.Where(character =>
-                char.IsAsciiLetterOrDigit(character) || character is '-' or '_')
-            .Take(64)
-            .ToArray());
+        if (string.IsNullOrWhiteSpace(value))
+            return fallback;
+        var safe = new string(
+            value.Where(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_').Take(64).ToArray()
+        );
         return safe.Length == 0 ? fallback : safe;
     }
 
     private static string? ReadString(JsonElement element, string name) =>
-        element.TryGetProperty(name, out var value) &&
-        value.ValueKind == JsonValueKind.String &&
-        !string.IsNullOrWhiteSpace(value.GetString())
+        element.TryGetProperty(name, out var value)
+        && value.ValueKind == JsonValueKind.String
+        && !string.IsNullOrWhiteSpace(value.GetString())
             ? value.GetString()!.Trim()
             : null;
 
     private static long ReadLong(JsonElement element, string name)
     {
-        if (!element.TryGetProperty(name, out var value)) return 0;
+        if (!element.TryGetProperty(name, out var value))
+            return 0;
         if (value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var number))
             return Math.Max(0, number);
-        if (value.ValueKind == JsonValueKind.String && long.TryParse(
-                value.GetString(),
-                NumberStyles.Integer,
-                CultureInfo.InvariantCulture,
-                out number))
+        if (
+            value.ValueKind == JsonValueKind.String
+            && long.TryParse(value.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out number)
+        )
             return Math.Max(0, number);
         return 0;
     }
@@ -329,4 +354,5 @@ internal readonly record struct FactoryLogUsage(
     long OutputTokens,
     long CacheReadTokens,
     long ReasoningTokens,
-    string SourceEventId);
+    string SourceEventId
+);

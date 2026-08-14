@@ -20,7 +20,8 @@ public sealed class UsageProviderClassifierTests
     public void Names_the_authorizing_provider_not_the_model_maker(
         string recordingSource,
         string authorizationProvider,
-        string expected)
+        string expected
+    )
     {
         Assert.Equal(expected, UsageProviderClassifier.GetDisplayName(recordingSource, authorizationProvider));
     }
@@ -30,7 +31,8 @@ public sealed class UsageProviderClassifierTests
     [InlineData("claude", "claude")]
     public void Harness_recorded_usage_is_not_labelled_as_an_auth_flow_we_never_detected(
         string recordingSource,
-        string authorizationProvider)
+        string authorizationProvider
+    )
     {
         string name = UsageProviderClassifier.GetDisplayName(recordingSource, authorizationProvider);
 
@@ -53,7 +55,8 @@ public sealed class UsageProviderClassifierTests
         // agree with it or the usage facets list the provider twice.
         Assert.Equal(
             UsageProviderClassifier.GetKey("codex", "codex"),
-            UsageProviderClassifier.GetKey("codex", "codex"));
+            UsageProviderClassifier.GetKey("codex", "codex")
+        );
         Assert.Equal("openai-codex", UsageProviderClassifier.GetKey("codex", "codex"));
         Assert.Equal("anthropic-claude-code", UsageProviderClassifier.GetKey("claude", "claude"));
         Assert.Equal("openai-chatgpt-oauth", UsageProviderClassifier.GetKey("opencode", "openai-oauth"));
@@ -68,9 +71,7 @@ public sealed class UsageProviderClassifierTests
     [InlineData("opencode", "openai-api")]
     [InlineData("opencode", "github-copilot")]
     [InlineData("cline", "cline-pass")]
-    public void Every_key_is_a_lowercase_slug_of_its_own_label(
-        string recordingSource,
-        string authorizationProvider)
+    public void Every_key_is_a_lowercase_slug_of_its_own_label(string recordingSource, string authorizationProvider)
     {
         string key = UsageProviderClassifier.GetKey(recordingSource, authorizationProvider);
 

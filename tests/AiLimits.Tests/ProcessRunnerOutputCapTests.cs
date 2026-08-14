@@ -16,9 +16,12 @@ public sealed class ProcessRunnerOutputCapTests
 
         // A reader that stopped at the cap would leave the pipe full and the
         // child blocked; the generous timeout only fails if draining broke.
-        ProcessResult result = await runner.RunAsync("powershell",
+        ProcessResult result = await runner.RunAsync(
+            "powershell",
             ["-NoProfile", "-NonInteractive", "-Command", FloodStdout],
-            TimeSpan.FromSeconds(60), default);
+            TimeSpan.FromSeconds(60),
+            default
+        );
 
         Assert.Equal(0, result.ExitCode);
         Assert.True(result.OutputTruncated);
@@ -33,9 +36,12 @@ public sealed class ProcessRunnerOutputCapTests
     {
         var runner = new ProcessRunner();
 
-        ProcessResult result = await runner.RunAsync("powershell",
+        ProcessResult result = await runner.RunAsync(
+            "powershell",
             ["-NoProfile", "-NonInteractive", "-Command", FloodStderr],
-            TimeSpan.FromSeconds(60), default);
+            TimeSpan.FromSeconds(60),
+            default
+        );
 
         Assert.True(result.ErrorTruncated);
         Assert.False(result.OutputTruncated);
@@ -47,9 +53,12 @@ public sealed class ProcessRunnerOutputCapTests
     {
         var runner = new ProcessRunner();
 
-        ProcessResult result = await runner.RunAsync("powershell",
+        ProcessResult result = await runner.RunAsync(
+            "powershell",
             ["-NoProfile", "-NonInteractive", "-Command", "[Console]::Out.Write('hello-cap')"],
-            TimeSpan.FromSeconds(30), default);
+            TimeSpan.FromSeconds(30),
+            default
+        );
 
         Assert.Equal(0, result.ExitCode);
         Assert.False(result.OutputTruncated);

@@ -6,7 +6,8 @@ namespace AiLimits.Presentation.WinUI;
 public sealed record DashboardDisplayOptions(
     bool ShowUsageAsRemaining = false,
     bool ShowResetTimeAsAbsolute = false,
-    bool HideZeroOrNotApplicableMeters = false);
+    bool HideZeroOrNotApplicableMeters = false
+);
 
 /// <summary>
 /// Persistent, process-wide display choices. The dashboard listens to
@@ -17,12 +18,18 @@ public static class DashboardDisplayPreference
     private static readonly object Gate = new();
     private static readonly string PreferencePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard", "display-preferences.json");
+        "QuotaBoard",
+        "display-preferences.json"
+    );
     private static DashboardDisplayOptions _current = LoadCore();
 
     public static DashboardDisplayOptions Current
     {
-        get { lock (Gate) return _current; }
+        get
+        {
+            lock (Gate)
+                return _current;
+        }
     }
 
     public static event Action<DashboardDisplayOptions>? Changed;
@@ -30,7 +37,8 @@ public static class DashboardDisplayPreference
     public static void Update(
         bool? showUsageAsRemaining = null,
         bool? showResetTimeAsAbsolute = null,
-        bool? hideZeroOrNotApplicableMeters = null)
+        bool? hideZeroOrNotApplicableMeters = null
+    )
     {
         DashboardDisplayOptions updated;
         lock (Gate)
@@ -39,7 +47,7 @@ public static class DashboardDisplayPreference
             {
                 ShowUsageAsRemaining = showUsageAsRemaining ?? _current.ShowUsageAsRemaining,
                 ShowResetTimeAsAbsolute = showResetTimeAsAbsolute ?? _current.ShowResetTimeAsAbsolute,
-                HideZeroOrNotApplicableMeters = hideZeroOrNotApplicableMeters ?? _current.HideZeroOrNotApplicableMeters
+                HideZeroOrNotApplicableMeters = hideZeroOrNotApplicableMeters ?? _current.HideZeroOrNotApplicableMeters,
             };
             if (updated == _current)
             {
@@ -75,9 +83,7 @@ public static class DashboardDisplayPreference
             Directory.CreateDirectory(Path.GetDirectoryName(PreferencePath)!);
             File.WriteAllText(PreferencePath, JsonSerializer.Serialize(options));
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 }
 
@@ -85,7 +91,9 @@ public static class TrayMonitorPreference
 {
     private static readonly string PreferencePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard", "tray-monitor.preference");
+        "QuotaBoard",
+        "tray-monitor.preference"
+    );
     private static bool _enabled = LoadCore();
 
     public static bool Enabled => _enabled;
@@ -103,9 +111,7 @@ public static class TrayMonitorPreference
             Directory.CreateDirectory(Path.GetDirectoryName(PreferencePath)!);
             File.WriteAllText(PreferencePath, enabled ? "On" : "Off");
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         Changed?.Invoke(enabled);
     }
 

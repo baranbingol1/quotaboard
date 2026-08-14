@@ -21,14 +21,20 @@ public sealed class ProcessRunner : IProcessRunner
     /// characters. Output past the cap is drained and discarded so the child
     /// never deadlocks on a full pipe, and the result is flagged as truncated.
     /// </summary>
-    private static async Task<CappedStream> ReadCappedAsync(StreamReader reader, int maxChars, CancellationToken cancellationToken)
+    private static async Task<CappedStream> ReadCappedAsync(
+        StreamReader reader,
+        int maxChars,
+        CancellationToken cancellationToken
+    )
     {
         char[] buffer = new char[8192];
         StringBuilder builder = new StringBuilder();
         bool truncated = false;
         while (true)
         {
-            int read = await reader.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken).ConfigureAwait(false);
+            int read = await reader
+                .ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken)
+                .ConfigureAwait(false);
             if (read == 0)
             {
                 break;
@@ -45,10 +51,20 @@ public sealed class ProcessRunner : IProcessRunner
 
     private readonly record struct CappedStream(string Text, bool Truncated);
 
-    public Task<ProcessResult> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken) =>
-        RunAsync(executable, arguments, timeout, MaxStreamChars, cancellationToken);
+    public Task<ProcessResult> RunAsync(
+        string executable,
+        IReadOnlyList<string> arguments,
+        TimeSpan timeout,
+        CancellationToken cancellationToken
+    ) => RunAsync(executable, arguments, timeout, MaxStreamChars, cancellationToken);
 
-    public async Task<ProcessResult> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout, int maxOutputChars, CancellationToken cancellationToken)
+    public async Task<ProcessResult> RunAsync(
+        string executable,
+        IReadOnlyList<string> arguments,
+        TimeSpan timeout,
+        int maxOutputChars,
+        CancellationToken cancellationToken
+    )
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maxOutputChars, 1);
         ProcessStartInfo startInfo = new ProcessStartInfo
@@ -60,22 +76,21 @@ public sealed class ProcessRunner : IProcessRunner
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8
+            StandardErrorEncoding = Encoding.UTF8,
         };
         foreach (string argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);
         }
-        using Process process = new Process
-        {
-            StartInfo = startInfo
-        };
+        using Process process = new Process { StartInfo = startInfo };
         long startedAt = Stopwatch.GetTimestamp();
         if (!process.Start())
         {
             throw new InvalidOperationException("The provider process could not be started.");
         }
-        using CancellationTokenSource timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using CancellationTokenSource timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken
+        );
         timeoutSource.CancelAfter(timeout);
         Task<CappedStream> outputTask = ReadCappedAsync(process.StandardOutput, maxOutputChars, timeoutSource.Token);
         // stderr keeps the default bound: a command may legitimately emit a
@@ -111,21 +126,31 @@ public sealed class ProcessRunner : IProcessRunner
             {
                 await Task.WhenAny(Task.WhenAll(outputTask, errorTask), Task.Delay(KillGrace)).ConfigureAwait(false);
             }
-            catch
-            {
-            }
+            catch { }
             throw;
         }
         int exitCode = process.ExitCode;
         CappedStream output = await outputTask.ConfigureAwait(false);
         CappedStream error = await errorTask.ConfigureAwait(false);
-        return new ProcessResult(exitCode, output.Text, error.Text, Stopwatch.GetElapsedTime(startedAt), output.Truncated, error.Truncated);
+        return new ProcessResult(
+            exitCode,
+            output.Text,
+            error.Text,
+            Stopwatch.GetElapsedTime(startedAt),
+            output.Truncated,
+            error.Truncated
+        );
     }
 }
 
 public interface IProcessRunner
 {
-    Task<ProcessResult> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken);
+    Task<ProcessResult> RunAsync(
+        string executable,
+        IReadOnlyList<string> arguments,
+        TimeSpan timeout,
+        CancellationToken cancellationToken
+    );
 
     /// <summary>
     /// Runs with an explicit per-stream capture cap, for the few commands whose
@@ -134,8 +159,20 @@ public interface IProcessRunner
     /// overload so existing implementations — including test fakes, which are
     /// never near any cap — need no change.
     /// </summary>
-    Task<ProcessResult> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout, int maxOutputChars, CancellationToken cancellationToken)
-        => RunAsync(executable, arguments, timeout, cancellationToken);
+    Task<ProcessResult> RunAsync(
+        string executable,
+        IReadOnlyList<string> arguments,
+        TimeSpan timeout,
+        int maxOutputChars,
+        CancellationToken cancellationToken
+    ) => RunAsync(executable, arguments, timeout, cancellationToken);
 }
 
-public sealed record ProcessResult(int ExitCode, string StandardOutput, string StandardError, TimeSpan Duration, bool OutputTruncated = false, bool ErrorTruncated = false);
+public sealed record ProcessResult(
+    int ExitCode,
+    string StandardOutput,
+    string StandardError,
+    TimeSpan Duration,
+    bool OutputTruncated = false,
+    bool ErrorTruncated = false
+);

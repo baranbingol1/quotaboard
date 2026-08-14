@@ -33,7 +33,8 @@ public sealed class SchemaMigrationTests
         finally
         {
             SqliteConnection.ClearAllPools();
-            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
         }
     }
 
@@ -73,7 +74,8 @@ public sealed class SchemaMigrationTests
         {
             held.Dispose();
             SqliteConnection.ClearAllPools();
-            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
         }
     }
 
@@ -98,7 +100,8 @@ public sealed class SchemaMigrationTests
             command.CommandText = "SELECT name FROM pragma_table_info('daily_usage');";
             var columns = new List<string>();
             await using var reader = await command.ExecuteReaderAsync();
-            while (await reader.ReadAsync()) columns.Add(reader.GetString(0));
+            while (await reader.ReadAsync())
+                columns.Add(reader.GetString(0));
             Assert.Contains("project_key", columns);
             Assert.Contains("project_path", columns);
             Assert.Contains("repository_root_path", columns);
@@ -106,7 +109,8 @@ public sealed class SchemaMigrationTests
         finally
         {
             SqliteConnection.ClearAllPools();
-            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
         }
     }
 
@@ -157,7 +161,8 @@ public sealed class SchemaMigrationTests
         finally
         {
             SqliteConnection.ClearAllPools();
-            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
         }
     }
 
@@ -214,7 +219,8 @@ public sealed class SchemaMigrationTests
         finally
         {
             SqliteConnection.ClearAllPools();
-            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
         }
     }
 }

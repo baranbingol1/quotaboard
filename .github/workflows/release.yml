@@ -38,15 +38,29 @@ jobs:
           restore-keys: nuget-${{ runner.os }}-
 
       - name: Restore
-        run: dotnet restore tests/AiLimits.Tests/AiLimits.Tests.csproj
+        run: >
+          dotnet restore tests/AiLimits.Tests/AiLimits.Tests.csproj;
+          dotnet restore tests/AiLimits.IntegrationTests/AiLimits.IntegrationTests.csproj
 
       - name: Test
         run: >
           dotnet test tests/AiLimits.Tests/AiLimits.Tests.csproj
           --configuration Release
           --no-restore
-          --logger "trx;LogFileName=tests.trx"
-          --results-directory TestResults
+          --collect:"XPlat Code Coverage"
+          --logger "trx;LogFileName=unit.trx"
+          --results-directory TestResults/unit
+          --blame-hang-timeout 5m
+          --blame-hang-dump-type none
+          --settings tests/coverlet.runsettings
+
+      - name: Integration tests
+        run: >
+          dotnet test tests/AiLimits.IntegrationTests/AiLimits.IntegrationTests.csproj
+          --configuration Release
+          --no-restore
+          --logger "trx;LogFileName=integration.trx"
+          --results-directory TestResults/integration
           --blame-hang-timeout 5m
           --blame-hang-dump-type none
 

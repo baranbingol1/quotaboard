@@ -30,8 +30,12 @@ public sealed class SqliteRetentionTests
                     INSERT INTO snapshots(provider_id, account_id, completeness, observed_at, confidence, generation, extensions_json)
                     VALUES ('claude', 'a', 0, '{{Iso(now.AddDays(-300))}}', 0, 1, '{}'),
                            ('claude', 'a', 0, '{{Iso(now.AddDays(-200))}}', 0, 2, '{}');
-                    INSERT INTO fetch_attempts VALUES('old', 'claude', 'a', 's', '{{Iso(now.AddDays(-40))}}', 1, 0, 'ok');
-                    INSERT INTO fetch_attempts VALUES('new', 'claude', 'a', 's', '{{Iso(now.AddDays(-1))}}', 1, 0, 'ok');
+                    INSERT INTO fetch_attempts VALUES('old', 'claude', 'a', 's', '{{Iso(
+                        now.AddDays(-40)
+                    )}}', 1, 0, 'ok');
+                    INSERT INTO fetch_attempts VALUES('new', 'claude', 'a', 's', '{{Iso(
+                        now.AddDays(-1)
+                    )}}', 1, 0, 'ok');
                     INSERT INTO scanner_fingerprints VALUES('old', 'claude', 'a', 's', '{{Iso(now.AddDays(-90))}}');
                     INSERT INTO scanner_fingerprints VALUES('new', 'claude', 'a', 's', '{{Iso(now.AddDays(-10))}}');
                     INSERT INTO alert_state VALUES('claude', 'a', 'm', 't', 'cycle-old', '{{Iso(now.AddDays(-90))}}');
@@ -70,7 +74,8 @@ public sealed class SqliteRetentionTests
         finally
         {
             SqliteConnection.ClearAllPools();
-            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
         }
     }
 
@@ -95,11 +100,19 @@ public sealed class SqliteRetentionTests
                 await using var seed = connection.CreateCommand();
                 seed.CommandText = $$"""
                     -- Every attempt for 'a' is past the cutoff; the newest still survives.
-                    INSERT INTO fetch_attempts VALUES('a-oldest', 'claude', 'a', 's', '{{Iso(now.AddDays(-45))}}', 1, 5, 'net');
-                    INSERT INTO fetch_attempts VALUES('a-newest', 'claude', 'a', 's', '{{Iso(now.AddDays(-40))}}', 1, 5, 'net');
+                    INSERT INTO fetch_attempts VALUES('a-oldest', 'claude', 'a', 's', '{{Iso(
+                        now.AddDays(-45)
+                    )}}', 1, 5, 'net');
+                    INSERT INTO fetch_attempts VALUES('a-newest', 'claude', 'a', 's', '{{Iso(
+                        now.AddDays(-40)
+                    )}}', 1, 5, 'net');
                     -- 'b' has a fresh attempt; its old ones prune as before.
-                    INSERT INTO fetch_attempts VALUES('b-old', 'claude', 'b', 's', '{{Iso(now.AddDays(-40))}}', 1, 5, 'net');
-                    INSERT INTO fetch_attempts VALUES('b-new', 'claude', 'b', 's', '{{Iso(now.AddDays(-1))}}', 1, 0, 'ok');
+                    INSERT INTO fetch_attempts VALUES('b-old', 'claude', 'b', 's', '{{Iso(
+                        now.AddDays(-40)
+                    )}}', 1, 5, 'net');
+                    INSERT INTO fetch_attempts VALUES('b-new', 'claude', 'b', 's', '{{Iso(
+                        now.AddDays(-1)
+                    )}}', 1, 0, 'ok');
                     """;
                 await seed.ExecuteNonQueryAsync();
             }
@@ -121,7 +134,8 @@ public sealed class SqliteRetentionTests
         finally
         {
             SqliteConnection.ClearAllPools();
-            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
         }
     }
 

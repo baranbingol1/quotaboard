@@ -79,7 +79,10 @@ public sealed class RefreshCoordinator : IDisposable
         {
             _owner = owner;
             _key = key;
-            _task = new Lazy<Task<RefreshPublication>>(() => RunAsync(request), LazyThreadSafetyMode.ExecutionAndPublication);
+            _task = new Lazy<Task<RefreshPublication>>(
+                () => RunAsync(request),
+                LazyThreadSafetyMode.ExecutionAndPublication
+            );
         }
 
         public bool TryAddWaiter()
@@ -92,8 +95,7 @@ public sealed class RefreshCoordinator : IDisposable
                 {
                     return false;
                 }
-            }
-            while (Interlocked.CompareExchange(ref _waiters, current + 1, current) != current);
+            } while (Interlocked.CompareExchange(ref _waiters, current + 1, current) != current);
             return true;
         }
 
@@ -143,11 +145,21 @@ public sealed class RefreshCoordinator : IDisposable
         }
     }
 
-    private readonly ConcurrentDictionary<RefreshKey, InflightOperation> _inflight = new ConcurrentDictionary<RefreshKey, InflightOperation>();
+    private readonly ConcurrentDictionary<RefreshKey, InflightOperation> _inflight =
+        new ConcurrentDictionary<RefreshKey, InflightOperation>();
 
-    private readonly ConcurrentDictionary<AccountKey, AccountRefreshState> _state = new ConcurrentDictionary<AccountKey, AccountRefreshState>();
+    private readonly ConcurrentDictionary<AccountKey, AccountRefreshState> _state =
+        new ConcurrentDictionary<AccountKey, AccountRefreshState>();
 
-    public RefreshCoordinator(IEnumerable<IProviderAdapter> adapters, IAccountRepository accounts, ISnapshotRepository snapshots, SnapshotMerger snapshotMerger, IClock clock, ILogger<RefreshCoordinator> logger, int maxProviderConcurrency = 4)
+    public RefreshCoordinator(
+        IEnumerable<IProviderAdapter> adapters,
+        IAccountRepository accounts,
+        ISnapshotRepository snapshots,
+        SnapshotMerger snapshotMerger,
+        IClock clock,
+        ILogger<RefreshCoordinator> logger,
+        int maxProviderConcurrency = 4
+    )
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maxProviderConcurrency, 1, "maxProviderConcurrency");
         _adapters = adapters.ToDictionary((IProviderAdapter adapter) => adapter.Descriptor.Id);
@@ -166,12 +178,18 @@ public sealed class RefreshCoordinator : IDisposable
     /// </summary>
     public void Dispose() => _providerConcurrency.Dispose();
 
-    public Task<RefreshPublication> RefreshAsync(RefreshRequest request, CancellationToken cancellationToken = default(CancellationToken))
+    public Task<RefreshPublication> RefreshAsync(
+        RefreshRequest request,
+        CancellationToken cancellationToken = default(CancellationToken)
+    )
     {
         RefreshKey key = new RefreshKey(request.Account, request.ConfigurationRevision, request.Force);
         while (true)
         {
-            InflightOperation operation = _inflight.GetOrAdd(key, (RefreshKey _) => new InflightOperation(this, key, request));
+            InflightOperation operation = _inflight.GetOrAdd(
+                key,
+                (RefreshKey _) => new InflightOperation(this, key, request)
+            );
             if (operation.TryAddWaiter())
             {
                 return operation.WaitAsync(cancellationToken);
@@ -192,7 +210,13 @@ public sealed class RefreshCoordinator : IDisposable
         }
         if (!_adapters.TryGetValue(request.Account.Provider, out IProviderAdapter adapter))
         {
-            return new RefreshPublication(RefreshPublicationStatus.NoStrategyAvailable, await _snapshots.GetLatestAsync(request.Account, cancellationToken).ConfigureAwait(false), Array.Empty<FetchAttempt>(), generation, "No provider adapter is registered.");
+            return new RefreshPublication(
+                RefreshPublicationStatus.NoStrategyAvailable,
+                await _snapshots.GetLatestAsync(request.Account, cancellationToken).ConfigureAwait(false),
+                Array.Empty<FetchAttempt>(),
+                generation,
+                "No provider adapter is registered."
+            );
         }
         await _providerConcurrency.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -213,15 +237,15 @@ public sealed class RefreshCoordinator : IDisposable
                 _logger.LogWarning(exception, "Creating limit strategies failed for {Account}", account.Key);
                 strategies = Array.Empty<ILimitFetchStrategy>();
             }
-            foreach (ILimitFetchStrategy strategy in from item in strategies
-                orderby item.Order
-                select item)
+            foreach (ILimitFetchStrategy strategy in from item in strategies orderby item.Order select item)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 StrategyAvailabilityResult availability;
                 try
                 {
-                    availability = await strategy.CheckAvailabilityAsync(account, cancellationToken).ConfigureAwait(false);
+                    availability = await strategy
+                        .CheckAvailabilityAsync(account, cancellationToken)
+                        .ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -229,8 +253,23 @@ public sealed class RefreshCoordinator : IDisposable
                 }
                 catch (Exception exception)
                 {
-                    _logger.LogWarning(exception, "Availability check for strategy {StrategyId} failed for {Account}", strategy.Id, account.Key);
-                    attempts.Add(await RecordAttemptAsync(account.Key, strategy.Id, TimeSpan.Zero, FetchFailureKind.Unknown, "The provider availability check failed unexpectedly.", cancellationToken).ConfigureAwait(false));
+                    _logger.LogWarning(
+                        exception,
+                        "Availability check for strategy {StrategyId} failed for {Account}",
+                        strategy.Id,
+                        account.Key
+                    );
+                    attempts.Add(
+                        await RecordAttemptAsync(
+                                account.Key,
+                                strategy.Id,
+                                TimeSpan.Zero,
+                                FetchFailureKind.Unknown,
+                                "The provider availability check failed unexpectedly.",
+                                cancellationToken
+                            )
+                            .ConfigureAwait(false)
+                    );
                     continue;
                 }
                 if (availability.Availability != StrategyAvailability.Available)
@@ -266,20 +305,43 @@ public sealed class RefreshCoordinator : IDisposable
                 }
                 catch (Exception exception)
                 {
-                    _logger.LogWarning(exception, "Provider strategy {StrategyId} failed for {Account}", strategy.Id, account.Key);
-                    result = FetchResult.Failure(FetchFailureKind.Unknown, "The provider strategy failed unexpectedly.", FallbackPolicy.TryNextStrategy, strategy.Id, stopwatch.Elapsed);
+                    _logger.LogWarning(
+                        exception,
+                        "Provider strategy {StrategyId} failed for {Account}",
+                        strategy.Id,
+                        account.Key
+                    );
+                    result = FetchResult.Failure(
+                        FetchFailureKind.Unknown,
+                        "The provider strategy failed unexpectedly.",
+                        FallbackPolicy.TryNextStrategy,
+                        strategy.Id,
+                        stopwatch.Elapsed
+                    );
                 }
                 stopwatch.Stop();
-                FetchAttempt attempt = new FetchAttempt(Guid.NewGuid().ToString("N"), account.Key, strategy.Id, startedAt, (result.Duration == TimeSpan.Zero) ? stopwatch.Elapsed : result.Duration, result.FailureKind, SanitizeDiagnostic(result.SafeMessage));
+                FetchAttempt attempt = new FetchAttempt(
+                    Guid.NewGuid().ToString("N"),
+                    account.Key,
+                    strategy.Id,
+                    startedAt,
+                    (result.Duration == TimeSpan.Zero) ? stopwatch.Elapsed : result.Duration,
+                    result.FailureKind,
+                    SanitizeDiagnostic(result.SafeMessage)
+                );
                 await _snapshots.RecordAttemptAsync(attempt, cancellationToken).ConfigureAwait(false);
                 attempts.Add(attempt);
-                if (result.RetryAfter is TimeSpan retryAfter && (!retryAfterHint.HasValue || retryAfter > retryAfterHint.Value))
+                if (
+                    result.RetryAfter is TimeSpan retryAfter
+                    && (!retryAfterHint.HasValue || retryAfter > retryAfterHint.Value)
+                )
                 {
                     retryAfterHint = retryAfter;
                 }
                 if (result.IsSuccess)
                 {
-                    return await PublishAsync(request, result.Snapshot, attempts, generation, state, cancellationToken).ConfigureAwait(false);
+                    return await PublishAsync(request, result.Snapshot, attempts, generation, state, cancellationToken)
+                        .ConfigureAwait(false);
                 }
                 if (result.FallbackPolicy != FallbackPolicy.Stop)
                 {
@@ -289,19 +351,45 @@ public sealed class RefreshCoordinator : IDisposable
             }
             if (attempts.Count == 0 && temporarilyUnavailableStrategyId is not null)
             {
-                attempts.Add(await RecordAttemptAsync(account.Key, temporarilyUnavailableStrategyId, TimeSpan.Zero,
-                    FetchFailureKind.TemporarilyUnavailable,
-                    temporarilyUnavailableReason ?? "The provider is temporarily unavailable.",
-                    cancellationToken).ConfigureAwait(false));
+                attempts.Add(
+                    await RecordAttemptAsync(
+                            account.Key,
+                            temporarilyUnavailableStrategyId,
+                            TimeSpan.Zero,
+                            FetchFailureKind.TemporarilyUnavailable,
+                            temporarilyUnavailableReason ?? "The provider is temporarily unavailable.",
+                            cancellationToken
+                        )
+                        .ConfigureAwait(false)
+                );
             }
             if (attempts.Count == 0 && unavailableStrategyId is not null)
             {
-                attempts.Add(await RecordAttemptAsync(account.Key, unavailableStrategyId, TimeSpan.Zero,
-                    FetchFailureKind.Unsupported, unavailableReason ?? "No provider strategy is configured for this account.",
-                    cancellationToken).ConfigureAwait(false));
+                attempts.Add(
+                    await RecordAttemptAsync(
+                            account.Key,
+                            unavailableStrategyId,
+                            TimeSpan.Zero,
+                            FetchFailureKind.Unsupported,
+                            unavailableReason ?? "No provider strategy is configured for this account.",
+                            cancellationToken
+                        )
+                        .ConfigureAwait(false)
+                );
             }
-            ProviderSnapshot cached = await _snapshots.GetLatestAsync(request.Account, cancellationToken).ConfigureAwait(false);
-            return new RefreshPublication((cached is null) ? RefreshPublicationStatus.FailedWithoutData : RefreshPublicationStatus.FailedWithCachedData, cached, attempts, generation, (cached is null) ? "All provider strategies failed." : "Showing last known data; refresh failed.", retryAfterHint);
+            ProviderSnapshot cached = await _snapshots
+                .GetLatestAsync(request.Account, cancellationToken)
+                .ConfigureAwait(false);
+            return new RefreshPublication(
+                (cached is null)
+                    ? RefreshPublicationStatus.FailedWithoutData
+                    : RefreshPublicationStatus.FailedWithCachedData,
+                cached,
+                attempts,
+                generation,
+                (cached is null) ? "All provider strategies failed." : "Showing last known data; refresh failed.",
+                retryAfterHint
+            );
         }
         finally
         {
@@ -309,33 +397,77 @@ public sealed class RefreshCoordinator : IDisposable
         }
     }
 
-    private async Task<RefreshPublication> PublishAsync(RefreshRequest request, ProviderSnapshot incoming, IReadOnlyList<FetchAttempt> attempts, long generation, AccountRefreshState state, CancellationToken cancellationToken)
+    private async Task<RefreshPublication> PublishAsync(
+        RefreshRequest request,
+        ProviderSnapshot incoming,
+        IReadOnlyList<FetchAttempt> attempts,
+        long generation,
+        AccountRefreshState state,
+        CancellationToken cancellationToken
+    )
     {
         if (incoming.Account != request.Account)
         {
             return Rejected(generation, "Provider returned data for a different account.", attempts);
         }
         ProviderAccount current = await _accounts.GetAsync(request.Account, cancellationToken).ConfigureAwait(false);
-        if (current is null || current.ConfigurationRevision != request.ConfigurationRevision || !state.IsCurrent(generation, request.ConfigurationRevision))
+        if (
+            current is null
+            || current.ConfigurationRevision != request.ConfigurationRevision
+            || !state.IsCurrent(generation, request.ConfigurationRevision)
+        )
         {
             return Rejected(generation, "A newer account configuration or refresh superseded this result.", attempts);
         }
-        ProviderSnapshot previous = await _snapshots.GetLatestAsync(request.Account, cancellationToken).ConfigureAwait(false);
+        ProviderSnapshot previous = await _snapshots
+            .GetLatestAsync(request.Account, cancellationToken)
+            .ConfigureAwait(false);
         ProviderSnapshot merged = _snapshotMerger.Merge(previous, incoming);
         await _snapshots.SaveAsync(merged, generation, cancellationToken).ConfigureAwait(false);
-        return new RefreshPublication(RefreshPublicationStatus.Published, merged, attempts, generation, "Usage refreshed.");
+        return new RefreshPublication(
+            RefreshPublicationStatus.Published,
+            merged,
+            attempts,
+            generation,
+            "Usage refreshed."
+        );
     }
 
-    private async Task<FetchAttempt> RecordAttemptAsync(AccountKey account, string strategyId, TimeSpan duration, FetchFailureKind failure, string message, CancellationToken cancellationToken)
+    private async Task<FetchAttempt> RecordAttemptAsync(
+        AccountKey account,
+        string strategyId,
+        TimeSpan duration,
+        FetchFailureKind failure,
+        string message,
+        CancellationToken cancellationToken
+    )
     {
-        FetchAttempt attempt = new FetchAttempt(Guid.NewGuid().ToString("N"), account, strategyId, _clock.UtcNow, duration, failure, SanitizeDiagnostic(message));
+        FetchAttempt attempt = new FetchAttempt(
+            Guid.NewGuid().ToString("N"),
+            account,
+            strategyId,
+            _clock.UtcNow,
+            duration,
+            failure,
+            SanitizeDiagnostic(message)
+        );
         await _snapshots.RecordAttemptAsync(attempt, cancellationToken).ConfigureAwait(false);
         return attempt;
     }
 
-    private static RefreshPublication Rejected(long generation, string message, IReadOnlyList<FetchAttempt>? attempts = null)
+    private static RefreshPublication Rejected(
+        long generation,
+        string message,
+        IReadOnlyList<FetchAttempt>? attempts = null
+    )
     {
-        return new RefreshPublication(RefreshPublicationStatus.StaleResultRejected, null, attempts ?? Array.Empty<FetchAttempt>(), generation, message);
+        return new RefreshPublication(
+            RefreshPublicationStatus.StaleResultRejected,
+            null,
+            attempts ?? Array.Empty<FetchAttempt>(),
+            generation,
+            message
+        );
     }
 
     internal static string SanitizeDiagnostic(string message) => DiagnosticRedactor.Redact(message);

@@ -7,7 +7,8 @@ public sealed class WebViewProfileManager(string rootDirectory)
     {
         string combined = Path.Combine(rootDirectory, Safe(providerId), Safe(accountId));
         string directory = Path.GetFullPath(combined);
-        string rootPrefix = Path.GetFullPath(rootDirectory).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        string rootPrefix =
+            Path.GetFullPath(rootDirectory).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         if (!directory.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("WebView profile path escaped the configured root.");
@@ -19,17 +20,22 @@ public sealed class WebViewProfileManager(string rootDirectory)
     public async Task DeleteProfileAsync(string providerId, string accountId, CancellationToken cancellationToken)
     {
         string directory = Path.GetFullPath(Path.Combine(rootDirectory, Safe(providerId), Safe(accountId)));
-        string value = Path.GetFullPath(rootDirectory).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        string value =
+            Path.GetFullPath(rootDirectory).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         if (!directory.StartsWith(value, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("WebView profile path escaped the configured root.");
         }
         if (Directory.Exists(directory))
         {
-            await Task.Run(delegate
-            {
-                Directory.Delete(directory, recursive: true);
-            }, cancellationToken).ConfigureAwait(false);
+            await Task.Run(
+                    delegate
+                    {
+                        Directory.Delete(directory, recursive: true);
+                    },
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
         }
     }
 

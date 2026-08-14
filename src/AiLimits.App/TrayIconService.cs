@@ -77,7 +77,7 @@ internal sealed class TrayIconService : IDisposable
             NoLeftClickDelay = true,
             PopupActivation = PopupActivationMode.LeftClick,
             MenuActivation = PopupActivationMode.RightClick,
-            ContextFlyout = menu
+            ContextFlyout = menu,
         };
         _icon.TrayPopup = BuildPopup();
         TryUpdateIcon();
@@ -123,30 +123,27 @@ internal sealed class TrayIconService : IDisposable
         }
     }
 
-    private static MenuFlyoutItem MenuItem(string text, Action action) => new()
-    {
-        Text = text,
-        Command = new DelegateCommand(action)
-    };
+    private static MenuFlyoutItem MenuItem(string text, Action action) =>
+        new() { Text = text, Command = new DelegateCommand(action) };
 
     private UIElement BuildPopup()
     {
         var content = new StackPanel { Spacing = 8, MinWidth = 300 };
-        content.Children.Add(new TextBlock
-        {
-            Text = "QUOTABOARD",
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            CharacterSpacing = 100
-        });
+        content.Children.Add(
+            new TextBlock
+            {
+                Text = "QUOTABOARD",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                CharacterSpacing = 100,
+            }
+        );
 
         var meters = TopMeters().Take(4).ToArray();
         if (meters.Length == 0)
         {
-            content.Children.Add(new TextBlock
-            {
-                Text = L("Tray_NoMeters"),
-                Foreground = new SolidColorBrush(Colors.Gray)
-            });
+            content.Children.Add(
+                new TextBlock { Text = L("Tray_NoMeters"), Foreground = new SolidColorBrush(Colors.Gray) }
+            );
         }
         else
         {
@@ -158,13 +155,13 @@ internal sealed class TrayIconService : IDisposable
                 var title = new TextBlock
                 {
                     Text = $"{provider.Name} · {meter.DisplayName}",
-                    TextTrimming = TextTrimming.CharacterEllipsis
+                    TextTrimming = TextTrimming.CharacterEllipsis,
                 };
                 var detail = new TextBlock
                 {
                     Text = $"{meter.DisplayUsageLabel} · {meter.DisplayResetLabel}",
                     Foreground = StatusBrush(meter.Status),
-                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                 };
                 Grid.SetColumn(detail, 1);
                 row.Children.Add(title);
@@ -173,12 +170,14 @@ internal sealed class TrayIconService : IDisposable
             }
         }
 
-        content.Children.Add(new TextBlock
-        {
-            Text = L("Tray_Hint"),
-            FontSize = 11,
-            Foreground = new SolidColorBrush(Colors.Gray)
-        });
+        content.Children.Add(
+            new TextBlock
+            {
+                Text = L("Tray_Hint"),
+                FontSize = 11,
+                Foreground = new SolidColorBrush(Colors.Gray),
+            }
+        );
 
         return new Border
         {
@@ -187,13 +186,13 @@ internal sealed class TrayIconService : IDisposable
             BorderThickness = new Thickness(1),
             BorderBrush = new SolidColorBrush(Color.FromArgb(255, 88, 96, 100)),
             Background = new SolidColorBrush(Color.FromArgb(255, 28, 32, 34)),
-            Child = content
+            Child = content,
         };
     }
 
     private IEnumerable<(ProviderCardViewModel Provider, MeterViewModel Meter)> TopMeters() =>
-        _dashboard.Providers
-            .SelectMany(provider => provider.AllMeters.Select(meter => (Provider: provider, Meter: meter)))
+        _dashboard
+            .Providers.SelectMany(provider => provider.AllMeters.Select(meter => (Provider: provider, Meter: meter)))
             .Where(item => !item.Meter.IsStale && TrayMeterStatusPolicy.IsCurrent(item.Meter.Status))
             .OrderByDescending(item => TrayMeterStatusPolicy.Severity(item.Meter.Status))
             .ThenByDescending(item => item.Meter.UsedPercent)
@@ -218,9 +217,10 @@ internal sealed class TrayIconService : IDisposable
             }
             _displayedStatus = status;
         }
-        string tooltip = urgent.Length == 0
-            ? L("Tray_TooltipNoMeters")
-            : $"QuotaBoard · {urgent[0].Provider.Name} {urgent[0].Meter.DisplayName}: {urgent[0].Meter.DisplayUsageLabel}";
+        string tooltip =
+            urgent.Length == 0
+                ? L("Tray_TooltipNoMeters")
+                : $"QuotaBoard · {urgent[0].Provider.Name} {urgent[0].Meter.DisplayName}: {urgent[0].Meter.DisplayUsageLabel}";
         _icon.ToolTipText = tooltip.Length <= 127 ? tooltip : tooltip[..127];
         _icon.TrayPopup = BuildPopup();
     }
@@ -255,13 +255,14 @@ internal sealed class TrayIconService : IDisposable
         return bitmap.GetHicon();
     }
 
-    private static System.Drawing.Color StatusColor(MeterStatus status) => status switch
-    {
-        MeterStatus.Exhausted => System.Drawing.Color.FromArgb(255, 92, 92),
-        MeterStatus.Critical => System.Drawing.Color.FromArgb(255, 139, 77),
-        MeterStatus.Approaching => System.Drawing.Color.FromArgb(255, 201, 71),
-        _ => System.Drawing.Color.FromArgb(69, 199, 113)
-    };
+    private static System.Drawing.Color StatusColor(MeterStatus status) =>
+        status switch
+        {
+            MeterStatus.Exhausted => System.Drawing.Color.FromArgb(255, 92, 92),
+            MeterStatus.Critical => System.Drawing.Color.FromArgb(255, 139, 77),
+            MeterStatus.Approaching => System.Drawing.Color.FromArgb(255, 201, 71),
+            _ => System.Drawing.Color.FromArgb(69, 199, 113),
+        };
 
     [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
     private static extern bool DestroyIcon(nint handle);
@@ -275,13 +276,16 @@ internal sealed class TrayIconService : IDisposable
         }
     }
 
-    private static SolidColorBrush StatusBrush(MeterStatus status) => new(status switch
-    {
-        MeterStatus.Exhausted => Color.FromArgb(255, 255, 92, 92),
-        MeterStatus.Critical => Color.FromArgb(255, 255, 139, 77),
-        MeterStatus.Approaching => Color.FromArgb(255, 255, 201, 71),
-        _ => Color.FromArgb(255, 69, 199, 113)
-    });
+    private static SolidColorBrush StatusBrush(MeterStatus status) =>
+        new(
+            status switch
+            {
+                MeterStatus.Exhausted => Color.FromArgb(255, 255, 92, 92),
+                MeterStatus.Critical => Color.FromArgb(255, 255, 139, 77),
+                MeterStatus.Approaching => Color.FromArgb(255, 255, 201, 71),
+                _ => Color.FromArgb(255, 69, 199, 113),
+            }
+        );
 
     private void OnWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
@@ -352,7 +356,11 @@ internal sealed class TrayIconService : IDisposable
 
     private void OnDashboardPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
-        if (args.PropertyName is nameof(LiveDashboardViewModel.IsRefreshing) or nameof(LiveDashboardViewModel.LastUpdated))
+        if (
+            args.PropertyName
+            is nameof(LiveDashboardViewModel.IsRefreshing)
+                or nameof(LiveDashboardViewModel.LastUpdated)
+        )
         {
             TryUpdateIcon();
         }
@@ -388,8 +396,14 @@ internal sealed class TrayIconService : IDisposable
 
     private sealed class DelegateCommand(Action execute) : ICommand
     {
-        public event EventHandler? CanExecuteChanged { add { } remove { } }
+        public event EventHandler? CanExecuteChanged
+        {
+            add { }
+            remove { }
+        }
+
         public bool CanExecute(object? parameter) => true;
+
         public void Execute(object? parameter) => execute();
     }
 }

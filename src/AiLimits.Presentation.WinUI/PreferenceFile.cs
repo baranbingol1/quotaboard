@@ -22,7 +22,11 @@ internal static class PreferenceFile
         {
             if (File.Exists(temp))
             {
-                try { File.Delete(temp); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+                try
+                {
+                    File.Delete(temp);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
             }
         }
     }

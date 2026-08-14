@@ -18,8 +18,9 @@ public sealed class ProviderStatusCache(IClock clock, TimeSpan? timeToLive = nul
 
     private readonly TimeSpan _timeToLive = timeToLive ?? DefaultTimeToLive;
 
-    private readonly Dictionary<string, (ProviderServiceStatus Status, DateTimeOffset FetchedAt)> _entries =
-        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, (ProviderServiceStatus Status, DateTimeOffset FetchedAt)> _entries = new(
+        StringComparer.OrdinalIgnoreCase
+    );
 
     /// <summary>
     /// Records the freshly polled statuses. Operational responses replace

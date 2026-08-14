@@ -23,11 +23,13 @@ public static class ProviderColors
     public const string OpenCode = "#FAB283";
     public const string Factory = "#EE6018";
     public const string Copilot = "#5E6AD2";
+
     // User preference: dark green/emerald (ampcode.com's dark theme is #091C1E
     // deep teal-green; the #F34E3F logo mark was rejected as the accent).
     public const string Amp = "#047857";
     public const string Antigravity = "#4285F4";
     public const string Cursor = "#E7E5E4";
+
     // ClinePass blue (CodexBar's ClinePass accent).
     public const string Cline = "#61A3FA";
     public const string Neutral = "#7E878B";
@@ -153,6 +155,10 @@ public static class ProviderColors
             4 => (x, 0.0, chroma),
             _ => (chroma, 0.0, x),
         };
-        return ((byte)Math.Round((r + m) * 255.0), (byte)Math.Round((g + m) * 255.0), (byte)Math.Round((b + m) * 255.0));
+        return (
+            (byte)Math.Round((r + m) * 255.0),
+            (byte)Math.Round((g + m) * 255.0),
+            (byte)Math.Round((b + m) * 255.0)
+        );
     }
 }

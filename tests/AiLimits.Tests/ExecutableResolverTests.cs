@@ -23,10 +23,7 @@ public sealed class ExecutableResolverTests
     [Fact]
     public void An_explicit_exe_suffix_is_not_doubled()
     {
-        Assert.Equal(
-            ExecutableResolver.Resolve("ping"),
-            ExecutableResolver.Resolve("ping.exe"),
-            ignoreCase: true);
+        Assert.Equal(ExecutableResolver.Resolve("ping"), ExecutableResolver.Resolve("ping.exe"), ignoreCase: true);
     }
 
     [Theory]
@@ -56,8 +53,7 @@ public sealed class ExecutableResolverTests
     [InlineData(".ps1")]
     public void A_shim_that_cannot_be_launched_directly_is_refused(string extension)
     {
-        string path = Path.Combine(Path.GetTempPath(), "AiLimits.Tests",
-            Guid.NewGuid().ToString("N") + extension);
+        string path = Path.Combine(Path.GetTempPath(), "AiLimits.Tests", Guid.NewGuid().ToString("N") + extension);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, "@echo off");
         try
@@ -81,7 +77,8 @@ public sealed class ExecutableResolverTests
     [Fact]
     public void A_name_that_is_on_no_path_entry_is_reported_as_missing()
     {
-        Assert.Throws<FileNotFoundException>(
-            () => ExecutableResolver.Resolve("quotaboard-no-such-cli-" + Guid.NewGuid().ToString("N")));
+        Assert.Throws<FileNotFoundException>(() =>
+            ExecutableResolver.Resolve("quotaboard-no-such-cli-" + Guid.NewGuid().ToString("N"))
+        );
     }
 }

@@ -15,8 +15,7 @@ public sealed class PartialSnapshotTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 26, 12, 0, 0, TimeSpan.Zero);
 
-    private static readonly AccountKey Account =
-        new(new ProviderId("copilot"), "github");
+    private static readonly AccountKey Account = new(new ProviderId("copilot"), "github");
 
     [Fact]
     public void A_partial_snapshot_carries_prior_meters_forward_and_badges_them_stale()
@@ -59,10 +58,29 @@ public sealed class PartialSnapshotTests
     }
 
     private static ProviderSnapshot Snapshot(SnapshotCompleteness completeness, params UsageMeter[] meters) =>
-        new(Account, meters, [], completeness, Now, DataConfidence.High,
-            new Dictionary<string, System.Text.Json.JsonElement>());
+        new(
+            Account,
+            meters,
+            [],
+            completeness,
+            Now,
+            DataConfidence.High,
+            new Dictionary<string, System.Text.Json.JsonElement>()
+        );
 
-    private static UsageMeter Meter(string key) => new(
-        new MeterKey(key), key, MeterScope.Account, MeterUnit.Percent, 10m, 100m, 10, null, null, null,
-        MeterStatus.Healthy, new MeterProvenance("test", "test", Now, true));
+    private static UsageMeter Meter(string key) =>
+        new(
+            new MeterKey(key),
+            key,
+            MeterScope.Account,
+            MeterUnit.Percent,
+            10m,
+            100m,
+            10,
+            null,
+            null,
+            null,
+            MeterStatus.Healthy,
+            new MeterProvenance("test", "test", Now, true)
+        );
 }

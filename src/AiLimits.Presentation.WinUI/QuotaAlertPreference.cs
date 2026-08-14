@@ -10,7 +10,8 @@ public static class QuotaAlertPreference
     private static readonly string PreferencePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "QuotaBoard",
-        "quota-alerts.preference");
+        "quota-alerts.preference"
+    );
 
     public static bool LoadEnabled()
     {
@@ -24,7 +25,8 @@ public static class QuotaAlertPreference
             return !string.Equals(
                 File.ReadAllText(PreferencePath).Trim(),
                 bool.FalseString,
-                StringComparison.OrdinalIgnoreCase);
+                StringComparison.OrdinalIgnoreCase
+            );
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -39,8 +41,6 @@ public static class QuotaAlertPreference
             Directory.CreateDirectory(Path.GetDirectoryName(PreferencePath)!);
             File.WriteAllText(PreferencePath, enabled.ToString());
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) { }
     }
 }

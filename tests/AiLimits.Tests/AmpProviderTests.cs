@@ -54,11 +54,14 @@ public sealed class AmpProviderTests
             ]}
             """;
 
-        Assert.True(AmpThreadParser.TryParseUsage(
-            "T-test",
-            export,
-            new DateTimeOffset(2026, 7, 19, 0, 0, 0, TimeSpan.Zero),
-            out IReadOnlyList<AmpThreadUsage> usage));
+        Assert.True(
+            AmpThreadParser.TryParseUsage(
+                "T-test",
+                export,
+                new DateTimeOffset(2026, 7, 19, 0, 0, 0, TimeSpan.Zero),
+                out IReadOnlyList<AmpThreadUsage> usage
+            )
+        );
 
         AmpThreadUsage item = Assert.Single(usage);
         Assert.Equal(20, item.OutputTokens);
@@ -85,9 +88,14 @@ public sealed class AmpProviderTests
         // caught it and never saved the cursor — the whole scan's work was
         // discarded and repeated on the next refresh, forever.
         var runner = new ScriptedRunner(
-            ScriptedReply.Ok("""[{"id":"T-new","updated":"2026-07-19T12:00:00Z"},{"id":"T-old","updated":"2026-07-18T12:00:00Z"}]"""),
-            ScriptedReply.Ok("""{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}"""),
-            ScriptedReply.Ok("not-json"));
+            ScriptedReply.Ok(
+                """[{"id":"T-new","updated":"2026-07-19T12:00:00Z"},{"id":"T-old","updated":"2026-07-18T12:00:00Z"}]"""
+            ),
+            ScriptedReply.Ok(
+                """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}"""
+            ),
+            ScriptedReply.Ok("not-json")
+        );
         var source = new AmpThreadTokenSource(runner, () => "amp-test");
 
         List<TokenUsageEvent> emitted = await DrainAsync(source, cursor: null);
@@ -105,9 +113,14 @@ public sealed class AmpProviderTests
         // runner's capture cap. Truncation is a property of that one thread,
         // not of the source.
         var runner = new ScriptedRunner(
-            ScriptedReply.Ok("""[{"id":"T-huge","updated":"2026-07-19T12:00:00Z"},{"id":"T-small","updated":"2026-07-19T11:00:00Z"}]"""),
+            ScriptedReply.Ok(
+                """[{"id":"T-huge","updated":"2026-07-19T12:00:00Z"},{"id":"T-small","updated":"2026-07-19T11:00:00Z"}]"""
+            ),
             ScriptedReply.Capped("{\"messages\":[ truncated"),
-            ScriptedReply.Ok("""{"messages":[{"messageId":9,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T11:00:00Z","outputTokens":5}}]}"""));
+            ScriptedReply.Ok(
+                """{"messages":[{"messageId":9,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T11:00:00Z","outputTokens":5}}]}"""
+            )
+        );
         var source = new AmpThreadTokenSource(runner, () => "amp-test");
 
         List<TokenUsageEvent> emitted = await DrainAsync(source, cursor: null);
@@ -121,7 +134,8 @@ public sealed class AmpProviderTests
     {
         var runner = new ScriptedRunner(
             ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-19T12:00:00Z"}]"""),
-            ScriptedReply.Failed("transient export failure"));
+            ScriptedReply.Failed("transient export failure")
+        );
         var source = new AmpThreadTokenSource(runner, () => "amp-test");
 
         await Assert.ThrowsAsync<TokenScanException>(() => DrainAsync(source, cursor: null));
@@ -135,13 +149,23 @@ public sealed class AmpProviderTests
     {
         var runner = new ScriptedRunner(
             ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-19T12:00:00Z"}]"""),
-            ScriptedReply.Ok("""{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}"""));
+            ScriptedReply.Ok(
+                """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}"""
+            )
+        );
         var source = new AmpThreadTokenSource(runner, () => "amp-test");
         var account = new ProviderAccount(
-            new AccountKey(new ProviderId("amp"), "one"), "Amp", null, "fixture", 1, true);
+            new AccountKey(new ProviderId("amp"), "one"),
+            "Amp",
+            null,
+            "fixture",
+            1,
+            true
+        );
 
-        await using IAsyncEnumerator<TokenUsageEvent> enumerator =
-            source.ReadAsync(account, null, default).GetAsyncEnumerator();
+        await using IAsyncEnumerator<TokenUsageEvent> enumerator = source
+            .ReadAsync(account, null, default)
+            .GetAsyncEnumerator();
 
         Assert.True(await enumerator.MoveNextAsync());
         Assert.Null(((IScanFailureCheckpointSource)source).FailureCheckpoint);
@@ -152,13 +176,17 @@ public sealed class AmpProviderTests
     {
         var runner = new ScriptedRunner(
             ScriptedReply.Ok("""[{"id":"T-ancient","updated":"2026-01-01T00:00:00Z"}]"""),
-            ScriptedReply.Ok("""{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-01-01T00:00:00Z","outputTokens":20}}]}"""));
+            ScriptedReply.Ok(
+                """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-01-01T00:00:00Z","outputTokens":20}}]}"""
+            )
+        );
         var source = new AmpThreadTokenSource(runner, () => "amp-test");
         var cursor = new ScannerCursor(
             source.Id,
             """{"T-ancient":"!retry"}""",
             new DateTimeOffset(2026, 7, 20, 0, 0, 0, TimeSpan.Zero),
-            null);
+            null
+        );
 
         List<TokenUsageEvent> emitted = await DrainAsync(source, cursor);
 
@@ -172,13 +200,17 @@ public sealed class AmpProviderTests
     {
         var runner = new ScriptedRunner(
             ScriptedReply.Ok("""[{"id":"T-other","updated":"2026-01-01T00:00:00Z"}]"""),
-            ScriptedReply.Ok("""{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-01-01T00:00:00Z","outputTokens":20}}]}"""));
+            ScriptedReply.Ok(
+                """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-01-01T00:00:00Z","outputTokens":20}}]}"""
+            )
+        );
         var source = new AmpThreadTokenSource(runner, () => "amp-test");
         var cursor = new ScannerCursor(
             source.Id,
             """{"T-pending":"!retry"}""",
             new DateTimeOffset(2026, 7, 20, 0, 0, 0, TimeSpan.Zero),
-            null);
+            null
+        );
 
         List<TokenUsageEvent> emitted = await DrainAsync(source, cursor);
 
@@ -193,34 +225,51 @@ public sealed class AmpProviderTests
         var replies = new List<ScriptedReply>();
         for (int page = 0; page < 9; page++)
         {
-            string listing = "[" + string.Join(",", Enumerable.Range(page * 20, 20).Select(index =>
-                $$"""{"id":"T-{{index}}","updated":"2026-01-01T00:00:00Z"}""")) + "]";
+            string listing =
+                "["
+                + string.Join(
+                    ",",
+                    Enumerable
+                        .Range(page * 20, 20)
+                        .Select(index => $$"""{"id":"T-{{index}}","updated":"2026-01-01T00:00:00Z"}""")
+                )
+                + "]";
             replies.Add(ScriptedReply.Ok(listing));
         }
         // Mutable offset pagination can repeat entries. This page adds only ten
         // new ids, leaving room for one more full page to overflow the cap.
-        string duplicatePage = "[" + string.Join(",", Enumerable.Range(0, 10)
-            .Concat(Enumerable.Range(180, 10))
-            .Select(index => $$"""{"id":"T-{{index}}","updated":"2026-01-01T00:00:00Z"}""")) + "]";
+        string duplicatePage =
+            "["
+            + string.Join(
+                ",",
+                Enumerable
+                    .Range(0, 10)
+                    .Concat(Enumerable.Range(180, 10))
+                    .Select(index => $$"""{"id":"T-{{index}}","updated":"2026-01-01T00:00:00Z"}""")
+            )
+            + "]";
         replies.Add(ScriptedReply.Ok(duplicatePage));
-        string overflowPage = "[" + string.Join(",", Enumerable.Range(190, 19)
-            .Select(index => $$"""{"id":"T-{{index}}","updated":"2026-01-01T00:00:00Z"}"""))
-            + "," + """{"id":"T-pending","updated":"2026-01-01T00:00:00Z"}]""";
+        string overflowPage =
+            "["
+            + string.Join(
+                ",",
+                Enumerable.Range(190, 19).Select(index => $$"""{"id":"T-{{index}}","updated":"2026-01-01T00:00:00Z"}""")
+            )
+            + ","
+            + """{"id":"T-pending","updated":"2026-01-01T00:00:00Z"}]""";
         replies.Add(ScriptedReply.Ok(overflowPage));
-        replies.Add(ScriptedReply.Ok(
-            """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-01-01T00:00:00Z","outputTokens":20}}]}"""));
+        replies.Add(
+            ScriptedReply.Ok(
+                """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-01-01T00:00:00Z","outputTokens":20}}]}"""
+            )
+        );
         var runner = new ScriptedRunner([.. replies]);
         var source = new AmpThreadTokenSource(runner, () => "amp-test");
-        var previous = Enumerable.Range(0, 200).ToDictionary(
-            index => $"T-{index}",
-            _ => "2026-01-01T00:00:00.0000000+00:00",
-            StringComparer.Ordinal);
+        var previous = Enumerable
+            .Range(0, 200)
+            .ToDictionary(index => $"T-{index}", _ => "2026-01-01T00:00:00.0000000+00:00", StringComparer.Ordinal);
         previous["T-pending"] = AmpScanState.RetryMarker;
-        var cursor = new ScannerCursor(
-            source.Id,
-            AmpScanState.Serialize(previous),
-            null,
-            null);
+        var cursor = new ScannerCursor(source.Id, AmpScanState.Serialize(previous), null, null);
 
         List<TokenUsageEvent> emitted = await DrainAsync(source, cursor);
 
@@ -237,7 +286,8 @@ public sealed class AmpProviderTests
         const string listing = """[{"id":"T-a","updated":"2026-07-19T12:00:00Z"}]""";
         var first = new ScriptedRunner(
             ScriptedReply.Ok(listing),
-            truncated ? ScriptedReply.Capped("truncated") : ScriptedReply.Ok("not-json"));
+            truncated ? ScriptedReply.Capped("truncated") : ScriptedReply.Ok("not-json")
+        );
         var firstSource = new AmpThreadTokenSource(first, () => "amp-test");
 
         await Assert.ThrowsAsync<TokenScanException>(() => DrainAsync(firstSource, cursor: null));
@@ -246,12 +296,16 @@ public sealed class AmpProviderTests
 
         var second = new ScriptedRunner(
             ScriptedReply.Ok(listing),
-            ScriptedReply.Ok("""{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}"""));
+            ScriptedReply.Ok(
+                """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}"""
+            )
+        );
         var secondSource = new AmpThreadTokenSource(second, () => "amp-test");
 
         List<TokenUsageEvent> emitted = await DrainAsync(
             secondSource,
-            new ScannerCursor(secondSource.Id, pendingPosition, null, null));
+            new ScannerCursor(secondSource.Id, pendingPosition, null, null)
+        );
 
         Assert.Single(emitted);
         Assert.DoesNotContain(AmpScanState.RetryMarker, ((IScanPositionSource)secondSource).Position);
@@ -260,11 +314,12 @@ public sealed class AmpProviderTests
     [Fact]
     public async Task A_thread_still_at_its_recorded_revision_is_not_exported_again()
     {
-        const string listing = """[{"id":"T-a","updated":"2026-07-19T12:00:00Z"},{"id":"T-b","updated":"2026-07-18T12:00:00Z"}]""";
-        const string export = """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}""";
+        const string listing =
+            """[{"id":"T-a","updated":"2026-07-19T12:00:00Z"},{"id":"T-b","updated":"2026-07-18T12:00:00Z"}]""";
+        const string export =
+            """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}""";
 
-        var first = new ScriptedRunner(
-            ScriptedReply.Ok(listing), ScriptedReply.Ok(export), ScriptedReply.Ok(export));
+        var first = new ScriptedRunner(ScriptedReply.Ok(listing), ScriptedReply.Ok(export), ScriptedReply.Ok(export));
         var firstSource = new AmpThreadTokenSource(first, () => "amp-test");
         await DrainAsync(firstSource, cursor: null);
         string? position = ((IScanPositionSource)firstSource).Position;
@@ -279,7 +334,8 @@ public sealed class AmpProviderTests
         var secondSource = new AmpThreadTokenSource(second, () => "amp-test");
         List<TokenUsageEvent> emitted = await DrainAsync(
             secondSource,
-            new ScannerCursor(secondSource.Id, position, null, null));
+            new ScannerCursor(secondSource.Id, position, null, null)
+        );
 
         Assert.Empty(emitted);
         Assert.Equal(1, second.CallCount);
@@ -289,10 +345,12 @@ public sealed class AmpProviderTests
     [Fact]
     public async Task A_changed_revision_is_exported_again()
     {
-        const string export = """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}""";
+        const string export =
+            """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}""";
         var first = new ScriptedRunner(
             ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-19T12:00:00Z"}]"""),
-            ScriptedReply.Ok(export));
+            ScriptedReply.Ok(export)
+        );
         var firstSource = new AmpThreadTokenSource(first, () => "amp-test");
         await DrainAsync(firstSource, cursor: null);
         string? position = ((IScanPositionSource)firstSource).Position;
@@ -300,11 +358,13 @@ public sealed class AmpProviderTests
         // Same thread id, newer `updated` — Amp appended to the conversation.
         var second = new ScriptedRunner(
             ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-20T12:00:00Z"}]"""),
-            ScriptedReply.Ok(export));
+            ScriptedReply.Ok(export)
+        );
         var secondSource = new AmpThreadTokenSource(second, () => "amp-test");
         List<TokenUsageEvent> emitted = await DrainAsync(
             secondSource,
-            new ScannerCursor(secondSource.Id, position, null, null));
+            new ScannerCursor(secondSource.Id, position, null, null)
+        );
 
         Assert.Single(emitted);
         Assert.Equal(2, second.CallCount);
@@ -314,10 +374,12 @@ public sealed class AmpProviderTests
     [Fact]
     public async Task A_failure_next_to_already_covered_threads_does_not_fail_the_scan()
     {
-        const string export = """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}""";
+        const string export =
+            """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}""";
         var first = new ScriptedRunner(
             ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-19T12:00:00Z"}]"""),
-            ScriptedReply.Ok(export));
+            ScriptedReply.Ok(export)
+        );
         var firstSource = new AmpThreadTokenSource(first, () => "amp-test");
         await DrainAsync(firstSource, cursor: null);
         string? position = ((IScanPositionSource)firstSource).Position;
@@ -326,13 +388,17 @@ public sealed class AmpProviderTests
         // but the scan still knows 1 of 2 threads is accounted for, so it must
         // not report itself as a total failure — that would cost the cursor.
         var second = new ScriptedRunner(
-            ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-19T12:00:00Z"},{"id":"T-b","updated":"2026-07-19T13:00:00Z"}]"""),
-            ScriptedReply.Ok("not-json"));
+            ScriptedReply.Ok(
+                """[{"id":"T-a","updated":"2026-07-19T12:00:00Z"},{"id":"T-b","updated":"2026-07-19T13:00:00Z"}]"""
+            ),
+            ScriptedReply.Ok("not-json")
+        );
         var secondSource = new AmpThreadTokenSource(second, () => "amp-test");
 
         List<TokenUsageEvent> emitted = await DrainAsync(
             secondSource,
-            new ScannerCursor(secondSource.Id, position, null, null));
+            new ScannerCursor(secondSource.Id, position, null, null)
+        );
 
         Assert.Empty(emitted);
         Assert.NotNull(((IScanPositionSource)secondSource).Position);
@@ -344,22 +410,30 @@ public sealed class AmpProviderTests
         // The watermark must cover every listed thread, not just the ones the
         // cutoff selects; otherwise the next scan cannot recognise a page as
         // fully covered and pages through the whole listing again.
-        const string export = """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}""";
+        const string export =
+            """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}""";
         var first = new ScriptedRunner(
-            ScriptedReply.Ok("""[{"id":"T-new","updated":"2026-07-19T12:00:00Z"},{"id":"T-ancient","updated":"2026-01-01T00:00:00Z"}]"""),
+            ScriptedReply.Ok(
+                """[{"id":"T-new","updated":"2026-07-19T12:00:00Z"},{"id":"T-ancient","updated":"2026-01-01T00:00:00Z"}]"""
+            ),
             ScriptedReply.Ok(export),
-            ScriptedReply.Ok(export));
+            ScriptedReply.Ok(export)
+        );
         var firstSource = new AmpThreadTokenSource(first, () => "amp-test");
         await DrainAsync(firstSource, cursor: null);
         string? position = ((IScanPositionSource)firstSource).Position;
 
         // Now rescan with a cutoff that excludes T-ancient entirely.
         var second = new ScriptedRunner(
-            ScriptedReply.Ok("""[{"id":"T-new","updated":"2026-07-19T12:00:00Z"},{"id":"T-ancient","updated":"2026-01-01T00:00:00Z"}]"""));
+            ScriptedReply.Ok(
+                """[{"id":"T-new","updated":"2026-07-19T12:00:00Z"},{"id":"T-ancient","updated":"2026-01-01T00:00:00Z"}]"""
+            )
+        );
         var secondSource = new AmpThreadTokenSource(second, () => "amp-test");
         await DrainAsync(
             secondSource,
-            new ScannerCursor(secondSource.Id, position, new DateTimeOffset(2026, 7, 19, 0, 0, 0, TimeSpan.Zero), null));
+            new ScannerCursor(secondSource.Id, position, new DateTimeOffset(2026, 7, 19, 0, 0, 0, TimeSpan.Zero), null)
+        );
 
         Assert.Contains("T-ancient", ((IScanPositionSource)secondSource).Position);
         Assert.Equal(1, second.CallCount);
@@ -373,7 +447,8 @@ public sealed class AmpProviderTests
         // would skip that thread until Amp happened to touch it again.
         var first = new ScriptedRunner(
             ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-19T12:00:00Z"}]"""),
-            new ScriptedReply("amp: network unreachable", 1, false));
+            new ScriptedReply("amp: network unreachable", 1, false)
+        );
         var firstSource = new AmpThreadTokenSource(first, () => "amp-test");
 
         await Assert.ThrowsAsync<TokenScanException>(() => DrainAsync(firstSource, cursor: null));
@@ -390,11 +465,15 @@ public sealed class AmpProviderTests
 
         var second = new ScriptedRunner(
             ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-19T12:00:00Z"}]"""),
-            ScriptedReply.Ok("""{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}"""));
+            ScriptedReply.Ok(
+                """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}"""
+            )
+        );
         var secondSource = new AmpThreadTokenSource(second, () => "amp-test");
         List<TokenUsageEvent> emitted = await DrainAsync(
             secondSource,
-            new ScannerCursor(secondSource.Id, position, null, null));
+            new ScannerCursor(secondSource.Id, position, null, null)
+        );
 
         Assert.Single(emitted);
         Assert.Equal("export", second.Calls[1][1]);
@@ -409,15 +488,22 @@ public sealed class AmpProviderTests
         // The "page fully covered" shortcut would otherwise stop at page one and
         // never offer the failed thread again, losing its usage until Amp
         // happened to touch it.
-        string fullPage = "[" + string.Join(",", Enumerable.Range(0, 20).Select(i =>
-            $$"""{"id":"T-{{i}}","updated":"2026-07-19T12:00:00Z"}""")) + "]";
-        const string export = """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}""";
+        string fullPage =
+            "["
+            + string.Join(
+                ",",
+                Enumerable.Range(0, 20).Select(i => $$"""{"id":"T-{{i}}","updated":"2026-07-19T12:00:00Z"}""")
+            )
+            + "]";
+        const string export =
+            """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}""";
 
         // First scan: every thread on page one exports, the one on page two
         // fails at the process level.
         var replies = new List<ScriptedReply> { ScriptedReply.Ok(fullPage) };
         replies.Add(ScriptedReply.Ok("""[{"id":"T-late","updated":"2026-07-19T11:00:00Z"}]"""));
-        for (int i = 0; i < 20; i++) replies.Add(ScriptedReply.Ok(export));
+        for (int i = 0; i < 20; i++)
+            replies.Add(ScriptedReply.Ok(export));
         replies.Add(new ScriptedReply("amp: transient", 1, false));
 
         var first = new ScriptedRunner(replies.ToArray());
@@ -431,11 +517,13 @@ public sealed class AmpProviderTests
         var second = new ScriptedRunner(
             ScriptedReply.Ok(fullPage),
             ScriptedReply.Ok("""[{"id":"T-late","updated":"2026-07-19T11:00:00Z"}]"""),
-            ScriptedReply.Ok(export));
+            ScriptedReply.Ok(export)
+        );
         var secondSource = new AmpThreadTokenSource(second, () => "amp-test");
         List<TokenUsageEvent> emitted = await DrainAsync(
             secondSource,
-            new ScannerCursor(secondSource.Id, position, null, null));
+            new ScannerCursor(secondSource.Id, position, null, null)
+        );
 
         Assert.Single(emitted);
         Assert.Equal(3, second.CallCount);
@@ -450,12 +538,16 @@ public sealed class AmpProviderTests
         // "incremental"; it must not be read as a watermark.
         var runner = new ScriptedRunner(
             ScriptedReply.Ok("""[{"id":"T-a","updated":"2026-07-19T12:00:00Z"}]"""),
-            ScriptedReply.Ok("""{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}"""));
+            ScriptedReply.Ok(
+                """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}"""
+            )
+        );
         var source = new AmpThreadTokenSource(runner, () => "amp-test");
 
         List<TokenUsageEvent> emitted = await DrainAsync(
             source,
-            new ScannerCursor(source.Id, "incremental", null, null));
+            new ScannerCursor(source.Id, "incremental", null, null)
+        );
 
         Assert.Single(emitted);
         Assert.Equal(2, runner.CallCount);
@@ -510,12 +602,16 @@ public sealed class AmpProviderTests
         // The cost of an unbounded retry is not the failed export itself, it is
         // that HasPendingRetries suspends the "page fully covered" shortcut, so
         // every refresh pages the whole listing instead of one page.
-        string fullPage = "[" + string.Join(",", Enumerable.Range(0, 20).Select(i =>
-            $$"""{"id":"T-{{i}}","updated":"2026-07-19T12:00:00Z"}""")) + "]";
-        var previous = Enumerable.Range(0, 20).ToDictionary(
-            i => $"T-{i}",
-            _ => "2026-07-19T12:00:00.0000000+00:00",
-            StringComparer.Ordinal);
+        string fullPage =
+            "["
+            + string.Join(
+                ",",
+                Enumerable.Range(0, 20).Select(i => $$"""{"id":"T-{{i}}","updated":"2026-07-19T12:00:00Z"}""")
+            )
+            + "]";
+        var previous = Enumerable
+            .Range(0, 20)
+            .ToDictionary(i => $"T-{i}", _ => "2026-07-19T12:00:00.0000000+00:00", StringComparer.Ordinal);
         // T-0 already spent its budget at exactly this revision.
         previous["T-0"] = AmpScanState.GaveUp("2026-07-19T12:00:00.0000000+00:00");
 
@@ -542,12 +638,19 @@ public sealed class AmpProviderTests
         };
         var runner = new ScriptedRunner(
             ScriptedReply.Ok(listing),
-            ScriptedReply.Failed("amp: Failed to export thread"));
+            ScriptedReply.Failed("amp: Failed to export thread")
+        );
         var source = new AmpThreadTokenSource(runner, () => "amp-test");
 
         List<TokenUsageEvent> emitted = await DrainAsync(
             source,
-            new ScannerCursor(source.Id, AmpScanState.Serialize(previous), new DateTimeOffset(2026, 7, 19, 0, 0, 0, TimeSpan.Zero), null));
+            new ScannerCursor(
+                source.Id,
+                AmpScanState.Serialize(previous),
+                new DateTimeOffset(2026, 7, 19, 0, 0, 0, TimeSpan.Zero),
+                null
+            )
+        );
 
         Assert.Empty(emitted);
         Assert.Equal("T-gone", runner.Calls[^1][2]);
@@ -557,10 +660,9 @@ public sealed class AmpProviderTests
     public async Task The_direct_retry_cap_preserves_unattempted_retry_state()
     {
         const string revision = "2026-06-09T00:48:32.0000000+00:00";
-        var previous = Enumerable.Range(0, 21).ToDictionary(
-            index => $"T-{index:D2}",
-            _ => AmpScanState.Retry(2, revision),
-            StringComparer.Ordinal);
+        var previous = Enumerable
+            .Range(0, 21)
+            .ToDictionary(index => $"T-{index:D2}", _ => AmpScanState.Retry(2, revision), StringComparer.Ordinal);
         var replies = new List<ScriptedReply> { ScriptedReply.Ok("[]") };
         replies.AddRange(Enumerable.Repeat(ScriptedReply.Failed("amp: Failed to export thread"), 20));
         var runner = new ScriptedRunner([.. replies]);
@@ -571,15 +673,19 @@ public sealed class AmpProviderTests
         Assert.Equal(21, runner.CallCount);
         Assert.DoesNotContain(runner.Calls, call => call is ["threads", "export", "T-20"]);
         using JsonDocument position = JsonDocument.Parse(((IScanPositionSource)source).Position!);
-        Assert.Equal(
-            AmpScanState.Retry(2, revision),
-            position.RootElement.GetProperty("T-20").GetString());
+        Assert.Equal(AmpScanState.Retry(2, revision), position.RootElement.GetProperty("T-20").GetString());
     }
 
     private static async Task<List<TokenUsageEvent>> DrainAsync(AmpThreadTokenSource source, ScannerCursor? cursor)
     {
         var account = new ProviderAccount(
-            new AccountKey(new ProviderId("amp"), "one"), "Amp", null, "fixture", 1, true);
+            new AccountKey(new ProviderId("amp"), "one"),
+            "Amp",
+            null,
+            "fixture",
+            1,
+            true
+        );
         var emitted = new List<TokenUsageEvent>();
         await foreach (TokenUsageEvent item in source.ReadAsync(account, cursor, default))
             emitted.Add(item);
@@ -592,15 +698,36 @@ public sealed class AmpProviderTests
         // Page one is full (20 threads, one updated inside the rescan window),
         // page two is short, so the source must request offsets 0 and 20 and
         // export only the thread the cutoff keeps.
-        string pageOne = "[" + string.Join(",", Enumerable.Range(0, 20).Select(index =>
-            $$"""{"id":"T-{{index}}","updated":"{{(index == 0 ? "2026-07-19T12:00:00Z" : "2026-07-10T12:00:00Z")}}"}""")) + "]";
+        string pageOne =
+            "["
+            + string.Join(
+                ",",
+                Enumerable
+                    .Range(0, 20)
+                    .Select(index =>
+                        $$"""{"id":"T-{{index}}","updated":"{{(index == 0 ? "2026-07-19T12:00:00Z" : "2026-07-10T12:00:00Z")}}"}"""
+                    )
+            )
+            + "]";
         string pageTwo = """[{"id":"T-20","updated":"2026-07-09T12:00:00Z"}]""";
-        string export = """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}""";
+        string export =
+            """{"messages":[{"messageId":1,"usage":{"model":"gpt-5.6-sol","timestamp":"2026-07-19T12:00:00Z","outputTokens":20}}]}""";
         var runner = new SequenceRunner(pageOne, pageTwo, export);
         var source = new AmpThreadTokenSource(runner, () => "amp-test");
         var account = new ProviderAccount(
-            new AccountKey(new ProviderId("amp"), "one"), "Amp", null, "fixture", 1, true);
-        var cursor = new ScannerCursor(source.Id, "incremental", new DateTimeOffset(2026, 7, 16, 0, 0, 0, TimeSpan.Zero), null);
+            new AccountKey(new ProviderId("amp"), "one"),
+            "Amp",
+            null,
+            "fixture",
+            1,
+            true
+        );
+        var cursor = new ScannerCursor(
+            source.Id,
+            "incremental",
+            new DateTimeOffset(2026, 7, 16, 0, 0, 0, TimeSpan.Zero),
+            null
+        );
 
         var emitted = new List<TokenUsageEvent>();
         await foreach (TokenUsageEvent item in source.ReadAsync(account, cursor, default))
@@ -630,7 +757,8 @@ public sealed class AmpProviderTests
             usage!,
             new DateTimeOffset(2026, 7, 18, 0, 0, 0, TimeSpan.Zero),
             "test",
-            "cli");
+            "cli"
+        );
 
         Assert.Collection(
             snapshot.Meters,
@@ -647,7 +775,8 @@ public sealed class AmpProviderTests
                 Assert.Equal("Orb usage", meter.DisplayName);
                 Assert.Equal(59, meter.UsedPercent);
                 Assert.Equal(TimeSpan.FromDays(30), meter.WindowDuration);
-            });
+            }
+        );
         Assert.Equal("Megawatt", snapshot.Extensions["plan_type"].GetString());
         Assert.Equal("dev@example.com", snapshot.Extensions["email"].GetString());
     }
@@ -679,7 +808,8 @@ public sealed class AmpProviderTests
             usage!,
             new DateTimeOffset(2026, 7, 15, 0, 0, 0, TimeSpan.Zero),
             "test",
-            "cli");
+            "cli"
+        );
 
         Assert.Collection(
             snapshot.Balances,
@@ -694,7 +824,8 @@ public sealed class AmpProviderTests
                 Assert.Equal("amp:workspace", balance.Key);
                 Assert.Equal(30m, balance.Value);
                 Assert.Equal(MeterUnit.Usd, balance.Unit);
-            });
+            }
+        );
         Assert.Equal("dev@example.com", snapshot.Extensions["email"].GetString());
     }
 
@@ -723,14 +854,15 @@ public sealed class AmpProviderTests
             string executable,
             IReadOnlyList<string> arguments,
             TimeSpan timeout,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken
+        )
         {
             Calls.Add(arguments.ToArray());
-            Assert.True(index < replies.Length,
-                $"Unexpected process call #{index + 1}: {string.Join(' ', arguments)}");
+            Assert.True(index < replies.Length, $"Unexpected process call #{index + 1}: {string.Join(' ', arguments)}");
             ScriptedReply reply = replies[index++];
-            return Task.FromResult(new ProcessResult(
-                reply.ExitCode, reply.Output, string.Empty, TimeSpan.Zero, reply.Truncated));
+            return Task.FromResult(
+                new ProcessResult(reply.ExitCode, reply.Output, string.Empty, TimeSpan.Zero, reply.Truncated)
+            );
         }
     }
 
@@ -744,7 +876,8 @@ public sealed class AmpProviderTests
             string executable,
             IReadOnlyList<string> arguments,
             TimeSpan timeout,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken
+        )
         {
             Calls.Add(arguments.ToArray());
             string output = outputs[index++];

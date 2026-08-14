@@ -15,13 +15,17 @@ public sealed class ClinePassLimitStrategyTests
     [Fact]
     public async Task All_three_windows_become_percent_meters()
     {
-        var handler = new ScriptedHandler(_ => Json("""
-            {"success":true,"data":{"limits":[
-              {"type":"five_hour","percentUsed":12.5,"resetsAt":"2026-07-16T15:00:00Z"},
-              {"type":"weekly","percentUsed":80,"resetsAt":"2026-07-20T00:00:00Z"},
-              {"type":"monthly","percentUsed":96.2,"resetsAt":null}
-            ]}}
-            """));
+        var handler = new ScriptedHandler(_ =>
+            Json(
+                """
+                {"success":true,"data":{"limits":[
+                  {"type":"five_hour","percentUsed":12.5,"resetsAt":"2026-07-16T15:00:00Z"},
+                  {"type":"weekly","percentUsed":80,"resetsAt":"2026-07-20T00:00:00Z"},
+                  {"type":"monthly","percentUsed":96.2,"resetsAt":null}
+                ]}}
+                """
+            )
+        );
         var strategy = new ClinePassLimitStrategy(new HttpClient(handler), new FixedClock(), TestCredential);
 
         FetchResult result = await strategy.FetchAsync(Account(), default);
@@ -32,7 +36,8 @@ public sealed class ClinePassLimitStrategyTests
         Assert.Equal(DataConfidence.High, snapshot.Confidence);
         Assert.Equal("api", snapshot.Extensions["source"].GetString());
         Assert.Equal(Now, snapshot.ObservedAt);
-        Assert.Collection(snapshot.Meters,
+        Assert.Collection(
+            snapshot.Meters,
             meter =>
             {
                 Assert.Equal("cline:5h", meter.Key.Value);
@@ -67,7 +72,8 @@ public sealed class ClinePassLimitStrategyTests
                 Assert.Equal(TimeSpan.FromDays(30), meter.WindowDuration);
                 Assert.Null(meter.ResetsAt);
                 Assert.Equal(MeterStatus.Critical, meter.Status);
-            });
+            }
+        );
         Assert.Equal("https://api.cline.bot/api/v1/users/me/plan/usage-limits", handler.RequestUri);
         Assert.Equal("Bearer", handler.AuthorizationScheme);
         Assert.Equal("test-token", handler.AuthorizationParameter);
@@ -77,11 +83,18 @@ public sealed class ClinePassLimitStrategyTests
     [Fact]
     public async Task Workos_session_tokens_ride_behind_the_workos_scheme_prefix()
     {
-        var handler = new ScriptedHandler(_ => Json("""
-            {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":41,"resetsAt":null}]}}
-            """));
-        var strategy = new ClinePassLimitStrategy(new HttpClient(handler), new FixedClock(),
-            () => new ClineCredential("header.payload.signature", "Cline CLI account", IsWorkOsSession: true));
+        var handler = new ScriptedHandler(_ =>
+            Json(
+                """
+                {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":41,"resetsAt":null}]}}
+                """
+            )
+        );
+        var strategy = new ClinePassLimitStrategy(
+            new HttpClient(handler),
+            new FixedClock(),
+            () => new ClineCredential("header.payload.signature", "Cline CLI account", IsWorkOsSession: true)
+        );
 
         FetchResult result = await strategy.FetchAsync(Account(), default);
 
@@ -93,11 +106,18 @@ public sealed class ClinePassLimitStrategyTests
     [Fact]
     public async Task An_already_prefixed_session_token_is_not_prefixed_twice()
     {
-        var handler = new ScriptedHandler(_ => Json("""
-            {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":41,"resetsAt":null}]}}
-            """));
-        var strategy = new ClinePassLimitStrategy(new HttpClient(handler), new FixedClock(),
-            () => new ClineCredential("workos:already", "Cline CLI account", IsWorkOsSession: true));
+        var handler = new ScriptedHandler(_ =>
+            Json(
+                """
+                {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":41,"resetsAt":null}]}}
+                """
+            )
+        );
+        var strategy = new ClinePassLimitStrategy(
+            new HttpClient(handler),
+            new FixedClock(),
+            () => new ClineCredential("workos:already", "Cline CLI account", IsWorkOsSession: true)
+        );
 
         FetchResult result = await strategy.FetchAsync(Account(), default);
 
@@ -108,19 +128,24 @@ public sealed class ClinePassLimitStrategyTests
     [Fact]
     public async Task Unknown_limit_types_are_tolerated_and_percents_clamped()
     {
-        var handler = new ScriptedHandler(_ => Json("""
-            {"success":true,"data":{"limits":[
-              {"type":"experimental_pool","percentUsed":61,"resetsAt":null},
-              {"type":"five_hour","percentUsed":101.4,"resetsAt":null},
-              {"type":"monthly","percentUsed":-3,"resetsAt":null}
-            ]}}
-            """));
+        var handler = new ScriptedHandler(_ =>
+            Json(
+                """
+                {"success":true,"data":{"limits":[
+                  {"type":"experimental_pool","percentUsed":61,"resetsAt":null},
+                  {"type":"five_hour","percentUsed":101.4,"resetsAt":null},
+                  {"type":"monthly","percentUsed":-3,"resetsAt":null}
+                ]}}
+                """
+            )
+        );
         var strategy = new ClinePassLimitStrategy(new HttpClient(handler), new FixedClock(), TestCredential);
 
         FetchResult result = await strategy.FetchAsync(Account(), default);
 
         Assert.True(result.IsSuccess, result.SafeMessage);
-        Assert.Collection(result.Snapshot!.Meters,
+        Assert.Collection(
+            result.Snapshot!.Meters,
             meter =>
             {
                 Assert.Equal("cline:5h", meter.Key.Value);
@@ -132,15 +157,20 @@ public sealed class ClinePassLimitStrategyTests
                 Assert.Equal("cline:monthly", meter.Key.Value);
                 Assert.Equal(0, meter.UsedPercent);
                 Assert.Equal(MeterStatus.Healthy, meter.Status);
-            });
+            }
+        );
     }
 
     [Fact]
     public async Task Null_reset_timestamps_stay_null()
     {
-        var handler = new ScriptedHandler(_ => Json("""
-            {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":42,"resetsAt":null}]}}
-            """));
+        var handler = new ScriptedHandler(_ =>
+            Json(
+                """
+                {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":42,"resetsAt":null}]}}
+                """
+            )
+        );
         var strategy = new ClinePassLimitStrategy(new HttpClient(handler), new FixedClock(), TestCredential);
 
         FetchResult result = await strategy.FetchAsync(Account(), default);
@@ -156,7 +186,7 @@ public sealed class ClinePassLimitStrategyTests
     {
         var handler = new ScriptedHandler(_ => new HttpResponseMessage(HttpStatusCode.Unauthorized)
         {
-            Content = new StringContent("{\"error\":\"bad token test-token\"}", Encoding.UTF8, "application/json")
+            Content = new StringContent("{\"error\":\"bad token test-token\"}", Encoding.UTF8, "application/json"),
         });
         var strategy = new ClinePassLimitStrategy(new HttpClient(handler), new FixedClock(), TestCredential);
 
@@ -192,7 +222,10 @@ public sealed class ClinePassLimitStrategyTests
         var ready = new ClinePassLimitStrategy(new HttpClient(), new FixedClock(), TestCredential);
         var missing = new ClinePassLimitStrategy(new HttpClient(), new FixedClock(), () => null);
 
-        Assert.Equal(StrategyAvailability.Available, (await ready.CheckAvailabilityAsync(Account(), default)).Availability);
+        Assert.Equal(
+            StrategyAvailability.Available,
+            (await ready.CheckAvailabilityAsync(Account(), default)).Availability
+        );
         StrategyAvailabilityResult unavailable = await missing.CheckAvailabilityAsync(Account(), default);
         Assert.Equal(StrategyAvailability.NotConfigured, unavailable.Availability);
         Assert.Contains("CLINE_API_KEY", unavailable.SafeReason);
@@ -209,12 +242,19 @@ public sealed class ClinePassLimitStrategyTests
         Environment.SetEnvironmentVariable("CLINE_API_KEY", "  \"env-token\"  ");
         try
         {
-            var handler = new ScriptedHandler(_ => Json("""
-                {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":1,"resetsAt":null}]}}
-                """));
+            var handler = new ScriptedHandler(_ =>
+                Json(
+                    """
+                    {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":1,"resetsAt":null}]}}
+                    """
+                )
+            );
             var strategy = new ClinePassLimitStrategy(new HttpClient(handler), new FixedClock());
 
-            Assert.Equal(StrategyAvailability.Available, (await strategy.CheckAvailabilityAsync(Account(), default)).Availability);
+            Assert.Equal(
+                StrategyAvailability.Available,
+                (await strategy.CheckAvailabilityAsync(Account(), default)).Availability
+            );
             FetchResult result = await strategy.FetchAsync(Account(), default);
 
             Assert.True(result.IsSuccess, result.SafeMessage);
@@ -228,13 +268,11 @@ public sealed class ClinePassLimitStrategyTests
 
     private static ClineCredential? TestCredential() => new("test-token", "API key (CLINE_API_KEY)");
 
-    private static ProviderAccount Account() => new(
-        new AccountKey(new ProviderId("cline"), "default"), "Cline", null, "fixture", 1, true);
+    private static ProviderAccount Account() =>
+        new(new AccountKey(new ProviderId("cline"), "default"), "Cline", null, "fixture", 1, true);
 
-    private static HttpResponseMessage Json(string body) => new(HttpStatusCode.OK)
-    {
-        Content = new StringContent(body, Encoding.UTF8, "application/json")
-    };
+    private static HttpResponseMessage Json(string body) =>
+        new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
 
     private sealed class FixedClock : IClock
     {
@@ -248,7 +286,10 @@ public sealed class ClinePassLimitStrategyTests
         public string? AuthorizationParameter;
         public string? Accept;
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken
+        )
         {
             RequestUri = request.RequestUri?.ToString();
             AuthorizationScheme = request.Headers.Authorization?.Scheme;

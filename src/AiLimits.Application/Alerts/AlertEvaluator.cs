@@ -7,7 +7,7 @@ namespace AiLimits.Application.Alerts;
 public enum AlertKind
 {
     UsageThreshold,
-    ResetReminder
+    ResetReminder,
 }
 
 public sealed record AlertCandidate(
@@ -17,17 +17,12 @@ public sealed record AlertCandidate(
     string DeduplicationKey,
     string Title,
     string Message,
-    DateTimeOffset? ResetCycle);
+    DateTimeOffset? ResetCycle
+);
 
-public sealed record AlertPolicy(
-    IReadOnlyList<double> UsageThresholds,
-    TimeSpan? ResetReminder,
-    bool Enabled)
+public sealed record AlertPolicy(IReadOnlyList<double> UsageThresholds, TimeSpan? ResetReminder, bool Enabled)
 {
-    public static AlertPolicy Suggested { get; } = new(
-        [80d, 95d],
-        TimeSpan.FromMinutes(30),
-        Enabled: true);
+    public static AlertPolicy Suggested { get; } = new([80d, 95d], TimeSpan.FromMinutes(30), Enabled: true);
 }
 
 public interface IAlertTextProvider
@@ -47,10 +42,7 @@ public sealed class AlertEvaluator(IAlertTextProvider? textProvider = null)
 {
     private readonly IAlertTextProvider _textProvider = textProvider ?? EnglishAlertTextProvider.Instance;
 
-    public IReadOnlyList<AlertCandidate> Evaluate(
-        ProviderSnapshot snapshot,
-        AlertPolicy policy,
-        DateTimeOffset now)
+    public IReadOnlyList<AlertCandidate> Evaluate(ProviderSnapshot snapshot, AlertPolicy policy, DateTimeOffset now)
     {
         if (!policy.Enabled)
         {
@@ -58,55 +50,73 @@ public sealed class AlertEvaluator(IAlertTextProvider? textProvider = null)
         }
 
         var candidates = new List<AlertCandidate>();
-        double[] thresholds = policy.UsageThresholds
-            .Where(threshold => double.IsFinite(threshold) && threshold is > 0 and <= 100)
+        double[] thresholds = policy
+            .UsageThresholds.Where(threshold => double.IsFinite(threshold) && threshold is > 0 and <= 100)
             .Distinct()
             .Order()
             .ToArray();
 
-        foreach (UsageMeter meter in snapshot.Meters.Where(meter =>
-            meter.Status is not (MeterStatus.Stale or MeterStatus.Unknown or MeterStatus.Unavailable)))
+        foreach (
+            UsageMeter meter in snapshot.Meters.Where(meter =>
+                meter.Status is not (MeterStatus.Stale or MeterStatus.Unknown or MeterStatus.Unavailable)
+            )
+        )
         {
             foreach (double threshold in thresholds)
             {
                 // A malformed NaN/Infinity reading satisfies no "< threshold"
                 // check and would otherwise fire every threshold at once.
-                if (meter.UsedPercent is not double usedPercent
+                if (
+                    meter.UsedPercent is not double usedPercent
                     || !double.IsFinite(usedPercent)
-                    || usedPercent < threshold)
+                    || usedPercent < threshold
+                )
                 {
                     continue;
                 }
 
                 string thresholdText = threshold.ToString("0.##", CultureInfo.InvariantCulture);
                 string resetCycle = FormatResetCycle(meter.ResetsAt);
-                candidates.Add(new AlertCandidate(
-                    AlertKind.UsageThreshold,
-                    snapshot.Account,
-                    meter.Key,
-                    $"{snapshot.Account}|{meter.Key}|usage-{thresholdText}|{resetCycle}",
-                    _textProvider.UsageTitle(snapshot.Account.Provider.Value, meter.Key.Value, meter.DisplayName, threshold),
-                    _textProvider.UsageMessage(usedPercent, meter.ResetsAt),
-                    meter.ResetsAt));
+                candidates.Add(
+                    new AlertCandidate(
+                        AlertKind.UsageThreshold,
+                        snapshot.Account,
+                        meter.Key,
+                        $"{snapshot.Account}|{meter.Key}|usage-{thresholdText}|{resetCycle}",
+                        _textProvider.UsageTitle(
+                            snapshot.Account.Provider.Value,
+                            meter.Key.Value,
+                            meter.DisplayName,
+                            threshold
+                        ),
+                        _textProvider.UsageMessage(usedPercent, meter.ResetsAt),
+                        meter.ResetsAt
+                    )
+                );
             }
 
-            if (policy.ResetReminder is not TimeSpan reminder
+            if (
+                policy.ResetReminder is not TimeSpan reminder
                 || meter.ResetsAt is not DateTimeOffset reset
                 || reset <= now
-                || reset - now > reminder)
+                || reset - now > reminder
+            )
             {
                 continue;
             }
 
             string cycle = FormatResetCycle(reset);
-            candidates.Add(new AlertCandidate(
-                AlertKind.ResetReminder,
-                snapshot.Account,
-                meter.Key,
-                $"{snapshot.Account}|{meter.Key}|reset-reminder|{cycle}",
-                _textProvider.ResetTitle(snapshot.Account.Provider.Value, meter.Key.Value, meter.DisplayName),
-                _textProvider.ResetMessage(reset - now),
-                reset));
+            candidates.Add(
+                new AlertCandidate(
+                    AlertKind.ResetReminder,
+                    snapshot.Account,
+                    meter.Key,
+                    $"{snapshot.Account}|{meter.Key}|reset-reminder|{cycle}",
+                    _textProvider.ResetTitle(snapshot.Account.Provider.Value, meter.Key.Value, meter.DisplayName),
+                    _textProvider.ResetMessage(reset - now),
+                    reset
+                )
+            );
         }
 
         return candidates;
@@ -127,8 +137,7 @@ public sealed class AlertEvaluator(IAlertTextProvider? textProvider = null)
                 ? $"{usedPercent:0.#}% used · resets {reset.LocalDateTime:g}"
                 : $"{usedPercent:0.#}% used";
 
-        public string ResetTitle(string providerId, string meterKey, string meterName) =>
-            $"{meterName} resets soon";
+        public string ResetTitle(string providerId, string meterKey, string meterName) => $"{meterName} resets soon";
 
         public string ResetMessage(TimeSpan remaining) => $"Reset in {FormatRemaining(remaining)}.";
 

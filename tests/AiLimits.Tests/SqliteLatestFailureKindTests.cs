@@ -74,11 +74,24 @@ public sealed class SqliteLatestFailureKindTests
         return new SqliteSnapshotRepository(database);
     }
 
-    private static Task RecordAsync(SqliteSnapshotRepository repository, AccountKey account,
-        DateTimeOffset startedAt, FetchFailureKind kind) =>
+    private static Task RecordAsync(
+        SqliteSnapshotRepository repository,
+        AccountKey account,
+        DateTimeOffset startedAt,
+        FetchFailureKind kind
+    ) =>
         repository.RecordAttemptAsync(
-            new FetchAttempt(Guid.NewGuid().ToString("N"), account, "strategy", startedAt,
-                TimeSpan.FromMilliseconds(1), kind, "message"), default);
+            new FetchAttempt(
+                Guid.NewGuid().ToString("N"),
+                account,
+                "strategy",
+                startedAt,
+                TimeSpan.FromMilliseconds(1),
+                kind,
+                "message"
+            ),
+            default
+        );
 
     private sealed class TemporaryDb : IDisposable
     {
@@ -93,7 +106,8 @@ public sealed class SqliteLatestFailureKindTests
         public void Dispose()
         {
             SqliteConnection.ClearAllPools();
-            if (Directory.Exists(Path)) Directory.Delete(Path, recursive: true);
+            if (Directory.Exists(Path))
+                Directory.Delete(Path, recursive: true);
         }
     }
 }

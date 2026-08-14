@@ -23,7 +23,8 @@ public sealed class ProcessRunnerTimeoutTests
             // too long; instead use a simple timeout process. On Windows,
             // ping -n 60 waits ~60 seconds, far beyond our 200ms timeout.
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-                runner.RunAsync("ping", ["/n", "60", "127.0.0.1"], TimeSpan.FromMilliseconds(200), default));
+                runner.RunAsync("ping", ["/n", "60", "127.0.0.1"], TimeSpan.FromMilliseconds(200), default)
+            );
 
             // Force GC + finalizers to surface any unobserved task exceptions
             // from the abandoned ReadToEndAsync tasks.

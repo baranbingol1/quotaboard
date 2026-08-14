@@ -16,7 +16,8 @@ public interface IDashboardDataSource
         bool forceRefresh,
         IProgress<RefreshProgress>? progress,
         IProgress<DashboardData>? interim,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken
+    );
 
     /// <summary>Current model-catalog state for the Settings card; reads the cache only.</summary>
     Task<ModelCatalogStatus> GetModelCatalogStatusAsync(CancellationToken cancellationToken);
@@ -62,4 +63,5 @@ public sealed record DashboardData(
     string ScannerDetail,
     string DatabaseStatus,
     string DatabaseDetail,
-    IReadOnlyList<FetchAttemptViewModel> RecentAttempts);
+    IReadOnlyList<FetchAttemptViewModel> RecentAttempts
+);

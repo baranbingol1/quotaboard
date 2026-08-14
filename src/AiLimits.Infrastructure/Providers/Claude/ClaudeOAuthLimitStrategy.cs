@@ -1,15 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
+using System.Diagnostics;
+using System.Net.Http.Headers;
+using System.Text.Json;
 using AiLimits.Application.Abstractions;
 using AiLimits.Domain;
 using AiLimits.Infrastructure.Providers.Common;
 using AiLimits.Infrastructure.Providers.Shared;
-using System.Diagnostics;
-using System.Net.Http.Headers;
-using System.Text.Json;
 
 namespace AiLimits.Infrastructure.Providers.Claude;
 
-internal sealed class ClaudeOAuthLimitStrategy(HttpClient httpClient, IClock clock, ProviderAccount expectedAccount, string credentialPath) : ILimitFetchStrategy
+internal sealed class ClaudeOAuthLimitStrategy(
+    HttpClient httpClient,
+    IClock clock,
+    ProviderAccount expectedAccount,
+    string credentialPath
+) : ILimitFetchStrategy
 {
     private static readonly Uri UsageUri = new Uri("https://api.anthropic.com/api/oauth/usage");
 
@@ -17,31 +22,54 @@ internal sealed class ClaudeOAuthLimitStrategy(HttpClient httpClient, IClock clo
 
     public int Order => 10;
 
-    public async Task<StrategyAvailabilityResult> CheckAvailabilityAsync(ProviderAccount account, CancellationToken cancellationToken)
+    public async Task<StrategyAvailabilityResult> CheckAvailabilityAsync(
+        ProviderAccount account,
+        CancellationToken cancellationToken
+    )
     {
-        return await CliCredentialReader.ReadClaudeAsync(credentialPath, cancellationToken).ConfigureAwait(false) is null
-            ? new StrategyAvailabilityResult(StrategyAvailability.NotConfigured, "Claude Code OAuth credentials were not found.")
+        return
+            await CliCredentialReader.ReadClaudeAsync(credentialPath, cancellationToken).ConfigureAwait(false) is null
+            ? new StrategyAvailabilityResult(
+                StrategyAvailability.NotConfigured,
+                "Claude Code OAuth credentials were not found."
+            )
             : StrategyAvailabilityResult.Ready();
     }
 
     public async Task<FetchResult> FetchAsync(ProviderAccount account, CancellationToken cancellationToken)
     {
         long started = Stopwatch.GetTimestamp();
-        CliCredential credential = await CliCredentialReader.ReadClaudeAsync(credentialPath, cancellationToken).ConfigureAwait(false);
+        CliCredential credential = await CliCredentialReader
+            .ReadClaudeAsync(credentialPath, cancellationToken)
+            .ConfigureAwait(false);
         if (credential is null)
         {
-            return FetchResult.Failure(FetchFailureKind.Authentication, "Claude Code OAuth credentials are unavailable.", FallbackPolicy.TryNextStrategy, Id, Stopwatch.GetElapsedTime(started));
+            return FetchResult.Failure(
+                FetchFailureKind.Authentication,
+                "Claude Code OAuth credentials are unavailable.",
+                FallbackPolicy.TryNextStrategy,
+                Id,
+                Stopwatch.GetElapsedTime(started)
+            );
         }
         if (!string.Equals(credential.AccountId, expectedAccount.Key.Value, StringComparison.Ordinal))
         {
-            return FetchResult.Failure(FetchFailureKind.AccountMismatch, "Claude credentials now belong to a different account.", FallbackPolicy.Stop, Id, Stopwatch.GetElapsedTime(started));
+            return FetchResult.Failure(
+                FetchFailureKind.AccountMismatch,
+                "Claude credentials now belong to a different account.",
+                FallbackPolicy.Stop,
+                Id,
+                Stopwatch.GetElapsedTime(started)
+            );
         }
         using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, UsageUri);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", credential.AccessToken);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         request.Headers.TryAddWithoutValidation("anthropic-beta", "oauth-2025-04-20");
         request.Headers.UserAgent.ParseAdd("AI-Limits-Windows/0.1");
-        using ProviderJsonResult exchange = await ProviderHttp.GetJsonAsync(httpClient, request, Id, "Claude", started, cancellationToken).ConfigureAwait(false);
+        using ProviderJsonResult exchange = await ProviderHttp
+            .GetJsonAsync(httpClient, request, Id, "Claude", started, cancellationToken)
+            .ConfigureAwait(false);
         if (!exchange.IsSuccess)
         {
             return exchange.Failure!;
@@ -51,16 +79,37 @@ internal sealed class ClaudeOAuthLimitStrategy(HttpClient httpClient, IClock clo
         Dictionary<string, MeterAlias> aliases = new Dictionary<string, MeterAlias>(StringComparer.OrdinalIgnoreCase)
         {
             ["five_hour"] = new MeterAlias("five_hour", "5-hour limit", PercentIsAbsolute: true),
-            ["seven_day"] = new MeterAlias("seven_day", "Weekly limit", PercentIsAbsolute: true)
+            ["seven_day"] = new MeterAlias("seven_day", "Weekly limit", PercentIsAbsolute: true),
         };
-        List<UsageMeter> meters = new DynamicMeterExtractor().Extract(expectedAccount.Key.Provider, document.RootElement, Id, now, authoritative: true, aliases)
+        List<UsageMeter> meters = new DynamicMeterExtractor()
+            .Extract(expectedAccount.Key.Provider, document.RootElement, Id, now, authoritative: true, aliases)
             .Select(WithKnownWindowDuration)
             .ToList();
         AddScopedLimitMeters(document.RootElement, now, meters);
         var extensions = string.IsNullOrWhiteSpace(credential.PlanHint)
             ? ProviderHttpSupport.SafeExtensions(("source", "oauth"))
             : ProviderHttpSupport.SafeExtensions(("source", "oauth"), ("plan_type", credential.PlanHint!));
-        return (meters.Count != 0) ? FetchResult.Success(new ProviderSnapshot(expectedAccount.Key, meters, Array.Empty<BalanceMetric>(), SnapshotCompleteness.Authoritative, now, DataConfidence.High, extensions), Id, Stopwatch.GetElapsedTime(started)) : FetchResult.Failure(FetchFailureKind.ProviderChanged, "Claude returned no recognizable limit meters.", FallbackPolicy.TryNextStrategy, Id, Stopwatch.GetElapsedTime(started));
+        return (meters.Count != 0)
+            ? FetchResult.Success(
+                new ProviderSnapshot(
+                    expectedAccount.Key,
+                    meters,
+                    Array.Empty<BalanceMetric>(),
+                    SnapshotCompleteness.Authoritative,
+                    now,
+                    DataConfidence.High,
+                    extensions
+                ),
+                Id,
+                Stopwatch.GetElapsedTime(started)
+            )
+            : FetchResult.Failure(
+                FetchFailureKind.ProviderChanged,
+                "Claude returned no recognizable limit meters.",
+                FallbackPolicy.TryNextStrategy,
+                Id,
+                Stopwatch.GetElapsedTime(started)
+            );
     }
 
     // The payload carries no window duration for the flat five_hour/seven_day
@@ -75,7 +124,7 @@ internal sealed class ClaudeOAuthLimitStrategy(HttpClient httpClient, IClock clo
         {
             "$.five_hour" => meter with { WindowDuration = TimeSpan.FromHours(5) },
             "$.seven_day" => meter with { WindowDuration = TimeSpan.FromDays(7) },
-            _ => meter
+            _ => meter,
         };
     }
 
@@ -94,55 +143,80 @@ internal sealed class ClaudeOAuthLimitStrategy(HttpClient httpClient, IClock clo
         foreach (JsonElement entry in limits.EnumerateArray())
         {
             index++;
-            if (entry.ValueKind != JsonValueKind.Object
-                || !entry.TryGetProperty("scope", out JsonElement scope) || scope.ValueKind != JsonValueKind.Object)
+            if (
+                entry.ValueKind != JsonValueKind.Object
+                || !entry.TryGetProperty("scope", out JsonElement scope)
+                || scope.ValueKind != JsonValueKind.Object
+            )
             {
                 continue;
             }
-            string? modelName = scope.TryGetProperty("model", out JsonElement model) && model.ValueKind == JsonValueKind.Object
-                && model.TryGetProperty("display_name", out JsonElement displayName) && displayName.ValueKind == JsonValueKind.String
-                ? displayName.GetString()
-                : null;
-            if (string.IsNullOrWhiteSpace(modelName)
-                || !entry.TryGetProperty("percent", out JsonElement percentElement) || percentElement.ValueKind != JsonValueKind.Number
-                || !percentElement.TryGetDouble(out double percent))
+            string? modelName =
+                scope.TryGetProperty("model", out JsonElement model)
+                && model.ValueKind == JsonValueKind.Object
+                && model.TryGetProperty("display_name", out JsonElement displayName)
+                && displayName.ValueKind == JsonValueKind.String
+                    ? displayName.GetString()
+                    : null;
+            if (
+                string.IsNullOrWhiteSpace(modelName)
+                || !entry.TryGetProperty("percent", out JsonElement percentElement)
+                || percentElement.ValueKind != JsonValueKind.Number
+                || !percentElement.TryGetDouble(out double percent)
+            )
             {
                 continue;
             }
-            string group = entry.TryGetProperty("group", out JsonElement groupElement) && groupElement.ValueKind == JsonValueKind.String
-                ? groupElement.GetString() ?? ""
-                : "";
-            DateTimeOffset? resetsAt = entry.TryGetProperty("resets_at", out JsonElement resetElement) && resetElement.ValueKind == JsonValueKind.String
-                && DateTimeOffset.TryParse(resetElement.GetString(), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out DateTimeOffset parsedReset)
-                ? parsedReset
-                : null;
+            string group =
+                entry.TryGetProperty("group", out JsonElement groupElement)
+                && groupElement.ValueKind == JsonValueKind.String
+                    ? groupElement.GetString() ?? ""
+                    : "";
+            DateTimeOffset? resetsAt =
+                entry.TryGetProperty("resets_at", out JsonElement resetElement)
+                && resetElement.ValueKind == JsonValueKind.String
+                && DateTimeOffset.TryParse(
+                    resetElement.GetString(),
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AdjustToUniversal
+                        | System.Globalization.DateTimeStyles.AssumeUniversal,
+                    out DateTimeOffset parsedReset
+                )
+                    ? parsedReset
+                    : null;
             (string suffix, TimeSpan? window) = group.ToLowerInvariant() switch
             {
                 "weekly" => (" weekly limit", (TimeSpan?)TimeSpan.FromDays(7)),
                 "session" => (" 5-hour limit", TimeSpan.FromHours(5)),
-                _ => (" limit", null)
+                _ => (" limit", null),
             };
             double clamped = Math.Clamp(percent, 0.0, 100.0);
-            MeterStatus status = clamped >= 100.0 ? MeterStatus.Exhausted
+            MeterStatus status =
+                clamped >= 100.0 ? MeterStatus.Exhausted
                 : clamped >= 95.0 ? MeterStatus.Critical
                 : clamped >= 80.0 ? MeterStatus.Approaching
                 : MeterStatus.Healthy;
-            string kind = entry.TryGetProperty("kind", out JsonElement kindElement) && kindElement.ValueKind == JsonValueKind.String
-                ? kindElement.GetString() ?? "scoped"
-                : "scoped";
-            meters.Add(new UsageMeter(
-                new MeterKey($"claude:scoped:{kind}:{modelName!.ToLowerInvariant()}"),
-                modelName + suffix,
-                MeterScope.Model,
-                MeterUnit.Percent,
-                null,
-                null,
-                clamped,
-                window,
-                resetsAt,
-                null,
-                status,
-                new MeterProvenance(Id, $"$.limits[{index}]", now, IsAuthoritative: true)));
+            string kind =
+                entry.TryGetProperty("kind", out JsonElement kindElement)
+                && kindElement.ValueKind == JsonValueKind.String
+                    ? kindElement.GetString() ?? "scoped"
+                    : "scoped";
+            meters.Add(
+                new UsageMeter(
+                    new MeterKey($"claude:scoped:{kind}:{modelName!.ToLowerInvariant()}"),
+                    modelName + suffix,
+                    MeterScope.Model,
+                    MeterUnit.Percent,
+                    null,
+                    null,
+                    clamped,
+                    window,
+                    resetsAt,
+                    null,
+                    status,
+                    new MeterProvenance(Id, $"$.limits[{index}]", now, IsAuthoritative: true)
+                )
+            );
         }
     }
 }

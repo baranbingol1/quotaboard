@@ -15,7 +15,8 @@ public sealed class RefreshSchedulerTransientRetryTests
             _ => throw new InvalidOperationException("boom"),
             () => false,
             clock,
-            logger: new CapturingLogger<RefreshScheduler>());
+            logger: new CapturingLogger<RefreshScheduler>()
+        );
 
         // Pretend a recent interaction and an already-completed external refresh
         // happened 3 minutes ago, so the adaptive delay (2 min) has already
@@ -47,7 +48,8 @@ public sealed class RefreshSchedulerTransientRetryTests
             _ => throw new InvalidOperationException("boom"),
             () => false,
             clock,
-            logger: logger);
+            logger: logger
+        );
 
         scheduler.NoteUserInteraction();
         scheduler.NoteExternalRefresh(false);
@@ -71,7 +73,8 @@ public sealed class RefreshSchedulerTransientRetryTests
         var deadline = DateTimeOffset.UtcNow + timeout;
         while (DateTimeOffset.UtcNow < deadline)
         {
-            if (predicate()) return;
+            if (predicate())
+                return;
             await Task.Delay(50);
         }
     }
@@ -80,6 +83,7 @@ public sealed class RefreshSchedulerTransientRetryTests
     {
         private DateTimeOffset _utcNow = initial;
         public DateTimeOffset UtcNow => _utcNow;
+
         public void Advance(TimeSpan delta) => _utcNow += delta;
     }
 
@@ -87,11 +91,18 @@ public sealed class RefreshSchedulerTransientRetryTests
     {
         public List<(LogLevel Level, string Message, Exception? Exception)> Warnings { get; } = [];
 
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
 
         public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Warning;
 
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter
+        )
         {
             if (logLevel >= LogLevel.Warning)
                 Warnings.Add((logLevel, formatter(state, exception), exception));

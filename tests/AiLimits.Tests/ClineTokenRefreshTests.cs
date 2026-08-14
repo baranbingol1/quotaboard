@@ -23,7 +23,10 @@ public sealed class ClineTokenRefreshTests : IDisposable
     private const string RefreshUri = "https://api.cline.bot/api/v1/auth/refresh";
 
     private readonly string _cacheDirectory = Path.Combine(
-        Path.GetTempPath(), "quotaboard-tests", Guid.NewGuid().ToString("N"));
+        Path.GetTempPath(),
+        "quotaboard-tests",
+        Guid.NewGuid().ToString("N")
+    );
 
     private string LegacyCachePath => Path.Combine(_cacheDirectory, "cline-session.json");
 
@@ -40,28 +43,40 @@ public sealed class ClineTokenRefreshTests : IDisposable
                 Directory.Delete(_cacheDirectory, recursive: true);
             }
         }
-        catch (IOException)
-        {
-        }
+        catch (IOException) { }
     }
 
     [Fact]
     public async Task Expired_cli_token_is_refreshed_before_the_usage_call()
     {
-        var handler = new RoutedHandler(request => request.RequestUri!.ToString() switch
-        {
-            RefreshUri => Json("""
-                {"success":true,"data":{"accessToken":"fresh-token","refreshToken":"rotated-refresh","expiresAt":"2026-07-24T13:05:00Z"}}
-                """),
-            _ => Json("""
-                {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":42,"resetsAt":null}]}}
-                """),
-        });
-        var strategy = new ClinePassLimitStrategy(new HttpClient(handler), new FixedClock(),
-            () => new ClineCredential("stale-token", "Cline CLI account",
-                ExpiresAt: Now - TimeSpan.FromHours(23), RefreshToken: "stored-refresh",
-                IsWorkOsSession: true),
-            Store());
+        var handler = new RoutedHandler(request =>
+            request.RequestUri!.ToString() switch
+            {
+                RefreshUri => Json(
+                    """
+                    {"success":true,"data":{"accessToken":"fresh-token","refreshToken":"rotated-refresh","expiresAt":"2026-07-24T13:05:00Z"}}
+                    """
+                ),
+                _ => Json(
+                    """
+                    {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":42,"resetsAt":null}]}}
+                    """
+                ),
+            }
+        );
+        var strategy = new ClinePassLimitStrategy(
+            new HttpClient(handler),
+            new FixedClock(),
+            () =>
+                new ClineCredential(
+                    "stale-token",
+                    "Cline CLI account",
+                    ExpiresAt: Now - TimeSpan.FromHours(23),
+                    RefreshToken: "stored-refresh",
+                    IsWorkOsSession: true
+                ),
+            Store()
+        );
 
         FetchResult result = await strategy.FetchAsync(Account(), default);
 
@@ -93,16 +108,28 @@ public sealed class ClineTokenRefreshTests : IDisposable
     [Fact]
     public async Task Fresher_cached_session_is_used_without_refreshing()
     {
-        await Store().SaveAsync(
-            new ClineSession("cached-token", "cached-refresh", Now + TimeSpan.FromMinutes(40)), default);
-        var handler = new RoutedHandler(_ => Json("""
-            {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":7,"resetsAt":null}]}}
-            """));
-        var strategy = new ClinePassLimitStrategy(new HttpClient(handler), new FixedClock(),
-            () => new ClineCredential("stale-token", "Cline CLI account",
-                ExpiresAt: Now - TimeSpan.FromHours(23), RefreshToken: "stored-refresh",
-                IsWorkOsSession: true),
-            Store());
+        await Store()
+            .SaveAsync(new ClineSession("cached-token", "cached-refresh", Now + TimeSpan.FromMinutes(40)), default);
+        var handler = new RoutedHandler(_ =>
+            Json(
+                """
+                {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":7,"resetsAt":null}]}}
+                """
+            )
+        );
+        var strategy = new ClinePassLimitStrategy(
+            new HttpClient(handler),
+            new FixedClock(),
+            () =>
+                new ClineCredential(
+                    "stale-token",
+                    "Cline CLI account",
+                    ExpiresAt: Now - TimeSpan.FromHours(23),
+                    RefreshToken: "stored-refresh",
+                    IsWorkOsSession: true
+                ),
+            Store()
+        );
 
         FetchResult result = await strategy.FetchAsync(Account(), default);
 
@@ -118,18 +145,28 @@ public sealed class ClineTokenRefreshTests : IDisposable
         var handler = new ConcurrentRefreshHandler();
         ClineSessionStore store = Store();
         string lockName = $"Local\\QuotaBoard.Tests.ClineRefresh.{Guid.NewGuid():N}";
-        ClineCredential Credential() => new(
-            "stale-token",
-            "Cline CLI account",
-            ExpiresAt: Now - TimeSpan.FromHours(1),
-            RefreshToken: "stored-refresh",
-            IsWorkOsSession: true);
+        ClineCredential Credential() =>
+            new(
+                "stale-token",
+                "Cline CLI account",
+                ExpiresAt: Now - TimeSpan.FromHours(1),
+                RefreshToken: "stored-refresh",
+                IsWorkOsSession: true
+            );
         var first = new ClinePassLimitStrategy(
-            new HttpClient(handler), new FixedClock(), Credential, store,
-            new ClineNamedRefreshLock(lockName, TimeSpan.FromSeconds(5)));
+            new HttpClient(handler),
+            new FixedClock(),
+            Credential,
+            store,
+            new ClineNamedRefreshLock(lockName, TimeSpan.FromSeconds(5))
+        );
         var second = new ClinePassLimitStrategy(
-            new HttpClient(handler), new FixedClock(), Credential, store,
-            new ClineNamedRefreshLock(lockName, TimeSpan.FromSeconds(5)));
+            new HttpClient(handler),
+            new FixedClock(),
+            Credential,
+            store,
+            new ClineNamedRefreshLock(lockName, TimeSpan.FromSeconds(5))
+        );
 
         Task<FetchResult> firstFetch = first.FetchAsync(Account(), default);
         await handler.FirstRefreshEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -174,13 +211,16 @@ public sealed class ClineTokenRefreshTests : IDisposable
             var refreshLock = new ClineNamedRefreshLock(name, TimeSpan.Zero);
             bool ran = false;
 
-            await Assert.ThrowsAsync<ClineRefreshLockException>(() => refreshLock.RunAsync(
-                () =>
-                {
-                    ran = true;
-                    return Task.FromResult(42);
-                },
-                default));
+            await Assert.ThrowsAsync<ClineRefreshLockException>(() =>
+                refreshLock.RunAsync(
+                    () =>
+                    {
+                        ran = true;
+                        return Task.FromResult(42);
+                    },
+                    default
+                )
+            );
 
             Assert.False(ran);
         }
@@ -195,12 +235,20 @@ public sealed class ClineTokenRefreshTests : IDisposable
     public async Task A_contended_lock_reports_temporarily_unavailable_and_leaves_the_store_alone()
     {
         var handler = new RoutedHandler(_ => Json("{}"));
-        var strategy = new ClinePassLimitStrategy(new HttpClient(handler), new FixedClock(),
-            () => new ClineCredential("stale-token", "Cline CLI account",
-                ExpiresAt: Now - TimeSpan.FromHours(1), RefreshToken: "stored-refresh",
-                IsWorkOsSession: true),
+        var strategy = new ClinePassLimitStrategy(
+            new HttpClient(handler),
+            new FixedClock(),
+            () =>
+                new ClineCredential(
+                    "stale-token",
+                    "Cline CLI account",
+                    ExpiresAt: Now - TimeSpan.FromHours(1),
+                    RefreshToken: "stored-refresh",
+                    IsWorkOsSession: true
+                ),
             Store(),
-            new ContendedRefreshLock());
+            new ContendedRefreshLock()
+        );
 
         FetchResult result = await strategy.FetchAsync(Account(), default);
 
@@ -227,24 +275,36 @@ public sealed class ClineTokenRefreshTests : IDisposable
         {
             if (request.RequestUri!.ToString() == RefreshUri)
             {
-                return Json("""
+                return Json(
+                    """
                     {"success":true,"data":{"accessToken":"fresh-token","expiresAt":"2026-07-24T13:05:00Z"}}
-                    """);
+                    """
+                );
             }
             return request.Headers.Authorization?.Parameter == "workos:fresh-token"
-                ? Json("""
+                ? Json(
+                    """
                     {"success":true,"data":{"limits":[{"type":"five_hour","percentUsed":3,"resetsAt":null}]}}
-                    """)
+                    """
+                )
                 : new HttpResponseMessage(HttpStatusCode.Unauthorized)
                 {
-                    Content = new StringContent("{}", Encoding.UTF8, "application/json")
+                    Content = new StringContent("{}", Encoding.UTF8, "application/json"),
                 };
         });
-        var strategy = new ClinePassLimitStrategy(new HttpClient(handler), new FixedClock(),
-            () => new ClineCredential("revoked-token", "Cline CLI account",
-                ExpiresAt: Now + TimeSpan.FromMinutes(30), RefreshToken: "stored-refresh",
-                IsWorkOsSession: true),
-            Store());
+        var strategy = new ClinePassLimitStrategy(
+            new HttpClient(handler),
+            new FixedClock(),
+            () =>
+                new ClineCredential(
+                    "revoked-token",
+                    "Cline CLI account",
+                    ExpiresAt: Now + TimeSpan.FromMinutes(30),
+                    RefreshToken: "stored-refresh",
+                    IsWorkOsSession: true
+                ),
+            Store()
+        );
 
         FetchResult result = await strategy.FetchAsync(Account(), default);
 
@@ -262,14 +322,27 @@ public sealed class ClineTokenRefreshTests : IDisposable
             request.RequestUri!.ToString() == RefreshUri
                 ? new HttpResponseMessage(HttpStatusCode.Unauthorized)
                 {
-                    Content = new StringContent("{\"error\":\"revoked stored-refresh\"}", Encoding.UTF8, "application/json")
+                    Content = new StringContent(
+                        "{\"error\":\"revoked stored-refresh\"}",
+                        Encoding.UTF8,
+                        "application/json"
+                    ),
                 }
-                : Json("{}"));
-        var strategy = new ClinePassLimitStrategy(new HttpClient(handler), new FixedClock(),
-            () => new ClineCredential("stale-token", "Cline CLI account",
-                ExpiresAt: Now - TimeSpan.FromHours(23), RefreshToken: "stored-refresh",
-                IsWorkOsSession: true),
-            Store());
+                : Json("{}")
+        );
+        var strategy = new ClinePassLimitStrategy(
+            new HttpClient(handler),
+            new FixedClock(),
+            () =>
+                new ClineCredential(
+                    "stale-token",
+                    "Cline CLI account",
+                    ExpiresAt: Now - TimeSpan.FromHours(23),
+                    RefreshToken: "stored-refresh",
+                    IsWorkOsSession: true
+                ),
+            Store()
+        );
 
         FetchResult result = await strategy.FetchAsync(Account(), default);
 
@@ -283,12 +356,19 @@ public sealed class ClineTokenRefreshTests : IDisposable
     [Fact]
     public async Task Env_style_credential_without_expiry_is_used_as_is()
     {
-        var handler = new RoutedHandler(_ => Json("""
-            {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":1,"resetsAt":null}]}}
-            """));
-        var strategy = new ClinePassLimitStrategy(new HttpClient(handler), new FixedClock(),
+        var handler = new RoutedHandler(_ =>
+            Json(
+                """
+                {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":1,"resetsAt":null}]}}
+                """
+            )
+        );
+        var strategy = new ClinePassLimitStrategy(
+            new HttpClient(handler),
+            new FixedClock(),
             () => new ClineCredential("env-token", "API key (CLINE_API_KEY)"),
-            Store());
+            Store()
+        );
 
         FetchResult result = await strategy.FetchAsync(Account(), default);
 
@@ -302,9 +382,12 @@ public sealed class ClineTokenRefreshTests : IDisposable
     {
         string path = Path.Combine(_cacheDirectory, "secrets.json");
         Directory.CreateDirectory(_cacheDirectory);
-        File.WriteAllText(path, """
+        File.WriteAllText(
+            path,
+            """
             {"cline:clineAccountId":"{\"idToken\":\"blob-token\",\"refreshToken\":\"blob-refresh\",\"expiresAt\":1784772484,\"provider\":\"cline\",\"userInfo\":{\"email\":\"x@y.z\"}}"}
-            """);
+            """
+        );
 
         ClineCredential? credential = ClineCredentialReader.ResolveSecrets(path);
 
@@ -319,9 +402,12 @@ public sealed class ClineTokenRefreshTests : IDisposable
     public async Task Legacy_plaintext_cache_is_migrated_into_the_secret_store_and_deleted()
     {
         Directory.CreateDirectory(_cacheDirectory);
-        await File.WriteAllTextAsync(LegacyCachePath, """
+        await File.WriteAllTextAsync(
+            LegacyCachePath,
+            """
             {"accessToken":"file-token","refreshToken":"file-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
-            """);
+            """
+        );
 
         ClineSession? migrated = await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(default);
 
@@ -345,8 +431,10 @@ public sealed class ClineTokenRefreshTests : IDisposable
         // the document no longer parses — keeping the file would keep a usable
         // refresh token in plaintext forever, since every later run reaches
         // this same verdict.
-        await File.WriteAllTextAsync(LegacyCachePath,
-            """{"accessToken":"file-token","refreshToken":"file-refresh","expiresAt":"2026-07-2""");
+        await File.WriteAllTextAsync(
+            LegacyCachePath,
+            """{"accessToken":"file-token","refreshToken":"file-refresh","expiresAt":"2026-07-2"""
+        );
 
         ClineSession? migrated = await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(default);
 
@@ -359,9 +447,12 @@ public sealed class ClineTokenRefreshTests : IDisposable
     {
         Directory.CreateDirectory(_cacheDirectory);
         // Parses fine, fails validation on a field that is not the tokens.
-        await File.WriteAllTextAsync(LegacyCachePath, """
+        await File.WriteAllTextAsync(
+            LegacyCachePath,
+            """
             {"accessToken":"file-token","refreshToken":"file-refresh"}
-            """);
+            """
+        );
 
         Assert.Null(await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(default));
         Assert.False(File.Exists(LegacyCachePath));
@@ -374,9 +465,12 @@ public sealed class ClineTokenRefreshTests : IDisposable
         // The old writer wrote a sibling .tmp and renamed it over the real
         // path. A crash before the very first rename leaves only the .tmp,
         // which the "does the real path exist?" check used to skip entirely.
-        await File.WriteAllTextAsync(LegacyCachePath + ".tmp", """
+        await File.WriteAllTextAsync(
+            LegacyCachePath + ".tmp",
+            """
             {"accessToken":"tmp-token","refreshToken":"tmp-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
-            """);
+            """
+        );
 
         ClineSession? migrated = await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(default);
 
@@ -392,9 +486,12 @@ public sealed class ClineTokenRefreshTests : IDisposable
     {
         Directory.CreateDirectory(_cacheDirectory);
         await File.WriteAllTextAsync(LegacyCachePath, "{ this is not json");
-        await File.WriteAllTextAsync(LegacyCachePath + ".tmp", """
+        await File.WriteAllTextAsync(
+            LegacyCachePath + ".tmp",
+            """
             {"accessToken":"tmp-token","refreshToken":"tmp-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
-            """);
+            """
+        );
 
         ClineSession? migrated = await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(default);
 
@@ -413,13 +510,18 @@ public sealed class ClineTokenRefreshTests : IDisposable
         // since signed out of Cline never reaches it, and their old plaintext
         // tokens would sit on disk forever.
         Directory.CreateDirectory(_cacheDirectory);
-        await File.WriteAllTextAsync(LegacyCachePath, """
+        await File.WriteAllTextAsync(
+            LegacyCachePath,
+            """
             {"accessToken":"orphaned-token","refreshToken":"orphaned-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
-            """);
+            """
+        );
         var strategy = new ClinePassLimitStrategy(
-            new HttpClient(new RoutedHandler(_ => Json("{}"))), new FixedClock(),
+            new HttpClient(new RoutedHandler(_ => Json("{}"))),
+            new FixedClock(),
             () => null,
-            new ClineSessionStore(_secrets, LegacyCachePath));
+            new ClineSessionStore(_secrets, LegacyCachePath)
+        );
 
         FetchResult result = await strategy.FetchAsync(Account(), default);
 
@@ -433,9 +535,12 @@ public sealed class ClineTokenRefreshTests : IDisposable
     public async Task A_failed_migration_keeps_the_plaintext_cache_and_retries_on_next_load()
     {
         Directory.CreateDirectory(_cacheDirectory);
-        await File.WriteAllTextAsync(LegacyCachePath, """
+        await File.WriteAllTextAsync(
+            LegacyCachePath,
+            """
             {"accessToken":"file-token","refreshToken":"file-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
-            """);
+            """
+        );
         _secrets.Fault = new System.ComponentModel.Win32Exception(5);
         var store = new ClineSessionStore(_secrets, LegacyCachePath);
 
@@ -458,9 +563,12 @@ public sealed class ClineTokenRefreshTests : IDisposable
     public async Task Retained_legacy_file_never_overwrites_a_rotated_committed_vault_session()
     {
         Directory.CreateDirectory(_cacheDirectory);
-        await File.WriteAllTextAsync(LegacyCachePath, """
+        await File.WriteAllTextAsync(
+            LegacyCachePath,
+            """
             {"accessToken":"legacy-access","refreshToken":"legacy-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
-            """);
+            """
+        );
         var store = new ClineSessionStore(_secrets, LegacyCachePath);
 
         // Reads remain possible, but Windows denies deletion until this handle
@@ -473,7 +581,9 @@ public sealed class ClineTokenRefreshTests : IDisposable
             Assert.True(File.Exists(LegacyCachePath));
 
             await store.SaveAsync(
-                new ClineSession("rotated-access", "rotated-refresh", Now + TimeSpan.FromHours(2)), default);
+                new ClineSession("rotated-access", "rotated-refresh", Now + TimeSpan.FromHours(2)),
+                default
+            );
 
             ClineSession? sameStore = await store.LoadAsync(default);
             Assert.Equal("rotated-access", sameStore!.AccessToken);
@@ -494,16 +604,20 @@ public sealed class ClineTokenRefreshTests : IDisposable
     public async Task A_partially_written_migration_keeps_the_plaintext_cache()
     {
         Directory.CreateDirectory(_cacheDirectory);
-        await File.WriteAllTextAsync(LegacyCachePath, """
+        await File.WriteAllTextAsync(
+            LegacyCachePath,
+            """
             {"accessToken":"file-token","refreshToken":"file-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
-            """);
+            """
+        );
         // The staging expires-at write fails after staging access succeeds:
         // the vault now holds a half-written staging set, but the live keys are
         // untouched and LoadAsync rejects them, so deleting the plaintext file
         // here would strand the user.
-        _secrets.FaultFor = key => key is { Scope: "cline", Key: "session.expires-at.staging" }
-            ? new System.ComponentModel.Win32Exception(5)
-            : null;
+        _secrets.FaultFor = key =>
+            key is { Scope: "cline", Key: "session.expires-at.staging" }
+                ? new System.ComponentModel.Win32Exception(5)
+                : null;
         var store = new ClineSessionStore(_secrets, LegacyCachePath);
 
         Assert.Null(await store.LoadAsync(default));
@@ -521,16 +635,20 @@ public sealed class ClineTokenRefreshTests : IDisposable
     public async Task A_refresh_write_failure_after_access_and_expiry_succeed_keeps_plaintext_and_hides_partial_state()
     {
         Directory.CreateDirectory(_cacheDirectory);
-        await File.WriteAllTextAsync(LegacyCachePath, """
+        await File.WriteAllTextAsync(
+            LegacyCachePath,
+            """
             {"accessToken":"file-token","refreshToken":"file-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
-            """);
+            """
+        );
         // The staging refresh-token write fails after staging access and
         // expiry succeed. The live keys must stay untouched so LoadAsync
         // cannot return a session with the new access but a stale or missing
         // refresh.
-        _secrets.FaultFor = key => key is { Scope: "cline", Key: "session.refresh-token.staging" }
-            ? new System.ComponentModel.Win32Exception(5)
-            : null;
+        _secrets.FaultFor = key =>
+            key is { Scope: "cline", Key: "session.refresh-token.staging" }
+                ? new System.ComponentModel.Win32Exception(5)
+                : null;
         var store = new ClineSessionStore(_secrets, LegacyCachePath);
 
         // No partial session leaks, and the plaintext cache is kept for retry.
@@ -551,9 +669,12 @@ public sealed class ClineTokenRefreshTests : IDisposable
     public async Task A_save_that_finds_no_staging_values_reports_failure_and_keeps_legacy_cache()
     {
         Directory.CreateDirectory(_cacheDirectory);
-        await File.WriteAllTextAsync(LegacyCachePath, """
+        await File.WriteAllTextAsync(
+            LegacyCachePath,
+            """
             {"accessToken":"file-token","refreshToken":"file-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
-            """);
+            """
+        );
         bool removed = false;
         _secrets.BeforeGet = key =>
         {
@@ -562,13 +683,15 @@ public sealed class ClineTokenRefreshTests : IDisposable
                 return;
             }
             removed = true;
-            foreach (string stagingKey in new[]
-            {
-                "session.access-token.staging",
-                "session.expires-at.staging",
-                "session.refresh-token.staging",
-                "session.clear-refresh.staging"
-            })
+            foreach (
+                string stagingKey in new[]
+                {
+                    "session.access-token.staging",
+                    "session.expires-at.staging",
+                    "session.refresh-token.staging",
+                    "session.clear-refresh.staging",
+                }
+            )
             {
                 _secrets.DeleteAsync("cline", stagingKey, default).GetAwaiter().GetResult();
             }
@@ -579,8 +702,7 @@ public sealed class ClineTokenRefreshTests : IDisposable
 
         Assert.Null(loaded);
         Assert.True(File.Exists(LegacyCachePath));
-        Assert.DoesNotContain(_secrets.Keys, key =>
-            key is { Scope: "cline", Key: "session.commit" });
+        Assert.DoesNotContain(_secrets.Keys, key => key is { Scope: "cline", Key: "session.commit" });
     }
 
     [Fact]
@@ -588,18 +710,17 @@ public sealed class ClineTokenRefreshTests : IDisposable
     {
         ClineSessionStore store = Store();
         // Save a good session first.
-        await store.SaveAsync(
-            new ClineSession("good-access", "good-refresh", Now + TimeSpan.FromHours(1)), default);
+        await store.SaveAsync(new ClineSession("good-access", "good-refresh", Now + TimeSpan.FromHours(1)), default);
         ClineSession? good = await store.LoadAsync(default);
         Assert.NotNull(good);
         Assert.Equal("good-access", good!.AccessToken);
 
         // Attempt to save a new session, but fault on the staging expiry write.
-        _secrets.FaultFor = key => key is { Scope: "cline", Key: "session.expires-at.staging" }
-            ? new System.ComponentModel.Win32Exception(5)
-            : null;
-        await store.SaveAsync(
-            new ClineSession("bad-access", "bad-refresh", Now + TimeSpan.FromHours(2)), default);
+        _secrets.FaultFor = key =>
+            key is { Scope: "cline", Key: "session.expires-at.staging" }
+                ? new System.ComponentModel.Win32Exception(5)
+                : null;
+        await store.SaveAsync(new ClineSession("bad-access", "bad-refresh", Now + TimeSpan.FromHours(2)), default);
 
         // The previous good session must still be intact.
         _secrets.FaultFor = null;
@@ -613,17 +734,16 @@ public sealed class ClineTokenRefreshTests : IDisposable
     public async Task A_failed_interrupted_promotion_does_not_expose_a_mixed_session()
     {
         ClineSessionStore store = Store();
-        await store.SaveAsync(
-            new ClineSession("old-access", "old-refresh", Now + TimeSpan.FromHours(1)), default);
+        await store.SaveAsync(new ClineSession("old-access", "old-refresh", Now + TimeSpan.FromHours(1)), default);
 
         // Fail the live refresh-token promotion after the new access token and
         // expiry have already been promoted. The commit marker and staging
         // values remain so LoadAsync can retry atomically later.
-        _secrets.SetFaultFor = key => key is { Scope: "cline", Key: "session.refresh-token" }
-            ? new System.ComponentModel.Win32Exception(5)
-            : null;
-        await store.SaveAsync(
-            new ClineSession("new-access", "new-refresh", Now + TimeSpan.FromHours(2)), default);
+        _secrets.SetFaultFor = key =>
+            key is { Scope: "cline", Key: "session.refresh-token" }
+                ? new System.ComponentModel.Win32Exception(5)
+                : null;
+        await store.SaveAsync(new ClineSession("new-access", "new-refresh", Now + TimeSpan.FromHours(2)), default);
 
         Assert.Null(await store.LoadAsync(default));
 
@@ -638,13 +758,12 @@ public sealed class ClineTokenRefreshTests : IDisposable
     public async Task Incomplete_recovery_keeps_the_commit_marker_and_never_exposes_mixed_live_keys()
     {
         ClineSessionStore store = Store();
-        await store.SaveAsync(
-            new ClineSession("old-access", "old-refresh", Now + TimeSpan.FromHours(1)), default);
-        _secrets.SetFaultFor = key => key is { Scope: "cline", Key: "session.refresh-token" }
-            ? new System.ComponentModel.Win32Exception(5)
-            : null;
-        await store.SaveAsync(
-            new ClineSession("new-access", "new-refresh", Now + TimeSpan.FromHours(2)), default);
+        await store.SaveAsync(new ClineSession("old-access", "old-refresh", Now + TimeSpan.FromHours(1)), default);
+        _secrets.SetFaultFor = key =>
+            key is { Scope: "cline", Key: "session.refresh-token" }
+                ? new System.ComponentModel.Win32Exception(5)
+                : null;
+        await store.SaveAsync(new ClineSession("new-access", "new-refresh", Now + TimeSpan.FromHours(2)), default);
         await _secrets.DeleteAsync("cline", "session.refresh-token.staging", default);
         _secrets.SetFaultFor = null;
 
@@ -678,13 +797,11 @@ public sealed class ClineTokenRefreshTests : IDisposable
         Assert.Null(loaded.RefreshToken);
     }
 
-    private static ProviderAccount Account() => new(
-        new AccountKey(new ProviderId("cline"), "default"), "Cline", null, "fixture", 1, true);
+    private static ProviderAccount Account() =>
+        new(new AccountKey(new ProviderId("cline"), "default"), "Cline", null, "fixture", 1, true);
 
-    private static HttpResponseMessage Json(string body) => new(HttpStatusCode.OK)
-    {
-        Content = new StringContent(body, Encoding.UTF8, "application/json")
-    };
+    private static HttpResponseMessage Json(string body) =>
+        new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
 
     private sealed class FixedClock : IClock
     {
@@ -695,16 +812,20 @@ public sealed class ClineTokenRefreshTests : IDisposable
     {
         public List<(string Method, string Uri, string? Authorization, string? Body)> Requests { get; } = [];
 
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken
+        )
         {
-            string? body = request.Content is null
-                ? null
-                : await request.Content.ReadAsStringAsync(cancellationToken);
-            Requests.Add((
-                request.Method.Method,
-                request.RequestUri?.ToString() ?? "",
-                request.Headers.Authorization?.ToString(),
-                body));
+            string? body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
+            Requests.Add(
+                (
+                    request.Method.Method,
+                    request.RequestUri?.ToString() ?? "",
+                    request.Headers.Authorization?.ToString(),
+                    body
+                )
+            );
             return respond(request);
         }
     }
@@ -726,22 +847,27 @@ public sealed class ClineTokenRefreshTests : IDisposable
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken
+        )
         {
             if (request.RequestUri!.ToString() == RefreshUri)
             {
                 Interlocked.Increment(ref _refreshCount);
                 FirstRefreshEntered.TrySetResult();
                 await ReleaseFirstRefresh.Task.WaitAsync(cancellationToken);
-                return Json("""
+                return Json(
+                    """
                     {"success":true,"data":{"accessToken":"fresh-token","refreshToken":"rotated-refresh","expiresAt":"2026-07-24T13:05:00Z"}}
-                    """);
+                    """
+                );
             }
 
             Interlocked.Increment(ref _usageCount);
-            return Json("""
+            return Json(
+                """
                 {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":42,"resetsAt":null}]}}
-                """);
+                """
+            );
         }
     }
 }

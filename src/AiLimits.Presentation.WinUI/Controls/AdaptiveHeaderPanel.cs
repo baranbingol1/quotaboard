@@ -24,13 +24,15 @@ public sealed class AdaptiveHeaderPanel : Panel
         nameof(Spacing),
         typeof(double),
         typeof(AdaptiveHeaderPanel),
-        new PropertyMetadata(16.0, OnLayoutPropertyChanged));
+        new PropertyMetadata(16.0, OnLayoutPropertyChanged)
+    );
 
     public static readonly DependencyProperty MinContentWidthProperty = DependencyProperty.Register(
         nameof(MinContentWidth),
         typeof(double),
         typeof(AdaptiveHeaderPanel),
-        new PropertyMetadata(280.0, OnLayoutPropertyChanged));
+        new PropertyMetadata(280.0, OnLayoutPropertyChanged)
+    );
 
     /// <summary>Gap between the two slots, horizontally when side by side and vertically when stacked.</summary>
     public double Spacing
@@ -76,7 +78,8 @@ public sealed class AdaptiveHeaderPanel : Panel
                 double.IsInfinity(availableSize.Width)
                     ? content.DesiredSize.Width + gap + actionsWidth
                     : availableSize.Width,
-                Math.Max(content.DesiredSize.Height, actions.DesiredSize.Height));
+                Math.Max(content.DesiredSize.Height, actions.DesiredSize.Height)
+            );
         }
 
         // Stacked: both slots get the full width.
@@ -84,7 +87,8 @@ public sealed class AdaptiveHeaderPanel : Panel
         actions.Measure(new Size(availableSize.Width, double.PositiveInfinity));
         return new Size(
             Math.Max(content.DesiredSize.Width, actions.DesiredSize.Width),
-            content.DesiredSize.Height + gap + actions.DesiredSize.Height);
+            content.DesiredSize.Height + gap + actions.DesiredSize.Height
+        );
     }
 
     protected override Size ArrangeOverride(Size finalSize)
@@ -109,21 +113,22 @@ public sealed class AdaptiveHeaderPanel : Panel
         {
             content.Arrange(new Rect(0, 0, contentWidth, finalSize.Height));
             // Right-aligned, and never narrower than what it asked for.
-            actions.Arrange(new Rect(
-                Math.Max(contentWidth + gap, finalSize.Width - actionsWidth),
-                0,
-                actionsWidth,
-                finalSize.Height));
+            actions.Arrange(
+                new Rect(
+                    Math.Max(contentWidth + gap, finalSize.Width - actionsWidth),
+                    0,
+                    actionsWidth,
+                    finalSize.Height
+                )
+            );
             return finalSize;
         }
 
         double contentHeight = content.DesiredSize.Height;
         content.Arrange(new Rect(0, 0, finalSize.Width, contentHeight));
-        actions.Arrange(new Rect(
-            0,
-            contentHeight + gap,
-            finalSize.Width,
-            Math.Max(0, finalSize.Height - contentHeight - gap)));
+        actions.Arrange(
+            new Rect(0, contentHeight + gap, finalSize.Width, Math.Max(0, finalSize.Height - contentHeight - gap))
+        );
         return finalSize;
     }
 

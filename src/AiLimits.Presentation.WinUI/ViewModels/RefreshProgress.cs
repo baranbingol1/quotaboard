@@ -11,7 +11,12 @@ namespace AiLimits.Presentation.WinUI.ViewModels;
 /// <param name="Total">Providers the data source plans to refresh. Zero means indeterminate.</param>
 /// <param name="CurrentProvider">Display name for the provider currently being fetched; empty when idle.</param>
 /// <param name="Stage">Which phase of the refresh is running, so the bar can label the local pre-fetch work instead of animating blind.</param>
-public readonly record struct RefreshProgress(int Completed, int Total, string CurrentProvider, RefreshStage Stage = RefreshStage.Fetching);
+public readonly record struct RefreshProgress(
+    int Completed,
+    int Total,
+    string CurrentProvider,
+    RefreshStage Stage = RefreshStage.Fetching
+);
 
 /// <summary>
 /// Coarse phase of a refresh run. Only <see cref="Fetching"/> carries a

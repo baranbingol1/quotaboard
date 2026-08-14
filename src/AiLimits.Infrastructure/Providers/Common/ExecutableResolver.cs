@@ -44,13 +44,17 @@ public static class ExecutableResolver
 
         // "..\tool.exe", "sub/tool.exe" and the drive-relative "C:tool.exe"
         // all resolve against a working directory we do not control.
-        if (candidate.Contains(Path.DirectorySeparatorChar) ||
-            candidate.Contains(Path.AltDirectorySeparatorChar) ||
-            Path.IsPathRooted(candidate) ||
-            candidate.Contains(':'))
+        if (
+            candidate.Contains(Path.DirectorySeparatorChar)
+            || candidate.Contains(Path.AltDirectorySeparatorChar)
+            || Path.IsPathRooted(candidate)
+            || candidate.Contains(':')
+        )
         {
             throw new ArgumentException(
-                "A provider executable must be a bare name or a fully qualified path.", nameof(executable));
+                "A provider executable must be a bare name or a fully qualified path.",
+                nameof(executable)
+            );
         }
 
         string fileName = candidate.EndsWith(Extension, StringComparison.OrdinalIgnoreCase)
@@ -73,7 +77,12 @@ public static class ExecutableResolver
     private static IEnumerable<string> SearchPath()
     {
         string path = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
-        foreach (string entry in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (
+            string entry in path.Split(
+                Path.PathSeparator,
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+            )
+        )
         {
             string directory = entry.Trim('"');
             // A relative PATH entry (including the empty-segment "." that some
@@ -91,7 +100,8 @@ public static class ExecutableResolver
         {
             throw new ArgumentException(
                 "A provider executable must be an .exe; .cmd and .bat shims cannot be launched directly.",
-                nameof(candidate));
+                nameof(candidate)
+            );
         }
     }
 }

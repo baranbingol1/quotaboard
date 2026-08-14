@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-using System.Text.Json;
-using System.Net;
 using System.Globalization;
+using System.Net;
+using System.Text.Json;
 using AiLimits.Application.Abstractions;
 using AiLimits.Domain;
 using AiLimits.Infrastructure.Providers.Antigravity;
@@ -13,48 +13,52 @@ public sealed class AgyProviderTests
     [Fact]
     public void QuotaSummaryMapsGoogleSubscriptionWindowsAndIdentity()
     {
-        using JsonDocument quota = JsonDocument.Parse("""
-        {
-          "response": {
-            "groups": [
-              {
-                "displayName": "Gemini Models",
-                "buckets": [
+        using JsonDocument quota = JsonDocument.Parse(
+            """
+            {
+              "response": {
+                "groups": [
                   {
-                    "bucketId": "gemini-5h",
-                    "displayName": "Session Limit",
-                    "remainingFraction": 0.75,
-                    "resetTime": "2026-07-18T12:00:00Z"
+                    "displayName": "Gemini Models",
+                    "buckets": [
+                      {
+                        "bucketId": "gemini-5h",
+                        "displayName": "Session Limit",
+                        "remainingFraction": 0.75,
+                        "resetTime": "2026-07-18T12:00:00Z"
+                      },
+                      {
+                        "bucketId": "gemini-weekly",
+                        "displayName": "Weekly Limit",
+                        "remaining": { "case": "remainingFraction", "value": 0.4 }
+                      }
+                    ]
                   },
                   {
-                    "bucketId": "gemini-weekly",
-                    "displayName": "Weekly Limit",
-                    "remaining": { "case": "remainingFraction", "value": 0.4 }
-                  }
-                ]
-              },
-              {
-                "displayName": "Claude and GPT models",
-                "buckets": [
-                  {
-                    "bucketId": "3p-session",
-                    "displayName": "Session",
-                    "remaining": { "remainingFraction": 0.9 }
+                    "displayName": "Claude and GPT models",
+                    "buckets": [
+                      {
+                        "bucketId": "3p-session",
+                        "displayName": "Session",
+                        "remaining": { "remainingFraction": 0.9 }
+                      }
+                    ]
                   }
                 ]
               }
-            ]
-          }
-        }
-        """);
-        using JsonDocument identity = JsonDocument.Parse("""
-        {
-          "userStatus": {
-            "email": "person@example.com",
-            "userTier": { "name": "Google AI Ultra" }
-          }
-        }
-        """);
+            }
+            """
+        );
+        using JsonDocument identity = JsonDocument.Parse(
+            """
+            {
+              "userStatus": {
+                "email": "person@example.com",
+                "userTier": { "name": "Google AI Ultra" }
+              }
+            }
+            """
+        );
         DateTimeOffset now = new(2026, 7, 18, 10, 0, 0, TimeSpan.Zero);
         AgyLimitStrategy strategy = new(new FixedClock(now), new AgyProcessDiscovery());
 
@@ -62,11 +66,13 @@ public sealed class AgyProviderTests
             new AccountKey(new ProviderId("antigravity"), "default"),
             quota.RootElement,
             identity.RootElement,
-            now);
+            now
+        );
 
         Assert.Equal(
             new[] { "Gemini 5-hour", "Gemini weekly", "Claude/GPT 5-hour" },
-            snapshot.Meters.Select(meter => meter.DisplayName));
+            snapshot.Meters.Select(meter => meter.DisplayName)
+        );
         Assert.Equal(new double?[] { 25, 60, 10 }, snapshot.Meters.Select(meter => meter.UsedPercent));
         Assert.Equal(TimeSpan.FromHours(5), snapshot.Meters[0].WindowDuration);
         Assert.Equal(TimeSpan.FromDays(7), snapshot.Meters[1].WindowDuration);
@@ -79,27 +85,30 @@ public sealed class AgyProviderTests
     [Fact]
     public void DisabledAndUnknownQuotaBucketsAreNotReportedAsExhausted()
     {
-        using JsonDocument quota = JsonDocument.Parse("""
-        {
-          "groups": [
+        using JsonDocument quota = JsonDocument.Parse(
+            """
             {
-              "displayName": "Gemini Models",
-              "buckets": [
-                { "bucketId": "disabled", "remainingFraction": 0, "disabled": true },
-                { "bucketId": "unknown", "displayName": "Unknown" },
-                { "bucketId": "weekly", "displayName": "Weekly", "remainingFraction": 0 }
+              "groups": [
+                {
+                  "displayName": "Gemini Models",
+                  "buckets": [
+                    { "bucketId": "disabled", "remainingFraction": 0, "disabled": true },
+                    { "bucketId": "unknown", "displayName": "Unknown" },
+                    { "bucketId": "weekly", "displayName": "Weekly", "remainingFraction": 0 }
+                  ]
+                }
               ]
             }
-          ]
-        }
-        """);
+            """
+        );
         AgyLimitStrategy strategy = new(new FixedClock(), new AgyProcessDiscovery());
 
         ProviderSnapshot snapshot = strategy.BuildSnapshot(
             new AccountKey(new ProviderId("antigravity"), "default"),
             quota.RootElement,
             null,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow
+        );
 
         UsageMeter meter = Assert.Single(snapshot.Meters);
         Assert.Equal("Gemini weekly", meter.DisplayName);
@@ -117,7 +126,8 @@ public sealed class AgyProviderTests
             null,
             "Existing agy session",
             1,
-            true);
+            true
+        );
 
         FetchResult result = await strategy.FetchAsync(account, default);
 
@@ -139,7 +149,8 @@ public sealed class AgyProviderTests
             new AccountKey(new ProviderId("antigravity"), "default"),
             quota.RootElement,
             identity.RootElement,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow
+        );
 
         Assert.Single(snapshot.Meters);
         Assert.False(snapshot.Extensions.ContainsKey("email"));
@@ -151,44 +162,53 @@ public sealed class AgyProviderTests
     public void OutOfRangeRemainingFractionIsRejected(double remainingFraction)
     {
         string fraction = remainingFraction.ToString(CultureInfo.InvariantCulture);
-        using JsonDocument quota = JsonDocument.Parse($$"""
-        {
-          "groups": [{
-            "displayName": "Gemini Models",
-            "buckets": [{
-              "bucketId": "gemini-weekly",
-              "remainingFraction": {{fraction}}
-            }]
-          }]
-        }
-        """);
+        using JsonDocument quota = JsonDocument.Parse(
+            $$"""
+            {
+              "groups": [{
+                "displayName": "Gemini Models",
+                "buckets": [{
+                  "bucketId": "gemini-weekly",
+                  "remainingFraction": {{fraction}}
+                }]
+              }]
+            }
+            """
+        );
         AgyLimitStrategy strategy = new(new FixedClock(), new AgyProcessDiscovery());
 
-        Assert.Throws<JsonException>(() => strategy.BuildSnapshot(
-            new AccountKey(new ProviderId("antigravity"), "default"),
-            quota.RootElement,
-            null,
-            DateTimeOffset.UtcNow));
+        Assert.Throws<JsonException>(() =>
+            strategy.BuildSnapshot(
+                new AccountKey(new ProviderId("antigravity"), "default"),
+                quota.RootElement,
+                null,
+                DateTimeOffset.UtcNow
+            )
+        );
     }
 
-    private static JsonDocument ValidQuota() => JsonDocument.Parse("""
-    {
-      "groups": [{
-        "displayName": "Gemini Models",
-        "buckets": [{
-          "bucketId": "gemini-weekly",
-          "displayName": "Weekly",
-          "remainingFraction": 0.5
-        }]
-      }]
-    }
-    """);
+    private static JsonDocument ValidQuota() =>
+        JsonDocument.Parse(
+            """
+            {
+              "groups": [{
+                "displayName": "Gemini Models",
+                "buckets": [{
+                  "bucketId": "gemini-weekly",
+                  "displayName": "Weekly",
+                  "remainingFraction": 0.5
+                }]
+              }]
+            }
+            """
+        );
 
     private sealed class IdentityTimeoutHandler : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken
+        )
         {
             if (request.RequestUri!.AbsolutePath.EndsWith("GetUserStatus", StringComparison.Ordinal))
             {
@@ -197,20 +217,22 @@ public sealed class AgyProviderTests
 
             HttpResponseMessage response = new(HttpStatusCode.OK)
             {
-                Content = new StringContent("""
-                {
-                  "response": {
-                    "groups": [{
-                      "displayName": "Gemini Models",
-                      "buckets": [{
-                        "bucketId": "gemini-weekly",
-                        "displayName": "Weekly",
-                        "remainingFraction": 0.5
-                      }]
-                    }]
-                  }
-                }
-                """)
+                Content = new StringContent(
+                    """
+                    {
+                      "response": {
+                        "groups": [{
+                          "displayName": "Gemini Models",
+                          "buckets": [{
+                            "bucketId": "gemini-weekly",
+                            "displayName": "Weekly",
+                            "remainingFraction": 0.5
+                          }]
+                        }]
+                      }
+                    }
+                    """
+                ),
             };
             return Task.FromResult(response);
         }

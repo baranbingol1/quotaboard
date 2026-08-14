@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 using System.Security.Cryptography;
-using System.Text.Json;
 using System.Text;
+using System.Text.Json;
 
 namespace AiLimits.Infrastructure.Providers.Common;
 
@@ -9,15 +9,39 @@ internal static class CliCredentialReader
 {
     public static Task<CliCredential?> ReadCodexAsync(string path, CancellationToken cancellationToken)
     {
-        return ReadAsync(path, "tokens", new string[] { "access_token", "accessToken" }, new string[] { "id_token", "idToken" }, new string[] { "account_id", "accountId" }, new string[] { "chatgpt_plan_type", "plan_type" }, cancellationToken);
+        return ReadAsync(
+            path,
+            "tokens",
+            new string[] { "access_token", "accessToken" },
+            new string[] { "id_token", "idToken" },
+            new string[] { "account_id", "accountId" },
+            new string[] { "chatgpt_plan_type", "plan_type" },
+            cancellationToken
+        );
     }
 
     public static Task<CliCredential?> ReadClaudeAsync(string path, CancellationToken cancellationToken)
     {
-        return ReadAsync(path, "claudeAiOauth", new string[] { "accessToken", "access_token" }, Array.Empty<string>(), Array.Empty<string>(), new string[] { "subscriptionType", "subscription_type" }, cancellationToken);
+        return ReadAsync(
+            path,
+            "claudeAiOauth",
+            new string[] { "accessToken", "access_token" },
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            new string[] { "subscriptionType", "subscription_type" },
+            cancellationToken
+        );
     }
 
-    private static async Task<CliCredential?> ReadAsync(string path, string containerName, IReadOnlyList<string> accessNames, IReadOnlyList<string> idTokenNames, IReadOnlyList<string> accountNames, IReadOnlyList<string> planNames, CancellationToken cancellationToken)
+    private static async Task<CliCredential?> ReadAsync(
+        string path,
+        string containerName,
+        IReadOnlyList<string> accessNames,
+        IReadOnlyList<string> idTokenNames,
+        IReadOnlyList<string> accountNames,
+        IReadOnlyList<string> planNames,
+        CancellationToken cancellationToken
+    )
     {
         if (!File.Exists(path))
         {
@@ -26,12 +50,31 @@ internal static class CliCredentialReader
         try
         {
             CliCredential result;
-            await using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 16384, FileOptions.Asynchronous | FileOptions.SequentialScan))
+            await using (
+                FileStream stream = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete,
+                    16384,
+                    FileOptions.Asynchronous | FileOptions.SequentialScan
+                )
+            )
             {
-                using JsonDocument document = await JsonDocument.ParseAsync(stream, default(JsonDocumentOptions), cancellationToken).ConfigureAwait(false);
+                using JsonDocument document = await JsonDocument
+                    .ParseAsync(stream, default(JsonDocumentOptions), cancellationToken)
+                    .ConfigureAwait(false);
                 JsonElement root = document.RootElement;
                 JsonElement nested;
-                JsonElement container = ((root.ValueKind == JsonValueKind.Object && root.TryGetProperty(containerName, out nested) && nested.ValueKind == JsonValueKind.Object) ? nested : root);
+                JsonElement container = (
+                    (
+                        root.ValueKind == JsonValueKind.Object
+                        && root.TryGetProperty(containerName, out nested)
+                        && nested.ValueKind == JsonValueKind.Object
+                    )
+                        ? nested
+                        : root
+                );
                 string accessToken = ReadString(container, accessNames);
                 if (string.IsNullOrWhiteSpace(accessToken))
                 {
@@ -41,14 +84,30 @@ internal static class CliCredentialReader
                 {
                     string idToken = ReadString(container, idTokenNames) ?? accessToken;
                     JsonElement claims = ParseJwtClaims(idToken);
-                    string accountId = ReadString(container, accountNames) ?? ReadString(root, accountNames) ?? ReadString(claims, new string[] { "chatgpt_account_id", "account_id", "organization_id", "org_id", "sub" });
-                    string planHint = ReadString(container, planNames) ?? ReadString(root, planNames) ?? ReadPlanFromClaims(claims, planNames);
-                    result = new CliCredential(Login: ReadString(claims, new string[] { "email", "preferred_username" }), AccessToken: accessToken, AccountId: accountId ?? AnonymousKey(path), SourcePath: path, PlanHint: planHint);
+                    string accountId =
+                        ReadString(container, accountNames)
+                        ?? ReadString(root, accountNames)
+                        ?? ReadString(
+                            claims,
+                            new string[] { "chatgpt_account_id", "account_id", "organization_id", "org_id", "sub" }
+                        );
+                    string planHint =
+                        ReadString(container, planNames)
+                        ?? ReadString(root, planNames)
+                        ?? ReadPlanFromClaims(claims, planNames);
+                    result = new CliCredential(
+                        Login: ReadString(claims, new string[] { "email", "preferred_username" }),
+                        AccessToken: accessToken,
+                        AccountId: accountId ?? AnonymousKey(path),
+                        SourcePath: path,
+                        PlanHint: planHint
+                    );
                 }
             }
             return result;
         }
-        catch (Exception ex) when (((ex is JsonException || ex is IOException || ex is UnauthorizedAccessException) ? 1 : 0) != 0)
+        catch (Exception ex)
+            when (((ex is JsonException || ex is IOException || ex is UnauthorizedAccessException) ? 1 : 0) != 0)
         {
             return null;
         }
@@ -87,7 +146,8 @@ internal static class CliCredentialReader
         {
             return direct;
         }
-        return claims.TryGetProperty("https://api.openai.com/auth", out var auth) && auth.ValueKind == JsonValueKind.Object
+        return
+            claims.TryGetProperty("https://api.openai.com/auth", out var auth) && auth.ValueKind == JsonValueKind.Object
             ? ReadString(auth, planNames)
             : null;
     }
@@ -100,7 +160,11 @@ internal static class CliCredentialReader
         }
         foreach (string name in names)
         {
-            if (element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString()))
+            if (
+                element.TryGetProperty(name, out var value)
+                && value.ValueKind == JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(value.GetString())
+            )
             {
                 return value.GetString().Trim();
             }
@@ -110,8 +174,17 @@ internal static class CliCredentialReader
 
     private static string AnonymousKey(string path)
     {
-        return "local-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(path)))[..8]).ToLowerInvariant();
+        return "local-"
+            + Convert
+                .ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(path)))[..8])
+                .ToLowerInvariant();
     }
 }
 
-internal sealed record CliCredential(string AccessToken, string AccountId, string? Login, string SourcePath, string? PlanHint = null);
+internal sealed record CliCredential(
+    string AccessToken,
+    string AccountId,
+    string? Login,
+    string SourcePath,
+    string? PlanHint = null
+);

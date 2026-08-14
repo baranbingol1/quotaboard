@@ -15,8 +15,8 @@ public sealed class ProviderVisibilitySetTests
     [Fact]
     public void Hiding_and_showing_round_trips_through_serialization()
     {
-        var set = ProviderVisibilitySet.Empty
-            .WithVisibility("copilot", visible: false)
+        var set = ProviderVisibilitySet
+            .Empty.WithVisibility("copilot", visible: false)
             .WithVisibility("antigravity", visible: false);
 
         var reloaded = ProviderVisibilitySet.Parse(set.Serialize());

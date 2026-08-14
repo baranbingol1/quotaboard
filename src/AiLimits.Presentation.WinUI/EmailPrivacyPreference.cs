@@ -13,7 +13,8 @@ public static class EmailPrivacyPreference
     private static readonly string PreferencePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "QuotaBoard",
-        "email-privacy.preference");
+        "email-privacy.preference"
+    );
     private static bool _enabled = LoadCore();
 
     public static bool Enabled => _enabled;
@@ -46,9 +47,7 @@ public static class EmailPrivacyPreference
             Directory.CreateDirectory(Path.GetDirectoryName(PreferencePath)!);
             File.WriteAllText(PreferencePath, enabled ? "On" : "Off");
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         Changed?.Invoke(enabled);
     }
 

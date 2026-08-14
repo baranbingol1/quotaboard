@@ -18,7 +18,13 @@ public sealed class AccountDiscoveryServiceTests
     public async Task Discovery_exception_preserves_saved_accounts_and_revision()
     {
         FakeAccountRepository repository = new FakeAccountRepository();
-        ProviderAccount saved = Account("codex", "user@example.com", revision: 3, connected: true, lastSuccess: DateTimeOffset.UtcNow.AddMinutes(-5));
+        ProviderAccount saved = Account(
+            "codex",
+            "user@example.com",
+            revision: 3,
+            connected: true,
+            lastSuccess: DateTimeOffset.UtcNow.AddMinutes(-5)
+        );
         await repository.UpsertAsync(saved, CancellationToken.None);
         AccountDiscoveryService service = Service(repository, new ThrowingAdapter("codex"));
 
@@ -34,7 +40,10 @@ public sealed class AccountDiscoveryServiceTests
     public async Task Successful_empty_discovery_disconnects_that_providers_accounts()
     {
         FakeAccountRepository repository = new FakeAccountRepository();
-        await repository.UpsertAsync(Account("codex", "user@example.com", revision: 3, connected: true), CancellationToken.None);
+        await repository.UpsertAsync(
+            Account("codex", "user@example.com", revision: 3, connected: true),
+            CancellationToken.None
+        );
         AccountDiscoveryService service = Service(repository, new ScriptedAdapter("codex"));
 
         IReadOnlyList<ProviderAccount> result = await service.DiscoverAsync(CancellationToken.None);
@@ -48,12 +57,19 @@ public sealed class AccountDiscoveryServiceTests
     public async Task One_providers_failure_never_affects_another_provider()
     {
         FakeAccountRepository repository = new FakeAccountRepository();
-        await repository.UpsertAsync(Account("codex", "codex@example.com", revision: 1, connected: true), CancellationToken.None);
-        await repository.UpsertAsync(Account("claude", "claude@example.com", revision: 1, connected: true), CancellationToken.None);
+        await repository.UpsertAsync(
+            Account("codex", "codex@example.com", revision: 1, connected: true),
+            CancellationToken.None
+        );
+        await repository.UpsertAsync(
+            Account("claude", "claude@example.com", revision: 1, connected: true),
+            CancellationToken.None
+        );
         AccountDiscoveryService service = Service(
             repository,
             new ThrowingAdapter("codex"),
-            new ScriptedAdapter("claude"));
+            new ScriptedAdapter("claude")
+        );
 
         IReadOnlyList<ProviderAccount> result = await service.DiscoverAsync(CancellationToken.None);
 
@@ -70,9 +86,18 @@ public sealed class AccountDiscoveryServiceTests
     {
         FakeAccountRepository repository = new FakeAccountRepository();
         DateTimeOffset lastSuccess = DateTimeOffset.UtcNow.AddHours(-1);
-        ProviderAccount saved = Account("codex", "user@example.com", revision: 2, connected: true, lastSuccess: lastSuccess);
+        ProviderAccount saved = Account(
+            "codex",
+            "user@example.com",
+            revision: 2,
+            connected: true,
+            lastSuccess: lastSuccess
+        );
         await repository.UpsertAsync(saved, CancellationToken.None);
-        AccountDiscoveryService service = Service(repository, new ScriptedAdapter("codex", Account("codex", "user@example.com", revision: 0, connected: true)));
+        AccountDiscoveryService service = Service(
+            repository,
+            new ScriptedAdapter("codex", Account("codex", "user@example.com", revision: 0, connected: true))
+        );
 
         IReadOnlyList<ProviderAccount> first = await service.DiscoverAsync(CancellationToken.None);
         IReadOnlyList<ProviderAccount> second = await service.DiscoverAsync(CancellationToken.None);
@@ -87,10 +112,13 @@ public sealed class AccountDiscoveryServiceTests
     public async Task Only_auth_or_login_changes_increment_configuration_revision()
     {
         FakeAccountRepository repository = new FakeAccountRepository();
-        await repository.UpsertAsync(Account("codex", "user@example.com", revision: 2, connected: true), CancellationToken.None);
+        await repository.UpsertAsync(
+            Account("codex", "user@example.com", revision: 2, connected: true),
+            CancellationToken.None
+        );
         ProviderAccount changedAuth = Account("codex", "user@example.com", revision: 0, connected: true) with
         {
-            AuthSource = "Codex CLI OAuth (device)"
+            AuthSource = "Codex CLI OAuth (device)",
         };
         AccountDiscoveryService service = Service(repository, new ScriptedAdapter("codex", changedAuth));
 
@@ -103,11 +131,15 @@ public sealed class AccountDiscoveryServiceTests
     public async Task Failed_provider_skips_disconnect_even_when_other_accounts_are_discovered()
     {
         FakeAccountRepository repository = new FakeAccountRepository();
-        await repository.UpsertAsync(Account("codex", "a@example.com", revision: 1, connected: true), CancellationToken.None);
+        await repository.UpsertAsync(
+            Account("codex", "a@example.com", revision: 1, connected: true),
+            CancellationToken.None
+        );
         AccountDiscoveryService service = Service(
             repository,
             new ThrowingAdapter("codex"),
-            new ScriptedAdapter("claude", Account("claude", "b@example.com", revision: 0, connected: true)));
+            new ScriptedAdapter("claude", Account("claude", "b@example.com", revision: 0, connected: true))
+        );
 
         IReadOnlyList<ProviderAccount> result = await service.DiscoverAsync(CancellationToken.None);
 
@@ -130,14 +162,36 @@ public sealed class AccountDiscoveryServiceTests
         return new AccountDiscoveryService(adapters, repository, NullLogger<AccountDiscoveryService>.Instance);
     }
 
-    private static ProviderAccount Account(string provider, string login, long revision, bool connected, DateTimeOffset? lastSuccess = null)
+    private static ProviderAccount Account(
+        string provider,
+        string login,
+        long revision,
+        bool connected,
+        DateTimeOffset? lastSuccess = null
+    )
     {
-        return new ProviderAccount(new AccountKey(new ProviderId(provider), login), provider, login, provider + " auth", revision, connected, lastSuccess);
+        return new ProviderAccount(
+            new AccountKey(new ProviderId(provider), login),
+            provider,
+            login,
+            provider + " auth",
+            revision,
+            connected,
+            lastSuccess
+        );
     }
 
     private static ProviderDescriptor Descriptor(string id)
     {
-        return new ProviderDescriptor(new ProviderId(id), id, "#333333", SupportsMultipleAccounts: true, SupportsExactTokens: false, "test", Array.Empty<string>());
+        return new ProviderDescriptor(
+            new ProviderId(id),
+            id,
+            "#333333",
+            SupportsMultipleAccounts: true,
+            SupportsExactTokens: false,
+            "test",
+            Array.Empty<string>()
+        );
     }
 
     private sealed class ScriptedAdapter : IProviderAdapter
@@ -225,11 +279,14 @@ public sealed class AccountDiscoveryServiceTests
 
     private sealed class FakeAccountRepository : IAccountRepository
     {
-        private readonly Dictionary<AccountKey, ProviderAccount> _accounts = new Dictionary<AccountKey, ProviderAccount>();
+        private readonly Dictionary<AccountKey, ProviderAccount> _accounts =
+            new Dictionary<AccountKey, ProviderAccount>();
 
         public Task<IReadOnlyList<ProviderAccount>> ListAsync(CancellationToken cancellationToken)
         {
-            return Task.FromResult<IReadOnlyList<ProviderAccount>>(_accounts.Values.OrderBy(account => account.Key.ToString(), StringComparer.Ordinal).ToArray());
+            return Task.FromResult<IReadOnlyList<ProviderAccount>>(
+                _accounts.Values.OrderBy(account => account.Key.ToString(), StringComparer.Ordinal).ToArray()
+            );
         }
 
         public Task<ProviderAccount?> GetAsync(AccountKey key, CancellationToken cancellationToken)

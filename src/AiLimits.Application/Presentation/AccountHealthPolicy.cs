@@ -8,17 +8,19 @@ public enum AccountHealth
 {
     /// <summary>Last refresh succeeded and the snapshot is fresh.</summary>
     Live,
+
     /// <summary>Data shown from cache; the last refresh did not fail.</summary>
     Cached,
     SignInRequired,
     RateLimited,
     Offline,
     UnsupportedResponse,
+
     /// <summary>The source could not run right now but recovers on its own.</summary>
     Retrying,
     FetchFailed,
     NotConnected,
-    NoQuota
+    NoQuota,
 }
 
 /// <summary>
@@ -58,8 +60,10 @@ public static class AccountHealthPolicy
                 FetchFailureKind.RateLimited => AccountHealth.RateLimited,
                 FetchFailureKind.Network or FetchFailureKind.Timeout => AccountHealth.Offline,
                 FetchFailureKind.TemporarilyUnavailable => AccountHealth.Retrying,
-                FetchFailureKind.MalformedResponse or FetchFailureKind.ProviderChanged or FetchFailureKind.OversizedResponse => AccountHealth.UnsupportedResponse,
-                _ => AccountHealth.Cached
+                FetchFailureKind.MalformedResponse
+                or FetchFailureKind.ProviderChanged
+                or FetchFailureKind.OversizedResponse => AccountHealth.UnsupportedResponse,
+                _ => AccountHealth.Cached,
             };
         }
         if (!isConnected)
@@ -80,10 +84,11 @@ public static class AccountHealthPolicy
             FetchFailureKind.RateLimited => AccountHealth.RateLimited,
             FetchFailureKind.Network or FetchFailureKind.Timeout => AccountHealth.Offline,
             FetchFailureKind.TemporarilyUnavailable => AccountHealth.Retrying,
-            FetchFailureKind.MalformedResponse or FetchFailureKind.ProviderChanged
-                or FetchFailureKind.OversizedResponse => AccountHealth.UnsupportedResponse,
+            FetchFailureKind.MalformedResponse
+            or FetchFailureKind.ProviderChanged
+            or FetchFailureKind.OversizedResponse => AccountHealth.UnsupportedResponse,
             FetchFailureKind.Unknown => AccountHealth.FetchFailed,
-            _ => AccountHealth.NoQuota
+            _ => AccountHealth.NoQuota,
         };
     }
 }

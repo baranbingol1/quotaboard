@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-using AiLimits.Infrastructure.Providers.Common;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using AiLimits.Infrastructure.Providers.Common;
 
 namespace AiLimits.Infrastructure.Providers.OpenCode;
 
@@ -11,14 +11,27 @@ public sealed class OpenCodePathDiscovery(IProcessRunner processRunner)
     {
         try
         {
-            ProcessResult result = await processRunner.RunAsync("opencode", new string[] { "db", "path" }, TimeSpan.FromSeconds(4L), cancellationToken).ConfigureAwait(false);
+            ProcessResult result = await processRunner
+                .RunAsync("opencode", new string[] { "db", "path" }, TimeSpan.FromSeconds(4L), cancellationToken)
+                .ConfigureAwait(false);
             string reportedPath = result.StandardOutput.Trim().Trim('"');
             if (result.ExitCode == 0 && !string.IsNullOrWhiteSpace(reportedPath) && File.Exists(reportedPath))
             {
                 return Path.GetFullPath(reportedPath);
             }
         }
-        catch (Exception ex) when (((ex is IOException || ex is InvalidOperationException || ex is Win32Exception || ex is OperationCanceledException) ? 1 : 0) != 0)
+        catch (Exception ex)
+            when ((
+                    (
+                        ex is IOException
+                        || ex is InvalidOperationException
+                        || ex is Win32Exception
+                        || ex is OperationCanceledException
+                    )
+                        ? 1
+                        : 0
+                ) != 0
+            )
         {
             if (ex is OperationCanceledException && cancellationToken.IsCancellationRequested)
             {

@@ -16,7 +16,17 @@ public sealed class OpenCodeProviderAdapter(OpenCodePathDiscovery pathDiscovery)
         {
             return Array.Empty<ProviderAccount>();
         }
-        return new ProviderAccount[] { new ProviderAccount(new AccountKey(Descriptor.Id, "local"), "OpenCode CLI history", null, File.Exists(authPath) ? "Local history + provider auth metadata" : "Local usage database", 1L, IsConnected: true) };
+        return new ProviderAccount[]
+        {
+            new ProviderAccount(
+                new AccountKey(Descriptor.Id, "local"),
+                "OpenCode CLI history",
+                null,
+                File.Exists(authPath) ? "Local history + provider auth metadata" : "Local usage database",
+                1L,
+                IsConnected: true
+            ),
+        };
     }
 
     // Deliberately empty: local history alone never implies a Go/Zen

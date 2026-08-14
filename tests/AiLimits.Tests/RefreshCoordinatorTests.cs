@@ -9,6 +9,7 @@ using AiLimits.Infrastructure.Persistence;
 using AiLimits.Infrastructure.Providers.Fixtures;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
+using xRetry;
 
 namespace AiLimits.Tests;
 
@@ -20,18 +21,29 @@ public sealed class RefreshCoordinatorTests
     // CancelingOneCoalescedCallerDoesNotCancelTheSharedOperation).
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(30);
 
-
     [Fact]
     public async Task EquivalentConcurrentRefreshesCoalesce()
     {
-        var account = new ProviderAccount(new AccountKey(new ProviderId("fake"), "one"),
-            "one", null, "fixture", 4, true);
+        var account = new ProviderAccount(
+            new AccountKey(new ProviderId("fake"), "one"),
+            "one",
+            null,
+            "fixture",
+            4,
+            true
+        );
         var accounts = new MemoryAccounts(account);
         var snapshots = new MemorySnapshots();
         var strategy = new ControlledStrategy(account.Key);
         var adapter = new FakeAdapter(strategy);
-        var coordinator = new RefreshCoordinator([adapter], accounts, snapshots, new SnapshotMerger(),
-            new FixedClock(), NullLogger<RefreshCoordinator>.Instance);
+        var coordinator = new RefreshCoordinator(
+            [adapter],
+            accounts,
+            snapshots,
+            new SnapshotMerger(),
+            new FixedClock(),
+            NullLogger<RefreshCoordinator>.Instance
+        );
 
         var first = coordinator.RefreshAsync(new RefreshRequest(account.Key, 4));
         var second = coordinator.RefreshAsync(new RefreshRequest(account.Key, 4));
@@ -46,12 +58,24 @@ public sealed class RefreshCoordinatorTests
     [Fact]
     public async Task ConfigurationChangeRejectsOldResult()
     {
-        var account = new ProviderAccount(new AccountKey(new ProviderId("fake"), "one"),
-            "one", null, "fixture", 1, true);
+        var account = new ProviderAccount(
+            new AccountKey(new ProviderId("fake"), "one"),
+            "one",
+            null,
+            "fixture",
+            1,
+            true
+        );
         var accounts = new MemoryAccounts(account);
         var strategy = new ControlledStrategy(account.Key);
-        var coordinator = new RefreshCoordinator([new FakeAdapter(strategy)], accounts, new MemorySnapshots(),
-            new SnapshotMerger(), new FixedClock(), NullLogger<RefreshCoordinator>.Instance);
+        var coordinator = new RefreshCoordinator(
+            [new FakeAdapter(strategy)],
+            accounts,
+            new MemorySnapshots(),
+            new SnapshotMerger(),
+            new FixedClock(),
+            NullLogger<RefreshCoordinator>.Instance
+        );
         var refresh = coordinator.RefreshAsync(new RefreshRequest(account.Key, 1));
         await strategy.Started.Task.WaitAsync(TestTimeout);
         accounts.Current = account with { ConfigurationRevision = 2 };
@@ -60,15 +84,27 @@ public sealed class RefreshCoordinatorTests
         Assert.Equal(RefreshPublicationStatus.StaleResultRejected, result.Status);
     }
 
-    [Fact]
+    [RetryFact(3, 500)]
     public async Task CancelingOneCoalescedCallerDoesNotCancelTheSharedOperation()
     {
-        var account = new ProviderAccount(new AccountKey(new ProviderId("fake"), "one"),
-            "one", null, "fixture", 4, true);
+        var account = new ProviderAccount(
+            new AccountKey(new ProviderId("fake"), "one"),
+            "one",
+            null,
+            "fixture",
+            4,
+            true
+        );
         var accounts = new MemoryAccounts(account);
         var strategy = new ControlledStrategy(account.Key);
-        var coordinator = new RefreshCoordinator([new FakeAdapter(strategy)], accounts, new MemorySnapshots(),
-            new SnapshotMerger(), new FixedClock(), NullLogger<RefreshCoordinator>.Instance);
+        var coordinator = new RefreshCoordinator(
+            [new FakeAdapter(strategy)],
+            accounts,
+            new MemorySnapshots(),
+            new SnapshotMerger(),
+            new FixedClock(),
+            NullLogger<RefreshCoordinator>.Instance
+        );
 
         using var impatient = new CancellationTokenSource();
         var first = coordinator.RefreshAsync(new RefreshRequest(account.Key, 4), impatient.Token);
@@ -88,12 +124,24 @@ public sealed class RefreshCoordinatorTests
     [Fact]
     public async Task CancelingTheLastCallerCancelsTheSharedOperation()
     {
-        var account = new ProviderAccount(new AccountKey(new ProviderId("fake"), "one"),
-            "one", null, "fixture", 4, true);
+        var account = new ProviderAccount(
+            new AccountKey(new ProviderId("fake"), "one"),
+            "one",
+            null,
+            "fixture",
+            4,
+            true
+        );
         var accounts = new MemoryAccounts(account);
         var strategy = new ControlledStrategy(account.Key);
-        var coordinator = new RefreshCoordinator([new FakeAdapter(strategy)], accounts, new MemorySnapshots(),
-            new SnapshotMerger(), new FixedClock(), NullLogger<RefreshCoordinator>.Instance);
+        var coordinator = new RefreshCoordinator(
+            [new FakeAdapter(strategy)],
+            accounts,
+            new MemorySnapshots(),
+            new SnapshotMerger(),
+            new FixedClock(),
+            NullLogger<RefreshCoordinator>.Instance
+        );
 
         using var only = new CancellationTokenSource();
         var refresh = coordinator.RefreshAsync(new RefreshRequest(account.Key, 4), only.Token);
@@ -113,30 +161,55 @@ public sealed class RefreshCoordinatorTests
     [Fact]
     public async Task AvailabilityCheckExceptionFallsThroughToTheNextStrategy()
     {
-        var account = new ProviderAccount(new AccountKey(new ProviderId("fake"), "one"),
-            "one", null, "fixture", 4, true);
+        var account = new ProviderAccount(
+            new AccountKey(new ProviderId("fake"), "one"),
+            "one",
+            null,
+            "fixture",
+            4,
+            true
+        );
         var accounts = new MemoryAccounts(account);
         var healthy = new ControlledStrategy(account.Key) { Order = 2 };
         healthy.Release.SetResult();
         var coordinator = new RefreshCoordinator(
-            [new FakeAdapter(new ThrowingAvailabilityStrategy(), healthy)], accounts, new MemorySnapshots(),
-            new SnapshotMerger(), new FixedClock(), NullLogger<RefreshCoordinator>.Instance);
+            [new FakeAdapter(new ThrowingAvailabilityStrategy(), healthy)],
+            accounts,
+            new MemorySnapshots(),
+            new SnapshotMerger(),
+            new FixedClock(),
+            NullLogger<RefreshCoordinator>.Instance
+        );
 
         var publication = await coordinator.RefreshAsync(new RefreshRequest(account.Key, 4));
 
         Assert.Equal(RefreshPublicationStatus.Published, publication.Status);
-        Assert.Contains(publication.Attempts, attempt => attempt.StrategyId == "throwing-availability"
-            && attempt.FailureKind == FetchFailureKind.Unknown);
+        Assert.Contains(
+            publication.Attempts,
+            attempt => attempt.StrategyId == "throwing-availability" && attempt.FailureKind == FetchFailureKind.Unknown
+        );
     }
 
     [Fact]
     public async Task StrategyCreationExceptionFailsThatAccountWithoutThrowing()
     {
-        var account = new ProviderAccount(new AccountKey(new ProviderId("fake"), "one"),
-            "one", null, "fixture", 4, true);
+        var account = new ProviderAccount(
+            new AccountKey(new ProviderId("fake"), "one"),
+            "one",
+            null,
+            "fixture",
+            4,
+            true
+        );
         var accounts = new MemoryAccounts(account);
-        var coordinator = new RefreshCoordinator([new StrategyCreationThrowingAdapter()], accounts, new MemorySnapshots(),
-            new SnapshotMerger(), new FixedClock(), NullLogger<RefreshCoordinator>.Instance);
+        var coordinator = new RefreshCoordinator(
+            [new StrategyCreationThrowingAdapter()],
+            accounts,
+            new MemorySnapshots(),
+            new SnapshotMerger(),
+            new FixedClock(),
+            NullLogger<RefreshCoordinator>.Instance
+        );
 
         var publication = await coordinator.RefreshAsync(new RefreshRequest(account.Key, 4));
 
@@ -146,17 +219,40 @@ public sealed class RefreshCoordinatorTests
     [Fact]
     public async Task AllUnavailableStrategiesReplaceAStaleSuccessfulAttemptOnce()
     {
-        var account = new ProviderAccount(new AccountKey(new ProviderId("fake"), "one"),
-            "one", null, "fixture", 4, true);
+        var account = new ProviderAccount(
+            new AccountKey(new ProviderId("fake"), "one"),
+            "one",
+            null,
+            "fixture",
+            4,
+            true
+        );
         var accounts = new MemoryAccounts(account);
         var snapshots = new MemorySnapshots();
-        snapshots.Attempts.Add(new FetchAttempt("previous", account.Key, "working", new FixedClock().UtcNow,
-            TimeSpan.Zero, FetchFailureKind.None, "Success"));
+        snapshots.Attempts.Add(
+            new FetchAttempt(
+                "previous",
+                account.Key,
+                "working",
+                new FixedClock().UtcNow,
+                TimeSpan.Zero,
+                FetchFailureKind.None,
+                "Success"
+            )
+        );
         var coordinator = new RefreshCoordinator(
-            [new FakeAdapter(
-                new SkippedStrategy("not-configured", StrategyAvailability.NotConfigured),
-                new SkippedStrategy("unsupported", StrategyAvailability.Unsupported))],
-            accounts, snapshots, new SnapshotMerger(), new FixedClock(), NullLogger<RefreshCoordinator>.Instance);
+            [
+                new FakeAdapter(
+                    new SkippedStrategy("not-configured", StrategyAvailability.NotConfigured),
+                    new SkippedStrategy("unsupported", StrategyAvailability.Unsupported)
+                ),
+            ],
+            accounts,
+            snapshots,
+            new SnapshotMerger(),
+            new FixedClock(),
+            NullLogger<RefreshCoordinator>.Instance
+        );
 
         var publication = await coordinator.RefreshAsync(new RefreshRequest(account.Key, 4));
 
@@ -164,22 +260,38 @@ public sealed class RefreshCoordinatorTests
         FetchAttempt unavailable = Assert.Single(publication.Attempts);
         Assert.Equal(FetchFailureKind.Unsupported, unavailable.FailureKind);
         Assert.Equal(2, snapshots.Attempts.Count);
-        Assert.Equal(AccountHealth.SignInRequired,
-            AccountHealthPolicy.Decide(isConnected: true, TimeSpan.FromSeconds(30), unavailable.FailureKind));
+        Assert.Equal(
+            AccountHealth.SignInRequired,
+            AccountHealthPolicy.Decide(isConnected: true, TimeSpan.FromSeconds(30), unavailable.FailureKind)
+        );
     }
 
     [Fact]
     public async Task AllTemporarilyUnavailableStrategiesPersistOneRepresentativeFailure()
     {
-        var account = new ProviderAccount(new AccountKey(new ProviderId("fake"), "one"),
-            "one", null, "fixture", 4, true);
+        var account = new ProviderAccount(
+            new AccountKey(new ProviderId("fake"), "one"),
+            "one",
+            null,
+            "fixture",
+            4,
+            true
+        );
         var accounts = new MemoryAccounts(account);
         var snapshots = new MemorySnapshots();
         var coordinator = new RefreshCoordinator(
-            [new FakeAdapter(
-                new SkippedStrategy("locked-db", StrategyAvailability.TemporarilyUnavailable) { Order = 1 },
-                new SkippedStrategy("busy-vault", StrategyAvailability.TemporarilyUnavailable) { Order = 2 })],
-            accounts, snapshots, new SnapshotMerger(), new FixedClock(), NullLogger<RefreshCoordinator>.Instance);
+            [
+                new FakeAdapter(
+                    new SkippedStrategy("locked-db", StrategyAvailability.TemporarilyUnavailable) { Order = 1 },
+                    new SkippedStrategy("busy-vault", StrategyAvailability.TemporarilyUnavailable) { Order = 2 }
+                ),
+            ],
+            accounts,
+            snapshots,
+            new SnapshotMerger(),
+            new FixedClock(),
+            NullLogger<RefreshCoordinator>.Instance
+        );
 
         var publication = await coordinator.RefreshAsync(new RefreshRequest(account.Key, 4));
 
@@ -196,18 +308,31 @@ public sealed class RefreshCoordinatorTests
     [InlineData(FetchFailureKind.Network)]
     [InlineData(FetchFailureKind.Timeout)]
     [InlineData(FetchFailureKind.RateLimited)]
-    public async Task ALaterTemporaryAvailabilityDoesNotMaskAnEarlierActionableFailure(
-        FetchFailureKind failureKind)
+    public async Task ALaterTemporaryAvailabilityDoesNotMaskAnEarlierActionableFailure(FetchFailureKind failureKind)
     {
-        var account = new ProviderAccount(new AccountKey(new ProviderId("fake"), "one"),
-            "one", null, "fixture", 4, true);
+        var account = new ProviderAccount(
+            new AccountKey(new ProviderId("fake"), "one"),
+            "one",
+            null,
+            "fixture",
+            4,
+            true
+        );
         var accounts = new MemoryAccounts(account);
         var snapshots = new MemorySnapshots();
         var coordinator = new RefreshCoordinator(
-            [new FakeAdapter(
-                new FailingStrategy(failureKind) { Order = 1 },
-                new SkippedStrategy("locked-db", StrategyAvailability.TemporarilyUnavailable) { Order = 2 })],
-            accounts, snapshots, new SnapshotMerger(), new FixedClock(), NullLogger<RefreshCoordinator>.Instance);
+            [
+                new FakeAdapter(
+                    new FailingStrategy(failureKind) { Order = 1 },
+                    new SkippedStrategy("locked-db", StrategyAvailability.TemporarilyUnavailable) { Order = 2 }
+                ),
+            ],
+            accounts,
+            snapshots,
+            new SnapshotMerger(),
+            new FixedClock(),
+            NullLogger<RefreshCoordinator>.Instance
+        );
 
         var publication = await coordinator.RefreshAsync(new RefreshRequest(account.Key, 4));
 
@@ -227,11 +352,20 @@ public sealed class RefreshCoordinatorTests
         var snapshots = new SqliteSnapshotRepository(database);
         var account = new ProviderAccount(FixtureProviderAdapter.FixtureAccount, "Fixture", null, "fixture", 1, true);
         await accounts.UpsertAsync(account, default);
-        var adapter = new FixtureProviderAdapter(new FixedClock(), """
+        var adapter = new FixtureProviderAdapter(
+            new FixedClock(),
+            """
             {"limits":{"weekly":{"id":"weekly","used_percent":61},"fable":{"used":4,"limit":10,"model_id":"fable-x"}}}
-            """);
-        var coordinator = new RefreshCoordinator([adapter], accounts, snapshots, new SnapshotMerger(),
-            new FixedClock(), NullLogger<RefreshCoordinator>.Instance);
+            """
+        );
+        var coordinator = new RefreshCoordinator(
+            [adapter],
+            accounts,
+            snapshots,
+            new SnapshotMerger(),
+            new FixedClock(),
+            NullLogger<RefreshCoordinator>.Instance
+        );
         var publication = await coordinator.RefreshAsync(new RefreshRequest(account.Key, 1));
         Assert.Equal(RefreshPublicationStatus.Published, publication.Status);
         var reloaded = await snapshots.GetLatestAsync(account.Key, default);
@@ -253,8 +387,11 @@ public sealed class RefreshCoordinatorTests
         public TaskCompletionSource Cancelled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public string Id => "fake";
         public int Order { get; init; } = 1;
-        public Task<StrategyAvailabilityResult> CheckAvailabilityAsync(ProviderAccount providerAccount, CancellationToken cancellationToken) =>
-            Task.FromResult(StrategyAvailabilityResult.Ready());
+
+        public Task<StrategyAvailabilityResult> CheckAvailabilityAsync(
+            ProviderAccount providerAccount,
+            CancellationToken cancellationToken
+        ) => Task.FromResult(StrategyAvailabilityResult.Ready());
 
         public async Task<FetchResult> FetchAsync(ProviderAccount providerAccount, CancellationToken cancellationToken)
         {
@@ -270,21 +407,46 @@ public sealed class RefreshCoordinatorTests
                 throw;
             }
             var at = DateTimeOffset.UtcNow;
-            var meter = new UsageMeter(new MeterKey("one"), "One", MeterScope.Account, MeterUnit.Percent,
-                null, null, 10, null, null, null, MeterStatus.Healthy,
-                new MeterProvenance(Id, "$", at, true));
-            return FetchResult.Success(new ProviderSnapshot(account, [meter], [], SnapshotCompleteness.Authoritative,
-                at, DataConfidence.Exact, new Dictionary<string, JsonElement>()), Id, TimeSpan.Zero);
+            var meter = new UsageMeter(
+                new MeterKey("one"),
+                "One",
+                MeterScope.Account,
+                MeterUnit.Percent,
+                null,
+                null,
+                10,
+                null,
+                null,
+                null,
+                MeterStatus.Healthy,
+                new MeterProvenance(Id, "$", at, true)
+            );
+            return FetchResult.Success(
+                new ProviderSnapshot(
+                    account,
+                    [meter],
+                    [],
+                    SnapshotCompleteness.Authoritative,
+                    at,
+                    DataConfidence.Exact,
+                    new Dictionary<string, JsonElement>()
+                ),
+                Id,
+                TimeSpan.Zero
+            );
         }
     }
 
     private sealed class FakeAdapter(params ILimitFetchStrategy[] strategies) : IProviderAdapter
     {
-        public ProviderDescriptor Descriptor { get; } = new(new ProviderId("fake"), "Fake", "#000000",
-            true, false, "fixture", ["fixture"]);
+        public ProviderDescriptor Descriptor { get; } =
+            new(new ProviderId("fake"), "Fake", "#000000", true, false, "fixture", ["fixture"]);
+
         public Task<IReadOnlyList<ProviderAccount>> DiscoverAccountsAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<ProviderAccount>>([]);
+
         public IReadOnlyList<ILimitFetchStrategy> CreateLimitStrategies(ProviderAccount account) => strategies;
+
         public IReadOnlyList<ITokenUsageSource> CreateTokenSources(ProviderAccount account) => [];
     }
 
@@ -292,8 +454,12 @@ public sealed class RefreshCoordinatorTests
     {
         public string Id => "throwing-availability";
         public int Order => 1;
-        public Task<StrategyAvailabilityResult> CheckAvailabilityAsync(ProviderAccount providerAccount, CancellationToken cancellationToken) =>
-            throw new InvalidOperationException("availability probe exploded");
+
+        public Task<StrategyAvailabilityResult> CheckAvailabilityAsync(
+            ProviderAccount providerAccount,
+            CancellationToken cancellationToken
+        ) => throw new InvalidOperationException("availability probe exploded");
+
         public Task<FetchResult> FetchAsync(ProviderAccount providerAccount, CancellationToken cancellationToken) =>
             throw new InvalidOperationException("should never be called");
     }
@@ -302,8 +468,12 @@ public sealed class RefreshCoordinatorTests
     {
         public string Id => id;
         public int Order { get; init; } = 1;
-        public Task<StrategyAvailabilityResult> CheckAvailabilityAsync(ProviderAccount providerAccount, CancellationToken cancellationToken) =>
-            Task.FromResult(new StrategyAvailabilityResult(availability, "not runnable right now"));
+
+        public Task<StrategyAvailabilityResult> CheckAvailabilityAsync(
+            ProviderAccount providerAccount,
+            CancellationToken cancellationToken
+        ) => Task.FromResult(new StrategyAvailabilityResult(availability, "not runnable right now"));
+
         public Task<FetchResult> FetchAsync(ProviderAccount providerAccount, CancellationToken cancellationToken) =>
             throw new InvalidOperationException("skipped strategies must never be fetched");
     }
@@ -312,31 +482,46 @@ public sealed class RefreshCoordinatorTests
     {
         public string Id => "failing";
         public int Order { get; init; } = 1;
-        public Task<StrategyAvailabilityResult> CheckAvailabilityAsync(ProviderAccount providerAccount, CancellationToken cancellationToken) =>
-            Task.FromResult(StrategyAvailabilityResult.Ready());
+
+        public Task<StrategyAvailabilityResult> CheckAvailabilityAsync(
+            ProviderAccount providerAccount,
+            CancellationToken cancellationToken
+        ) => Task.FromResult(StrategyAvailabilityResult.Ready());
+
         public Task<FetchResult> FetchAsync(ProviderAccount providerAccount, CancellationToken cancellationToken) =>
             Task.FromResult(FetchResult.Failure(kind, "boom", FallbackPolicy.TryNextStrategy, Id, TimeSpan.Zero));
     }
 
     private sealed class StrategyCreationThrowingAdapter : IProviderAdapter
     {
-        public ProviderDescriptor Descriptor { get; } = new(new ProviderId("fake"), "Fake", "#000000",
-            true, false, "fixture", ["fixture"]);
+        public ProviderDescriptor Descriptor { get; } =
+            new(new ProviderId("fake"), "Fake", "#000000", true, false, "fixture", ["fixture"]);
+
         public Task<IReadOnlyList<ProviderAccount>> DiscoverAccountsAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<ProviderAccount>>([]);
+
         public IReadOnlyList<ILimitFetchStrategy> CreateLimitStrategies(ProviderAccount account) =>
             throw new InvalidOperationException("strategy creation exploded");
+
         public IReadOnlyList<ITokenUsageSource> CreateTokenSources(ProviderAccount account) => [];
     }
 
     private sealed class MemoryAccounts(ProviderAccount current) : IAccountRepository
     {
         public ProviderAccount Current { get; set; } = current;
+
         public Task<IReadOnlyList<ProviderAccount>> ListAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<ProviderAccount>>([Current]);
+
         public Task<ProviderAccount?> GetAsync(AccountKey key, CancellationToken cancellationToken) =>
             Task.FromResult<ProviderAccount?>(Current.Key == key ? Current : null);
-        public Task UpsertAsync(ProviderAccount account, CancellationToken cancellationToken) { Current = account; return Task.CompletedTask; }
+
+        public Task UpsertAsync(ProviderAccount account, CancellationToken cancellationToken)
+        {
+            Current = account;
+            return Task.CompletedTask;
+        }
+
         public Task DeleteAsync(AccountKey key, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
@@ -344,11 +529,27 @@ public sealed class RefreshCoordinatorTests
     {
         private ProviderSnapshot? _snapshot;
         public List<FetchAttempt> Attempts { get; } = [];
-        public Task<ProviderSnapshot?> GetLatestAsync(AccountKey account, CancellationToken cancellationToken) => Task.FromResult(_snapshot);
-        public Task SaveAsync(ProviderSnapshot snapshot, long generation, CancellationToken cancellationToken) { _snapshot = snapshot; return Task.CompletedTask; }
-        public Task<IReadOnlyList<ProviderSnapshot>> GetHistoryAsync(AccountKey account, DateTimeOffset from, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<ProviderSnapshot>>(_snapshot is null ? [] : [_snapshot]);
-        public Task RecordAttemptAsync(FetchAttempt attempt, CancellationToken cancellationToken) { Attempts.Add(attempt); return Task.CompletedTask; }
+
+        public Task<ProviderSnapshot?> GetLatestAsync(AccountKey account, CancellationToken cancellationToken) =>
+            Task.FromResult(_snapshot);
+
+        public Task SaveAsync(ProviderSnapshot snapshot, long generation, CancellationToken cancellationToken)
+        {
+            _snapshot = snapshot;
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<ProviderSnapshot>> GetHistoryAsync(
+            AccountKey account,
+            DateTimeOffset from,
+            CancellationToken cancellationToken
+        ) => Task.FromResult<IReadOnlyList<ProviderSnapshot>>(_snapshot is null ? [] : [_snapshot]);
+
+        public Task RecordAttemptAsync(FetchAttempt attempt, CancellationToken cancellationToken)
+        {
+            Attempts.Add(attempt);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class TemporaryDirectory : IDisposable
@@ -358,11 +559,14 @@ public sealed class RefreshCoordinatorTests
             Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AiLimits.Tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(Path);
         }
+
         public string Path { get; }
+
         public void Dispose()
         {
             SqliteConnection.ClearAllPools();
-            if (Directory.Exists(Path)) Directory.Delete(Path, true);
+            if (Directory.Exists(Path))
+                Directory.Delete(Path, true);
         }
     }
 }

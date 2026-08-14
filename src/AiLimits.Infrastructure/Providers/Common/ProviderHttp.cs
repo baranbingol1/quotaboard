@@ -12,7 +12,10 @@ using AiLimits.Domain;
 
 namespace AiLimits.Infrastructure.Providers.Common;
 
-internal sealed record ProviderHttpOptions(TimeSpan? Timeout = null, long MaxResponseBytes = ProviderHttp.DefaultMaxResponseBytes);
+internal sealed record ProviderHttpOptions(
+    TimeSpan? Timeout = null,
+    long MaxResponseBytes = ProviderHttp.DefaultMaxResponseBytes
+);
 
 /// <summary>
 /// Outcome of one provider HTTP+JSON exchange: either a parsed document or a
@@ -63,7 +66,8 @@ internal static class ProviderHttp
         string providerLabel,
         long startedTimestamp,
         CancellationToken cancellationToken,
-        ProviderHttpOptions? options = null)
+        ProviderHttpOptions? options = null
+    )
     {
         options ??= new ProviderHttpOptions();
         using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -71,7 +75,9 @@ internal static class ProviderHttp
         HttpResponseMessage response;
         try
         {
-            response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
+            response = await client
+                .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token)
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -79,22 +85,37 @@ internal static class ProviderHttp
         }
         catch (OperationCanceledException)
         {
-            return Fail(FetchFailureKind.Timeout, providerLabel + " did not respond in time.", FallbackPolicy.TryNextStrategy, strategyId, startedTimestamp);
+            return Fail(
+                FetchFailureKind.Timeout,
+                providerLabel + " did not respond in time.",
+                FallbackPolicy.TryNextStrategy,
+                strategyId,
+                startedTimestamp
+            );
         }
         catch (HttpRequestException)
         {
-            return Fail(FetchFailureKind.Network, providerLabel + " could not be reached.", FallbackPolicy.TryNextStrategy, strategyId, startedTimestamp);
+            return Fail(
+                FetchFailureKind.Network,
+                providerLabel + " could not be reached.",
+                FallbackPolicy.TryNextStrategy,
+                strategyId,
+                startedTimestamp
+            );
         }
         using (response)
         {
             if (!response.IsSuccessStatusCode)
             {
-                return ProviderJsonResult.FromFailure(FailureForResponse(response, strategyId, providerLabel, startedTimestamp));
+                return ProviderJsonResult.FromFailure(
+                    FailureForResponse(response, strategyId, providerLabel, startedTimestamp)
+                );
             }
             byte[]? body;
             try
             {
-                body = await ReadBoundedContentAsync(response.Content, options.MaxResponseBytes, timeout.Token).ConfigureAwait(false);
+                body = await ReadBoundedContentAsync(response.Content, options.MaxResponseBytes, timeout.Token)
+                    .ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -102,15 +123,33 @@ internal static class ProviderHttp
             }
             catch (OperationCanceledException)
             {
-                return Fail(FetchFailureKind.Timeout, providerLabel + " did not respond in time.", FallbackPolicy.TryNextStrategy, strategyId, startedTimestamp);
+                return Fail(
+                    FetchFailureKind.Timeout,
+                    providerLabel + " did not respond in time.",
+                    FallbackPolicy.TryNextStrategy,
+                    strategyId,
+                    startedTimestamp
+                );
             }
             catch (Exception exception) when (exception is HttpRequestException or IOException)
             {
-                return Fail(FetchFailureKind.Network, providerLabel + " connection failed while reading the response.", FallbackPolicy.TryNextStrategy, strategyId, startedTimestamp);
+                return Fail(
+                    FetchFailureKind.Network,
+                    providerLabel + " connection failed while reading the response.",
+                    FallbackPolicy.TryNextStrategy,
+                    strategyId,
+                    startedTimestamp
+                );
             }
             if (body is null)
             {
-                return Fail(FetchFailureKind.OversizedResponse, providerLabel + " returned an unexpectedly large response.", FallbackPolicy.TryNextStrategy, strategyId, startedTimestamp);
+                return Fail(
+                    FetchFailureKind.OversizedResponse,
+                    providerLabel + " returned an unexpectedly large response.",
+                    FallbackPolicy.TryNextStrategy,
+                    strategyId,
+                    startedTimestamp
+                );
             }
             try
             {
@@ -118,23 +157,66 @@ internal static class ProviderHttp
             }
             catch (JsonException)
             {
-                return Fail(FetchFailureKind.MalformedResponse, providerLabel + " returned malformed JSON.", FallbackPolicy.TryNextStrategy, strategyId, startedTimestamp);
+                return Fail(
+                    FetchFailureKind.MalformedResponse,
+                    providerLabel + " returned malformed JSON.",
+                    FallbackPolicy.TryNextStrategy,
+                    strategyId,
+                    startedTimestamp
+                );
             }
         }
     }
 
-    internal static FetchResult FailureForResponse(HttpResponseMessage response, string strategyId, string providerLabel, long startedTimestamp)
+    internal static FetchResult FailureForResponse(
+        HttpResponseMessage response,
+        string strategyId,
+        string providerLabel,
+        long startedTimestamp
+    )
     {
         TimeSpan elapsed = System.Diagnostics.Stopwatch.GetElapsedTime(startedTimestamp);
         TimeSpan? retryAfter = ParseRetryAfter(response.Headers);
         int status = (int)response.StatusCode;
         return response.StatusCode switch
         {
-            HttpStatusCode.Unauthorized => FetchResult.Failure(FetchFailureKind.Authentication, providerLabel + " credentials expired or were rejected.", FallbackPolicy.TryNextStrategy, strategyId, elapsed),
-            HttpStatusCode.Forbidden => FetchResult.Failure(FetchFailureKind.Authorization, "The connected account is not authorized to read " + providerLabel + " usage.", FallbackPolicy.TryNextStrategy, strategyId, elapsed),
-            HttpStatusCode.TooManyRequests => FetchResult.Failure(FetchFailureKind.RateLimited, providerLabel + " rate-limited this refresh.", FallbackPolicy.Stop, strategyId, elapsed, retryAfter),
-            _ when status >= 500 => FetchResult.Failure(FetchFailureKind.Network, $"{providerLabel} reported a server error (HTTP {status}).", FallbackPolicy.TryNextStrategy, strategyId, elapsed, retryAfter),
-            _ => FetchResult.Failure(FetchFailureKind.Network, $"{providerLabel} returned HTTP {status}.", FallbackPolicy.TryNextStrategy, strategyId, elapsed),
+            HttpStatusCode.Unauthorized => FetchResult.Failure(
+                FetchFailureKind.Authentication,
+                providerLabel + " credentials expired or were rejected.",
+                FallbackPolicy.TryNextStrategy,
+                strategyId,
+                elapsed
+            ),
+            HttpStatusCode.Forbidden => FetchResult.Failure(
+                FetchFailureKind.Authorization,
+                "The connected account is not authorized to read " + providerLabel + " usage.",
+                FallbackPolicy.TryNextStrategy,
+                strategyId,
+                elapsed
+            ),
+            HttpStatusCode.TooManyRequests => FetchResult.Failure(
+                FetchFailureKind.RateLimited,
+                providerLabel + " rate-limited this refresh.",
+                FallbackPolicy.Stop,
+                strategyId,
+                elapsed,
+                retryAfter
+            ),
+            _ when status >= 500 => FetchResult.Failure(
+                FetchFailureKind.Network,
+                $"{providerLabel} reported a server error (HTTP {status}).",
+                FallbackPolicy.TryNextStrategy,
+                strategyId,
+                elapsed,
+                retryAfter
+            ),
+            _ => FetchResult.Failure(
+                FetchFailureKind.Network,
+                $"{providerLabel} returned HTTP {status}.",
+                FallbackPolicy.TryNextStrategy,
+                strategyId,
+                elapsed
+            ),
         };
     }
 
@@ -157,13 +239,31 @@ internal static class ProviderHttp
         return null;
     }
 
-    private static ProviderJsonResult Fail(FetchFailureKind kind, string safeMessage, FallbackPolicy fallback, string strategyId, long startedTimestamp)
+    private static ProviderJsonResult Fail(
+        FetchFailureKind kind,
+        string safeMessage,
+        FallbackPolicy fallback,
+        string strategyId,
+        long startedTimestamp
+    )
     {
-        return ProviderJsonResult.FromFailure(FetchResult.Failure(kind, safeMessage, fallback, strategyId, System.Diagnostics.Stopwatch.GetElapsedTime(startedTimestamp)));
+        return ProviderJsonResult.FromFailure(
+            FetchResult.Failure(
+                kind,
+                safeMessage,
+                fallback,
+                strategyId,
+                System.Diagnostics.Stopwatch.GetElapsedTime(startedTimestamp)
+            )
+        );
     }
 
     /// <summary>Reads at most <paramref name="maxBytes"/>; returns null when the response is larger.</summary>
-    internal static async Task<byte[]?> ReadBoundedContentAsync(HttpContent content, long maxBytes, CancellationToken cancellationToken)
+    internal static async Task<byte[]?> ReadBoundedContentAsync(
+        HttpContent content,
+        long maxBytes,
+        CancellationToken cancellationToken
+    )
     {
         await using Stream stream = await content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using MemoryStream buffer = new MemoryStream();

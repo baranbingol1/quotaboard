@@ -13,8 +13,12 @@ public sealed class ClineProviderAdapterTests
     public async Task Local_logs_alone_connect_the_account()
     {
         using var temp = new TempDir();
-        var adapter = new ClineProviderAdapter(new HttpClient(), new FixedClock(),
-            roots: [temp.Path], credentialProbe: () => null);
+        var adapter = new ClineProviderAdapter(
+            new HttpClient(),
+            new FixedClock(),
+            roots: [temp.Path],
+            credentialProbe: () => null
+        );
 
         ProviderAccount account = Assert.Single(await adapter.DiscoverAccountsAsync(default));
 
@@ -30,8 +34,12 @@ public sealed class ClineProviderAdapterTests
     [Fact]
     public async Task A_credential_alone_connects_the_account_and_labels_the_source()
     {
-        var adapter = new ClineProviderAdapter(new HttpClient(), new FixedClock(),
-            roots: [], credentialProbe: () => new ClineCredential("token", "API key (CLINE_API_KEY)"));
+        var adapter = new ClineProviderAdapter(
+            new HttpClient(),
+            new FixedClock(),
+            roots: [],
+            credentialProbe: () => new ClineCredential("token", "API key (CLINE_API_KEY)")
+        );
 
         ProviderAccount account = Assert.Single(await adapter.DiscoverAccountsAsync(default));
 
@@ -42,23 +50,31 @@ public sealed class ClineProviderAdapterTests
         ILimitFetchStrategy strategy = Assert.Single(adapter.CreateLimitStrategies(account));
         Assert.Equal("cline.pass-usage-limits-api", strategy.Id);
         Assert.Equal(10, strategy.Order);
-        Assert.Equal(StrategyAvailability.Available,
-            (await strategy.CheckAvailabilityAsync(account, default)).Availability);
+        Assert.Equal(
+            StrategyAvailability.Available,
+            (await strategy.CheckAvailabilityAsync(account, default)).Availability
+        );
     }
 
     [Fact]
     public async Task Nothing_discovered_marks_the_account_disconnected()
     {
-        var adapter = new ClineProviderAdapter(new HttpClient(), new FixedClock(),
-            roots: [], credentialProbe: () => null);
+        var adapter = new ClineProviderAdapter(
+            new HttpClient(),
+            new FixedClock(),
+            roots: [],
+            credentialProbe: () => null
+        );
 
         ProviderAccount account = Assert.Single(await adapter.DiscoverAccountsAsync(default));
 
         Assert.False(account.IsConnected);
         Assert.Equal("Local logs", account.AuthSource);
         ILimitFetchStrategy strategy = Assert.Single(adapter.CreateLimitStrategies(account));
-        Assert.Equal(StrategyAvailability.NotConfigured,
-            (await strategy.CheckAvailabilityAsync(account, default)).Availability);
+        Assert.Equal(
+            StrategyAvailability.NotConfigured,
+            (await strategy.CheckAvailabilityAsync(account, default)).Availability
+        );
     }
 
     [Fact]
@@ -86,8 +102,10 @@ public sealed class ClineProviderAdapterTests
     {
         using var temp = new TempDir();
         string secrets = Path.Combine(temp.Path, "secrets.json");
-        File.WriteAllText(secrets,
-            "{\"cline:clineAccountId\":\"opaque-token\",\"openai-codex-oauth-credentials\":\"xyz\"}");
+        File.WriteAllText(
+            secrets,
+            "{\"cline:clineAccountId\":\"opaque-token\",\"openai-codex-oauth-credentials\":\"xyz\"}"
+        );
 
         ClineCredential? credential = ClineCredentialReader.ResolveSecrets(secrets);
 
@@ -104,11 +122,11 @@ public sealed class ClineProviderAdapterTests
         string secrets = Path.Combine(temp.Path, "secrets.json");
         // The blob's userInfo can hold non-ASCII (display names); only the
         // ASCII idToken may ride in the Authorization header.
-        string blob = "{\"idToken\":\"header.payload.signature\",\"refreshToken\":\"r1\"," +
-                      "\"userInfo\":{\"displayName\":\"Gökçe Yılmaz\",\"email\":\"someone@example.com\"}," +
-                      "\"expiresAt\":1784772484}";
-        File.WriteAllText(secrets,
-            "{\"cline:clineAccountId\":" + JsonSerializer.Serialize(blob) + "}");
+        string blob =
+            "{\"idToken\":\"header.payload.signature\",\"refreshToken\":\"r1\","
+            + "\"userInfo\":{\"displayName\":\"Gökçe Yılmaz\",\"email\":\"someone@example.com\"},"
+            + "\"expiresAt\":1784772484}";
+        File.WriteAllText(secrets, "{\"cline:clineAccountId\":" + JsonSerializer.Serialize(blob) + "}");
 
         ClineCredential? credential = ClineCredentialReader.ResolveSecrets(secrets);
 
@@ -122,10 +140,18 @@ public sealed class ClineProviderAdapterTests
     [Fact]
     public async Task The_signed_in_email_labels_the_account()
     {
-        var adapter = new ClineProviderAdapter(new HttpClient(), new FixedClock(),
+        var adapter = new ClineProviderAdapter(
+            new HttpClient(),
+            new FixedClock(),
             roots: [],
-            credentialProbe: () => new ClineCredential("header.payload.signature", "Cline CLI account",
-                IsWorkOsSession: true, Email: "someone@example.com"));
+            credentialProbe: () =>
+                new ClineCredential(
+                    "header.payload.signature",
+                    "Cline CLI account",
+                    IsWorkOsSession: true,
+                    Email: "someone@example.com"
+                )
+        );
 
         ProviderAccount account = Assert.Single(await adapter.DiscoverAccountsAsync(default));
 
@@ -194,7 +220,8 @@ public sealed class ClineProviderAdapterTests
 
         public void Dispose()
         {
-            if (Directory.Exists(Path)) Directory.Delete(Path, true);
+            if (Directory.Exists(Path))
+                Directory.Delete(Path, true);
         }
     }
 }

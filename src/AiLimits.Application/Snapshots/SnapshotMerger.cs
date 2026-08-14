@@ -13,7 +13,9 @@ public sealed class SnapshotMerger
         {
             return incoming with
             {
-                Meters = incoming.Meters.Select((UsageMeter meter) => MarkFirstObservation(meter, incoming.ObservedAt)).ToArray()
+                Meters = incoming
+                    .Meters.Select((UsageMeter meter) => MarkFirstObservation(meter, incoming.ObservedAt))
+                    .ToArray(),
             };
         }
         if (previous.Account != incoming.Account)
@@ -27,11 +29,13 @@ public sealed class SnapshotMerger
             if (dictionary.Remove(meter.Key, out var value))
             {
                 DateTimeOffset dateTimeOffset = value.FirstObservedAt ?? previous.ObservedAt;
-                list.Add(meter with
-                {
-                    FirstObservedAt = dateTimeOffset,
-                    IsNew = (incoming.ObservedAt - dateTimeOffset <= NewMeterBadgeDuration)
-                });
+                list.Add(
+                    meter with
+                    {
+                        FirstObservedAt = dateTimeOffset,
+                        IsNew = (incoming.ObservedAt - dateTimeOffset <= NewMeterBadgeDuration),
+                    }
+                );
             }
             else
             {
@@ -40,24 +44,15 @@ public sealed class SnapshotMerger
         }
         if (incoming.Completeness == SnapshotCompleteness.Partial)
         {
-            list.AddRange(dictionary.Values.Select((UsageMeter prior) => prior with
-            {
-                Status = MeterStatus.Stale,
-                IsNew = false
-            }));
+            list.AddRange(
+                dictionary.Values.Select((UsageMeter prior) => prior with { Status = MeterStatus.Stale, IsNew = false })
+            );
         }
-        return incoming with
-        {
-            Meters = list
-        };
+        return incoming with { Meters = list };
     }
 
     private static UsageMeter MarkFirstObservation(UsageMeter meter, DateTimeOffset observedAt)
     {
-        return meter with
-        {
-            FirstObservedAt = observedAt,
-            IsNew = true
-        };
+        return meter with { FirstObservedAt = observedAt, IsNew = true };
     }
 }
