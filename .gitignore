@@ -36,11 +36,10 @@ GeneratedFiles/
 .env.*
 !.env.example
 
-# Local AI coding-assistant instructions and skills
+# Local AI coding-assistant instructions and skills.
+# AGENTS.md is committed; local CLAUDE.md / .agents remain private.
 /.agents/
 /.claude/
-/AGENTS.md
-/agents.md
 /CLAUDE.md
 
 # OS metadata

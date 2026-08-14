@@ -36,6 +36,14 @@ if (-not $SkipFormat) {
 Invoke-Gate 'Large files' { & "$PSScriptRoot\quality\Find-LargeFiles.ps1" }
 Invoke-Gate 'Cyclomatic complexity' { & "$PSScriptRoot\quality\Measure-Complexity.ps1" }
 Invoke-Gate 'Tech-debt markers' { & "$PSScriptRoot\quality\Find-TechDebt.ps1" }
+Invoke-Gate 'Unused packages' {
+    if ($Quick) {
+        & "$PSScriptRoot\quality\Find-UnusedPackages.ps1" -SkipBuild
+    }
+    else {
+        & "$PSScriptRoot\quality\Find-UnusedPackages.ps1"
+    }
+}
 
 if (-not $Quick) {
     Invoke-Gate 'Duplicate code' { & "$PSScriptRoot\quality\Find-DuplicateCode.ps1" }

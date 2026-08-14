@@ -24,5 +24,14 @@
     <NuGetAuditMode>all</NuGetAuditMode>
     <NuGetAuditLevel>high</NuGetAuditLevel>
     <WarningsAsErrors>$(WarningsAsErrors);NU1903;NU1904</WarningsAsErrors>
+    <!-- Unused PackageReference detection. Off by default so everyday
+         builds stay quiet; CI turns it on via EnableReferenceTrimmer=true. -->
+    <EnableReferenceTrimmer Condition="'$(EnableReferenceTrimmer)' == ''">false</EnableReferenceTrimmer>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- Build/test SDK packages are consumed by MSBuild, not C# usings. -->
+    <PackageReference Update="coverlet.collector" TreatAsUsed="true" />
+    <PackageReference Update="Microsoft.NET.Test.Sdk" TreatAsUsed="true" />
+    <PackageReference Update="xunit.runner.visualstudio" TreatAsUsed="true" />
+  </ItemGroup>
 </Project>

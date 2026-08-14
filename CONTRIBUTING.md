@@ -19,8 +19,8 @@ a real on-disk database.
 
 ## Quality gates
 
-Formatting, naming, complexity, file size, dead-code, duplication, and
-TODO tracking are enforced locally and in CI:
+Formatting, naming, complexity, file size, dead-code, duplication,
+unused packages, and TODO tracking are enforced locally and in CI:
 
 ```powershell
 dotnet tool restore
@@ -29,11 +29,13 @@ dotnet csharpier check src tests
 ./scripts/install-git-hooks.ps1   # one-time; points this clone at .githooks
 ```
 
-`.editorconfig` is the naming and formatting contract. CSharpier is the
-formatter. Pre-commit (`.githooks/pre-commit` and `.pre-commit-config.yaml`)
-runs the same scripts CI runs. Architecture boundaries are locked by
-ArchUnitNET in `tests/AiLimits.Tests/Architecture`. Snapshot history has an
-N+1 query budget in `SqliteHistoryQueryBudgetTests`.
+Agent operating commands live in `AGENTS.md`. `.editorconfig` is the naming
+and formatting contract. CSharpier is the formatter. Pre-commit
+(`.githooks/pre-commit` and `.pre-commit-config.yaml`) runs the same scripts
+CI runs. Architecture boundaries are locked by ArchUnitNET in
+`tests/AiLimits.Tests/Architecture`. Snapshot history has an N+1 query budget
+in `SqliteHistoryQueryBudgetTests`. Unused PackageReferences are reported by
+ReferenceTrimmer (`scripts/quality/Find-UnusedPackages.ps1`).
 
 Coverage is collected with Coverlet. CI fails the suite under 40% line
 coverage, prints the slowest tests from the TRX, and retries the known

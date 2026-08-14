@@ -47,6 +47,7 @@ QuotaBoard stores its local database, pricing cache, and preferences in `%LOCALA
 ## Contributing 🛠️
 
 Development, test, publishing, and repository-layout guidance is in [CONTRIBUTING.md](CONTRIBUTING.md).
+Coding-agent commands and guardrails are in [AGENTS.md](AGENTS.md).
 
 ## License 📄
 
