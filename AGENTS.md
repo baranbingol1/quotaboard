@@ -42,7 +42,6 @@ source edit; republish before clicking the app.
 - `tests/AiLimits.IntegrationTests` — real on-disk SQLite + refresh pipeline.
 - `scripts/` — publish, validate, quality gates. `scripts/publish-ai-limits.ps1`
   is the only publish path.
-- `docs/` — architecture and design. `docs/04-windows-blueprint.md` is the map.
 
 `app/`, `bin/`, `obj/`, `TestResults/`, `CodexBar/` are not source.
 
@@ -75,7 +74,6 @@ CSharpier + `.editorconfig` are the format/naming contract (PascalCase types,
 `// SPDX-License-Identifier: Apache-2.0`. Pin packages in
 `Directory.Packages.props`; do not add a version on the `<PackageReference>`.
 
-UI changes follow `docs/07-design-principles.md` and `docs/08-design-tokens.md`.
 Do not invent colors, type sizes, or spacing. Stale/failed/unknown are
 first-class states; never present a cached quota as live.
 
@@ -116,10 +114,4 @@ A publish is required only when the change needs a running window
 (`./scripts/publish-ai-limits.ps1` then `explorer ./app/win-x64/QuotaBoard.exe`).
 `scripts/drive-app.ps1` can drive the published exe over UIA.
 
-## More detail
-
-- Architecture: `docs/04-windows-blueprint.md`
-- Design: `docs/07-design-principles.md`, `docs/08-design-tokens.md`
-- Provider ship bar: `docs/provider-release-checklist.md`
-- Privacy / no-telemetry: `PRIVACY.md`
-- Security reports: `SECURITY.md`
+Privacy and no-telemetry: `PRIVACY.md`. Vulnerability reports: `SECURITY.md`.
