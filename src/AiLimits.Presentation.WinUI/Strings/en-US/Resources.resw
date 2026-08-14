@@ -471,7 +471,7 @@
   <data name="Meter_StatusOnTrack" xml:space="preserve"><value>ON TRACK</value></data>
   <data name="ProviderCard_MoreLimits" xml:space="preserve"><value>+{0} more limits</value></data>
   <data name="ProviderCard_ViewProvider" xml:space="preserve"><value>View provider</value></data>
-  <data name="ProviderCard_ServiceIncident" xml:space="preserve"><value>SERVICE INCIDENT</value></data>
+  <data name="ProviderCard_ServiceIncident" xml:space="preserve"><value>PROVIDER STATUS</value></data>
   <data name="Reset_AutomationName" xml:space="preserve"><value>Quota reset reminder</value></data>
   <data name="Settings_DetectedPlan" xml:space="preserve"><value>Detected {0}</value></data>
   <data name="Settings_DetectedPlanNamed" xml:space="preserve"><value>Detected {0} plan</value></data>
@@ -555,11 +555,11 @@
   <data name="Runtime_MeaningTemporarilyUnavailable" xml:space="preserve"><value>The source is temporarily unavailable. QuotaBoard keeps retrying automatically.</value></data>
   <data name="Runtime_MeaningUnknown" xml:space="preserve"><value>The check failed for an unknown reason. Try refreshing again.</value></data>
   <data name="Runtime_ApiKeySuffix" xml:space="preserve"><value>(API key)</value></data>
-  <data name="Runtime_StatusMinor" xml:space="preserve"><value>Minor service outage</value></data>
-  <data name="Runtime_StatusMajor" xml:space="preserve"><value>Partial system outage</value></data>
-  <data name="Runtime_StatusCritical" xml:space="preserve"><value>Major system outage</value></data>
-  <data name="Runtime_StatusMaintenance" xml:space="preserve"><value>Under maintenance</value></data>
-  <data name="Runtime_StatusUnknown" xml:space="preserve"><value>Service disruption</value></data>
+  <data name="Runtime_StatusMinor" xml:space="preserve"><value>Provider reports a minor service outage</value></data>
+  <data name="Runtime_StatusMajor" xml:space="preserve"><value>Provider reports a partial system outage</value></data>
+  <data name="Runtime_StatusCritical" xml:space="preserve"><value>Provider reports a major system outage</value></data>
+  <data name="Runtime_StatusMaintenance" xml:space="preserve"><value>Provider reports maintenance</value></data>
+  <data name="Runtime_StatusUnknown" xml:space="preserve"><value>Provider reports a service disruption</value></data>
   <data name="Alert_UsageTitle" xml:space="preserve"><value>{0} · {1} reached {2:0}%</value></data>
   <data name="Alert_UsageWithReset" xml:space="preserve"><value>{0:0.#}% used · resets {1:g}</value></data>
   <data name="Alert_Usage" xml:space="preserve"><value>{0:0.#}% used</value></data>

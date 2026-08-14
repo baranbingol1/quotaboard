@@ -471,7 +471,7 @@
   <data name="Meter_StatusOnTrack" xml:space="preserve"><value>YOLUNDA</value></data>
   <data name="ProviderCard_MoreLimits" xml:space="preserve"><value>+{0} limit daha</value></data>
   <data name="ProviderCard_ViewProvider" xml:space="preserve"><value>Sağlayıcıyı görüntüle</value></data>
-  <data name="ProviderCard_ServiceIncident" xml:space="preserve"><value>HİZMET SORUNU</value></data>
+  <data name="ProviderCard_ServiceIncident" xml:space="preserve"><value>SAĞLAYICI DURUMU</value></data>
   <data name="Reset_AutomationName" xml:space="preserve"><value>Kota sıfırlama anımsatıcısı</value></data>
   <data name="Settings_DetectedPlan" xml:space="preserve"><value>{0} algılandı</value></data>
   <data name="Settings_DetectedPlanNamed" xml:space="preserve"><value>{0} planı algılandı</value></data>
@@ -555,11 +555,11 @@
   <data name="Runtime_MeaningTemporarilyUnavailable" xml:space="preserve"><value>Kaynak geçici olarak kullanılamıyor. QuotaBoard otomatik olarak yeniden deniyor.</value></data>
   <data name="Runtime_MeaningUnknown" xml:space="preserve"><value>Denetim bilinmeyen bir nedenle başarısız oldu. Yeniden yenilemeyi deneyin.</value></data>
   <data name="Runtime_ApiKeySuffix" xml:space="preserve"><value>(API anahtarı)</value></data>
-  <data name="Runtime_StatusMinor" xml:space="preserve"><value>Küçük çaplı hizmet kesintisi</value></data>
-  <data name="Runtime_StatusMajor" xml:space="preserve"><value>Kısmi sistem kesintisi</value></data>
-  <data name="Runtime_StatusCritical" xml:space="preserve"><value>Büyük sistem kesintisi</value></data>
-  <data name="Runtime_StatusMaintenance" xml:space="preserve"><value>Bakım çalışması</value></data>
-  <data name="Runtime_StatusUnknown" xml:space="preserve"><value>Hizmet kesintisi</value></data>
+  <data name="Runtime_StatusMinor" xml:space="preserve"><value>Sağlayıcı küçük çaplı bir hizmet kesintisi bildiriyor</value></data>
+  <data name="Runtime_StatusMajor" xml:space="preserve"><value>Sağlayıcı kısmi bir sistem kesintisi bildiriyor</value></data>
+  <data name="Runtime_StatusCritical" xml:space="preserve"><value>Sağlayıcı büyük bir sistem kesintisi bildiriyor</value></data>
+  <data name="Runtime_StatusMaintenance" xml:space="preserve"><value>Sağlayıcı bakım çalışması bildiriyor</value></data>
+  <data name="Runtime_StatusUnknown" xml:space="preserve"><value>Sağlayıcı bir hizmet kesintisi bildiriyor</value></data>
   <data name="Alert_UsageTitle" xml:space="preserve"><value>{0} · {1} %{2:0} seviyesine ulaştı</value></data>
   <data name="Alert_UsageWithReset" xml:space="preserve"><value>%{0:0.#} kullanıldı · {1:g} tarihinde sıfırlanır</value></data>
   <data name="Alert_Usage" xml:space="preserve"><value>%{0:0.#} kullanıldı</value></data>
