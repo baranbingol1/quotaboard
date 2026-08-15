@@ -18,7 +18,7 @@ telemetry.
 Verify a download against its `.sha256` file:
 
 ```powershell
-Get-FileHash .\QuotaBoard-1.0.0-win-x64.zip -Algorithm SHA256
+Get-FileHash .\QuotaBoard-*-win-x64.zip -Algorithm SHA256
 ```
 
 Requires Windows 10 22H2 (build 19045) or newer. The runtime is self-contained,
