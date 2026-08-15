@@ -141,7 +141,7 @@ jobs:
       # Set the path after the runner starts so every later step can use it.
       - name: Set publish directory
         shell: pwsh
-        run: >-
+        run: |
           "PUBLISH_DIR=$env:RUNNER_TEMP\AiLimits\release\win-${{ matrix.arch }}"
           | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           "PACKAGE_DIR=$env:RUNNER_TEMP\AiLimits\packages\win-${{ matrix.arch }}"
