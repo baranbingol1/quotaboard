@@ -16,7 +16,7 @@ public sealed partial class MainWindow : Window
     public MainWindow(
         LiveDashboardViewModel viewModel,
         UpdateViewModel updateViewModel,
-        IStartupRegistrationService startupRegistration
+        IStartupRegistrationService? startupRegistration
     )
     {
         InitializeComponent();

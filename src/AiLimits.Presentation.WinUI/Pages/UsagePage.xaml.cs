@@ -15,6 +15,7 @@ public sealed partial class UsagePage : Page
 {
     private const int BreakdownPageSize = 5;
     private const int ModelMixPageSize = 6;
+    private const double StackedLayoutWidth = 900;
     // Plot geometry, shared with the matching row heights in UsagePage.xaml.
     private const double PlotHeight = 210;
     private const double SparkHeight = 30;
@@ -33,6 +34,7 @@ public sealed partial class UsagePage : Page
     private int _visibleModelMixCount = ModelMixPageSize;
     private double _chartViewportWidth;
     private UsageChartSeriesDimension _chartSeriesDimension = UsageChartSeriesDimension.Provider;
+    private bool _isStackedLayout;
 
     public UsagePage(LiveDashboardViewModel viewModel)
     {
@@ -71,6 +73,28 @@ public sealed partial class UsagePage : Page
 
     private void OnUsageAnalyticsDataChanged(object? sender, EventArgs args) =>
         DispatcherQueue.TryEnqueue(RefreshQuery);
+
+    private void OnUsageContentSizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        bool stacked = args.NewSize.Width < StackedLayoutWidth;
+        if (stacked == _isStackedLayout)
+        {
+            return;
+        }
+        _isStackedLayout = stacked;
+
+        QueryColumn.Width = stacked ? new GridLength(1, GridUnitType.Star) : new GridLength(260);
+        ResultsColumn.Width = stacked ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
+        ResultsColumn.MinWidth = stacked ? 0 : 300;
+        SummaryColumn.Width = stacked ? new GridLength(0) : new GridLength(270);
+
+        Grid.SetColumn(QueryPanel, 0);
+        Grid.SetColumn(ResultsPanel, stacked ? 0 : 1);
+        Grid.SetColumn(SummaryPanel, stacked ? 0 : 2);
+        Grid.SetRow(QueryPanel, 0);
+        Grid.SetRow(ResultsPanel, stacked ? 1 : 0);
+        Grid.SetRow(SummaryPanel, stacked ? 2 : 0);
+    }
 
     private void OnThemeApplied(ElementTheme theme) =>
         DispatcherQueue.TryEnqueue(() =>

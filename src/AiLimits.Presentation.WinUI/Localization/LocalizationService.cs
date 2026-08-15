@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 using System.Globalization;
+using AiLimits.Presentation.WinUI;
 using Microsoft.Windows.ApplicationModel.Resources;
 using Microsoft.Windows.Globalization;
 
@@ -21,11 +22,7 @@ public static class LocalizationService
     private const string SystemPreferenceValue = "system";
     private static readonly CultureInfo SystemCulture = CultureInfo.CurrentCulture;
     private static readonly CultureInfo SystemUiCulture = CultureInfo.CurrentUICulture;
-    private static readonly string PreferencePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard",
-        "language.txt"
-    );
+    private static readonly string PreferencePath = AppDataDirectory.File("language.txt");
 
     public static IReadOnlyList<string> SupportedLanguageTags { get; } = [EnglishLanguageTag, TurkishLanguageTag];
 

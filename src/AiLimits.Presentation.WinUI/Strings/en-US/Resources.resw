@@ -101,6 +101,9 @@
   <data name="Providers_Search.PlaceholderText" xml:space="preserve">
     <value>Search connections</value>
   </data>
+  <data name="Providers_NoMatches.Text" xml:space="preserve">
+    <value>No connections match this search.</value>
+  </data>
   <data name="Providers_RefreshDetection.Content" xml:space="preserve">
     <value>Refresh detection</value>
   </data>
@@ -473,7 +476,7 @@
   <data name="ProviderCard_MoreLimits" xml:space="preserve"><value>+{0} more limits</value></data>
   <data name="ProviderCard_ViewProvider" xml:space="preserve"><value>View provider</value></data>
   <data name="ProviderCard_ServiceIncident" xml:space="preserve"><value>PROVIDER STATUS</value></data>
-  <data name="Reset_AutomationName" xml:space="preserve"><value>Quota reset reminder</value></data>
+  <data name="Reset_AutomationName" xml:space="preserve"><value>Quota reset reminder: {0}, {1}, {2}, {3}, {4}</value></data>
   <data name="Settings_DetectedPlan" xml:space="preserve"><value>Detected {0}</value></data>
   <data name="Settings_DetectedPlanNamed" xml:space="preserve"><value>Detected {0} plan</value></data>
   <data name="Settings_UsdPerMonth" xml:space="preserve"><value>USD / month</value></data>

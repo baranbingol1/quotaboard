@@ -10,11 +10,7 @@ namespace AiLimits.Presentation.WinUI;
 /// </summary>
 public static class EmailPrivacyPreference
 {
-    private static readonly string PreferencePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard",
-        "email-privacy.preference"
-    );
+    private static readonly string PreferencePath = AppDataDirectory.File("email-privacy.preference");
     private static bool _enabled = LoadCore();
 
     public static bool Enabled => _enabled;

@@ -16,7 +16,7 @@
     <!-- One version for every assembly. The release workflow refuses to build
          a tag whose name disagrees with this, so the number in Windows'
          file-properties dialog always matches the release it came from. -->
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <Product>QuotaBoard</Product>
     <!-- Audit all transitive dependencies and block known high or critical
          vulnerabilities during restore. Lower severities remain visible. -->

@@ -147,12 +147,14 @@ public sealed record ResetHorizonItemViewModel(
     DateTimeOffset ResetsAt
 )
 {
+    public string DisplayAccount => EmailPrivacyPreference.Apply(Account);
+
     public string AutomationName =>
         string.Format(
             CultureInfo.CurrentCulture,
             LocalizationService.GetString("Reset_AutomationName"),
             Provider,
-            Account,
+            DisplayAccount,
             Meter,
             Countdown,
             ResetTime

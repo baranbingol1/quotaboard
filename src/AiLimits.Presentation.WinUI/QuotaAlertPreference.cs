@@ -7,11 +7,7 @@ namespace AiLimits.Presentation.WinUI;
 /// </summary>
 public static class QuotaAlertPreference
 {
-    private static readonly string PreferencePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard",
-        "quota-alerts.preference"
-    );
+    private static readonly string PreferencePath = AppDataDirectory.File("quota-alerts.preference");
 
     public static bool LoadEnabled()
     {

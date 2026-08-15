@@ -452,6 +452,7 @@ public sealed partial class LiveDashboardViewModel : ObservableObject, IDisposab
         // Re-materializing the items regenerates their containers, so the
         // DisplayAccount bindings re-read the preference.
         Replace(Providers, Providers.ToArray());
+        Replace(ResetHorizon, ResetHorizon.ToArray());
         Replace(ResetCycles, ResetCycles.ToArray());
         Replace(Connections, Connections.ToArray());
     }

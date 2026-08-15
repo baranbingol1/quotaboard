@@ -32,6 +32,7 @@
     <Content Include="Assets\QuotaBoard.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\QuotaBoard-Light.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\QuotaBoard-Tray-Glyph.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\THIRD-PARTY-NOTICES.txt" Link="THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>

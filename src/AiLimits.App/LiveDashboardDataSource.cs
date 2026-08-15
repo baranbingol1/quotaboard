@@ -153,15 +153,15 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
 
     private TimeSpan? _lastRetryAfterHint;
 
+    private readonly bool _isolatedEmptyState;
+
     /// <summary>Largest Retry-After any provider reported during the last refresh, if any.</summary>
     public TimeSpan? LastRetryAfterHint => _lastRetryAfterHint;
 
-    public LiveDashboardDataSource()
+    public LiveDashboardDataSource(bool isolatedEmptyState = false)
     {
-        string text = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "QuotaBoard"
-        );
+        _isolatedEmptyState = isolatedEmptyState;
+        string text = AppDataDirectory.Root;
         Directory.CreateDirectory(text);
         _databasePath = Path.Combine(text, "ai-limits.db");
         _database = new SqliteDatabase(_databasePath);
@@ -174,26 +174,37 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         );
         _providerStatuses = new ProviderStatusCache(_clock);
         _quotaAlerts = new QuotaAlertMonitor(_database);
-        ProcessRunner processRunner = new ProcessRunner();
-        OpenCodePathDiscovery pathDiscovery = new OpenCodePathDiscovery(processRunner);
         _catalogModelResolver = new CatalogModelResolver(_modelResolver);
-        _adapters = new IProviderAdapter[]
+        if (isolatedEmptyState)
         {
-            new CodexProviderAdapter(_httpClient, _clock),
-            new ClaudeProviderAdapter(_httpClient, _clock, processRunner: processRunner),
-            new OpenCodeProviderAdapter(pathDiscovery),
-            new DroidProviderAdapter(_httpClient, _clock),
-            new AmpProviderAdapter(_httpClient, _clock, processRunner),
-            new CopilotProviderAdapter(_httpClient, _clock),
-            new AgyProviderAdapter(_clock),
-            new CursorProviderAdapter(_cursorHttpClient, _clock, logger: NullLogger<CursorProviderAdapter>.Instance),
-            new ClineProviderAdapter(
-                _httpClient,
-                _clock,
-                secrets: new WindowsCredentialSecretStore(),
-                legacySessionCachePath: Path.Combine(text, "cline-session.json")
-            ),
-        };
+            _adapters = [];
+        }
+        else
+        {
+            ProcessRunner processRunner = new ProcessRunner();
+            OpenCodePathDiscovery pathDiscovery = new OpenCodePathDiscovery(processRunner);
+            _adapters =
+            [
+                new CodexProviderAdapter(_httpClient, _clock),
+                new ClaudeProviderAdapter(_httpClient, _clock, processRunner: processRunner),
+                new OpenCodeProviderAdapter(pathDiscovery),
+                new DroidProviderAdapter(_httpClient, _clock),
+                new AmpProviderAdapter(_httpClient, _clock, processRunner),
+                new CopilotProviderAdapter(_httpClient, _clock),
+                new AgyProviderAdapter(_clock),
+                new CursorProviderAdapter(
+                    _cursorHttpClient,
+                    _clock,
+                    logger: NullLogger<CursorProviderAdapter>.Instance
+                ),
+                new ClineProviderAdapter(
+                    _httpClient,
+                    _clock,
+                    secrets: new WindowsCredentialSecretStore(),
+                    legacySessionCachePath: Path.Combine(text, "cline-session.json")
+                ),
+            ];
+        }
         _adapterById = _adapters.ToDictionary((IProviderAdapter adapter) => adapter.Descriptor.Id);
         _discovery = new AccountDiscoveryService(_adapters, _accounts, NullLogger<AccountDiscoveryService>.Instance);
         _refresh = new RefreshCoordinator(
@@ -220,7 +231,14 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             await EnsureDatabaseAsync(cancellationToken).ConfigureAwait(false);
             IReadOnlyList<ProviderAccount> accounts;
             PricingCatalogSnapshot? catalog;
-            if (forceRefresh)
+            if (forceRefresh && _isolatedEmptyState)
+            {
+                _lastRefreshHadTransientFailure = false;
+                progress?.Report(new RefreshProgress(0, 0, string.Empty, RefreshStage.DiscoveringAccounts));
+                accounts = await _accounts.ListAsync(cancellationToken).ConfigureAwait(false);
+                catalog = await _catalog.GetCurrentAsync(cancellationToken).ConfigureAwait(false);
+            }
+            else if (forceRefresh)
             {
                 _lastRefreshHadTransientFailure = false;
                 progress?.Report(new RefreshProgress(0, 0, string.Empty, RefreshStage.DiscoveringAccounts));
@@ -318,8 +336,17 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         return Describe(snapshot);
     }
 
-    public async Task<PricingCatalogRefresh> RefreshModelCatalogAsync(CancellationToken cancellationToken) =>
-        await _catalog.RefreshAsync(force: true, cancellationToken).ConfigureAwait(false);
+    public async Task<PricingCatalogRefresh> RefreshModelCatalogAsync(CancellationToken cancellationToken)
+    {
+        if (_isolatedEmptyState)
+        {
+            return new PricingCatalogRefresh(
+                PricingCatalogOutcome.NotDue,
+                await _catalog.GetCurrentAsync(cancellationToken).ConfigureAwait(false)
+            );
+        }
+        return await _catalog.RefreshAsync(force: true, cancellationToken).ConfigureAwait(false);
+    }
 
     private ModelCatalogStatus Describe(PricingCatalogSnapshot? snapshot) =>
         snapshot is null

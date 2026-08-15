@@ -11,6 +11,7 @@ namespace AiLimits.Presentation.WinUI.Pages;
 
 public sealed partial class ProvidersPage : Page
 {
+    private const double NarrowLayoutWidth = 900;
     private NotifyCollectionChangedEventHandler? _connectionsChangedHandler;
 
     public ProvidersPage(LiveDashboardViewModel viewModel)
@@ -49,6 +50,14 @@ public sealed partial class ProvidersPage : Page
     private void OnSearchTextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args) =>
         ApplyFilter(sender.Text);
 
+    private void OnProvidersContentSizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        bool narrow = args.NewSize.Width < NarrowLayoutWidth;
+        WideColumnHeaders.Visibility = narrow ? Visibility.Collapsed : Visibility.Visible;
+        WideConnections.Visibility = narrow ? Visibility.Collapsed : Visibility.Visible;
+        NarrowConnections.Visibility = narrow ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     // Web links only — detection never launches or drives a CLI.
     private async void OnConnectionActionClick(object sender, RoutedEventArgs args)
     {
@@ -73,5 +82,6 @@ public sealed partial class ProvidersPage : Page
                 connection.AuthSource.Contains(query, StringComparison.CurrentCultureIgnoreCase));
         FilteredConnections.Clear();
         foreach (var connection in matches) FilteredConnections.Add(connection);
+        NoMatchesText.Visibility = FilteredConnections.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 }

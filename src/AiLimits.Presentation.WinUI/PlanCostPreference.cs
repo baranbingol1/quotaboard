@@ -11,17 +11,9 @@ namespace AiLimits.Presentation.WinUI;
 /// </summary>
 public static class PlanCostPreference
 {
-    private static readonly string PreferencePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard",
-        "plan-costs.json"
-    );
+    private static readonly string PreferencePath = AppDataDirectory.File("plan-costs.json");
 
-    private static readonly string LegacySingleValuePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard",
-        "plan-cost.preference"
-    );
+    private static readonly string LegacySingleValuePath = AppDataDirectory.File("plan-cost.preference");
 
     public static IReadOnlyDictionary<string, decimal> LoadAll()
     {

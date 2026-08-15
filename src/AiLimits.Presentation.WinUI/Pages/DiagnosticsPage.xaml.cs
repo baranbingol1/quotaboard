@@ -13,6 +13,8 @@ namespace AiLimits.Presentation.WinUI.Pages;
 
 public sealed partial class DiagnosticsPage : Page
 {
+    private const double StackedStatusWidth = 650;
+
     // Shared with the provider cards and the Connections rows: one status
     // colour scale everywhere, so a red dot always means the same thing.
     private static readonly CardStatusBrushConverter StatusBrush = new();
@@ -49,6 +51,21 @@ public sealed partial class DiagnosticsPage : Page
     private void OnUnloaded(object sender, RoutedEventArgs args)
     {
         ViewModel.RecentAttempts.CollectionChanged -= _attemptsChangedHandler;
+    }
+
+    private void OnStatusGridSizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        bool stacked = args.NewSize.Width < StackedStatusWidth;
+        for (int index = 0; index < StatusGrid.ColumnDefinitions.Count; index++)
+        {
+            StatusGrid.ColumnDefinitions[index].Width = stacked
+                ? new GridLength(index == 0 ? 1 : 0, GridUnitType.Star)
+                : new GridLength(1, GridUnitType.Star);
+            StatusGrid.ColumnDefinitions[index].MinWidth = stacked ? 0 : 150;
+            FrameworkElement card = (FrameworkElement)StatusGrid.Children[index];
+            Grid.SetColumn(card, stacked ? 0 : index);
+            Grid.SetRow(card, stacked ? index : 0);
+        }
     }
 
     private void BindStatusCard(int index, string statusPath, string detailPath)

@@ -10,11 +10,7 @@ public sealed record FontSelection(string? ContentFontId, string? MetricFontId);
 /// <summary>Persists the font selection next to the other preference files.</summary>
 public static class FontPreference
 {
-    private static readonly string PreferencePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard",
-        "font.json"
-    );
+    private static readonly string PreferencePath = AppDataDirectory.File("font.json");
 
     public static FontSelection Load()
     {

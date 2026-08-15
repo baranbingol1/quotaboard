@@ -101,6 +101,9 @@
   <data name="Providers_Search.PlaceholderText" xml:space="preserve">
     <value>Bağlantılarda ara</value>
   </data>
+  <data name="Providers_NoMatches.Text" xml:space="preserve">
+    <value>Bu aramayla eşleşen bağlantı yok.</value>
+  </data>
   <data name="Providers_RefreshDetection.Content" xml:space="preserve">
     <value>Algılamayı yenile</value>
   </data>
@@ -473,7 +476,7 @@
   <data name="ProviderCard_MoreLimits" xml:space="preserve"><value>+{0} limit daha</value></data>
   <data name="ProviderCard_ViewProvider" xml:space="preserve"><value>Sağlayıcıyı görüntüle</value></data>
   <data name="ProviderCard_ServiceIncident" xml:space="preserve"><value>SAĞLAYICI DURUMU</value></data>
-  <data name="Reset_AutomationName" xml:space="preserve"><value>Kota sıfırlama anımsatıcısı</value></data>
+  <data name="Reset_AutomationName" xml:space="preserve"><value>Kota sıfırlama anımsatıcısı: {0}, {1}, {2}, {3}, {4}</value></data>
   <data name="Settings_DetectedPlan" xml:space="preserve"><value>{0} algılandı</value></data>
   <data name="Settings_DetectedPlanNamed" xml:space="preserve"><value>{0} planı algılandı</value></data>
   <data name="Settings_UsdPerMonth" xml:space="preserve"><value>USD / ay</value></data>

@@ -40,12 +40,17 @@ public partial class App : Microsoft.UI.Xaml.Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         bool startMinimized = Program.InitialActivation.KeepHidden;
-        MigrateLegacyDataDirectory();
-        var dataSource = new LiveDashboardDataSource();
+        if (!Program.IsolatedEmptyState)
+        {
+            MigrateLegacyDataDirectory();
+        }
+        var dataSource = new LiveDashboardDataSource(Program.IsolatedEmptyState);
         var dashboard = new LiveDashboardViewModel(dataSource);
         var updateService = new VelopackApplicationUpdateService(() => BeginShutdownAsync(closeWindow: true));
         var updateViewModel = new UpdateViewModel(updateService);
-        var startupRegistration = new WindowsStartupRegistration();
+        IStartupRegistrationService? startupRegistration = Program.IsolatedEmptyState
+            ? null
+            : new WindowsStartupRegistration();
         _dataSource = dataSource;
         _dashboard = dashboard;
         _updateViewModel = updateViewModel;
@@ -236,9 +241,9 @@ public partial class App : Microsoft.UI.Xaml.Application
     // missing instead of requiring an empty target.
     private static void MigrateLegacyDataDirectory()
     {
-        string root = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
+        string current = AppDataDirectory.Root;
+        string root = Path.GetDirectoryName(current)!;
         string legacy = Path.Combine(root, "AI Limits");
-        string current = Path.Combine(root, "QuotaBoard");
         if (!Directory.Exists(legacy))
         {
             return;

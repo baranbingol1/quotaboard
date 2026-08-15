@@ -7,19 +7,40 @@ param(
     # Resize before the settle so responsive layouts reflow once, not twice.
     # 0 keeps whatever size the app opened at.
     [int]$Width = 0,
-    [int]$Height = 0
+    [int]$Height = 0,
+    [switch]$CleanState,
+    [string]$DataRoot = "",
+    [switch]$FollowSystemTheme
 )
 
 $ErrorActionPreference = "Stop"
 $exe = $Exe
-$prefDir = Join-Path $env:LOCALAPPDATA "QuotaBoard"
+$arguments = $null
+if ($CleanState) {
+    if ($DataRoot -eq "") {
+        $DataRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("QuotaBoard-E2E-" + [guid]::NewGuid().ToString("N"))
+    }
+    $DataRoot = [System.IO.Path]::GetFullPath($DataRoot)
+    $tempPrefix = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd('\') + '\'
+    if (-not $DataRoot.StartsWith($tempPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "-DataRoot must be below the Windows temporary directory"
+    }
+    New-Item -ItemType Directory -Force $DataRoot | Out-Null
+    $prefDir = $DataRoot
+    $arguments = "--e2e-clean-state `"$DataRoot`""
+    Write-Host "Isolated data root: $DataRoot"
+} else {
+    if ($DataRoot -ne "") { throw "-DataRoot requires -CleanState" }
+    $prefDir = Join-Path $env:LOCALAPPDATA "QuotaBoard"
+}
 $prefPath = Join-Path $prefDir "theme.preference"
 
+if ($Theme -ne "" -and $FollowSystemTheme) { throw "Use either -Theme or -FollowSystemTheme, not both" }
 if ($Theme -ne "") {
     New-Item -ItemType Directory -Force $prefDir | Out-Null
     [System.IO.File]::WriteAllText($prefPath, $Theme)
     Write-Host "Seeded theme.preference = $Theme"
-} elseif (Test-Path $prefPath) {
+} elseif ($FollowSystemTheme -and (Test-Path $prefPath)) {
     Remove-Item $prefPath -Force -Confirm:$false
     Write-Host "Removed theme.preference (follow system)"
 }
@@ -39,13 +60,35 @@ public static class Win32 {
 }
 "@
 
-$process = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru
+$startParameters = @{
+    FilePath = $exe
+    WorkingDirectory = (Split-Path $exe)
+    PassThru = $true
+}
+if ($null -ne $arguments) { $startParameters.ArgumentList = $arguments }
+$processName = [System.IO.Path]::GetFileNameWithoutExtension($exe)
+$workingPrefix = [System.IO.Path]::GetFullPath($startParameters.WorkingDirectory).TrimEnd('\') + '\'
+$existingProcessIds = @(Get-Process -Name $processName -ErrorAction SilentlyContinue | ForEach-Object Id)
+$process = Start-Process @startParameters
 try {
     $deadline = (Get-Date).AddSeconds(15)
     do {
         Start-Sleep -Milliseconds 300
         $process.Refresh()
-    } while (-not $process.HasExited -and $process.MainWindowHandle -eq 0 -and (Get-Date) -lt $deadline)
+        # A portable Velopack ZIP starts through its root launcher. Follow the
+        # new process under current\ after that short-lived launcher exits.
+        if ($process.HasExited) {
+            $launchedApp = Get-Process -Name $processName -ErrorAction SilentlyContinue | Where-Object {
+                if ($existingProcessIds -contains $_.Id) { return $false }
+                try { return $_.Path.StartsWith($workingPrefix, [System.StringComparison]::OrdinalIgnoreCase) }
+                catch { return $false }
+            } | Select-Object -First 1
+            if ($null -ne $launchedApp) {
+                $process = $launchedApp
+                Write-Host "Following launched app process $($process.Id)"
+            }
+        }
+    } while (($process.HasExited -or $process.MainWindowHandle -eq 0) -and (Get-Date) -lt $deadline)
 
     if ($process.HasExited) { throw "App exited early, code $($process.ExitCode)" }
     if ($process.MainWindowHandle -eq 0) { throw "No window within 15s" }

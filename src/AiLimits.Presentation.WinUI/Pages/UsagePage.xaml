@@ -85,15 +85,19 @@
             </controls:AdaptiveHeaderPanel>
         </Border>
 
-        <!-- Kept as a plain Grid on purpose: wrapping it in a horizontal
-             ScrollViewer makes the star column measure against infinity, so
-             the chart overruns the window instead of filling it. The narrow
-             case is handled by keeping the side columns small enough that all
-             three fit at ~870px. -->
-        <Grid Grid.Row="1" Padding="20,18,20,28" ColumnSpacing="14">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="260"/><ColumnDefinition Width="*" MinWidth="300"/><ColumnDefinition Width="270"/></Grid.ColumnDefinitions>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
+        <Grid x:Name="UsageContentGrid" Padding="20,18,20,28" ColumnSpacing="14" RowSpacing="14"
+              SizeChanged="OnUsageContentSizeChanged">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="QueryColumn" Width="260"/>
+                <ColumnDefinition x:Name="ResultsColumn" Width="*" MinWidth="300"/>
+                <ColumnDefinition x:Name="SummaryColumn" Width="270"/>
+            </Grid.ColumnDefinitions>
 
-            <Border Style="{StaticResource QueryPanelStyle}" Padding="15">
+            <Border x:Name="QueryPanel" Style="{StaticResource QueryPanelStyle}" Padding="15">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="14">
                         <Grid ColumnSpacing="8">
@@ -174,7 +178,7 @@
                 </ScrollViewer>
             </Border>
 
-            <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="ResultsPanel" Grid.Column="1">
                 <StackPanel Spacing="14">
                     <Border Style="{StaticResource QueryPanelStyle}" Padding="22">
                         <StackPanel>
@@ -407,9 +411,9 @@
                         </StackPanel>
                     </Border>
                 </StackPanel>
-            </ScrollViewer>
+            </StackPanel>
 
-            <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="SummaryPanel" Grid.Column="2">
                 <StackPanel Spacing="14">
                     <Border Style="{StaticResource QueryPanelStyle}"><StackPanel Spacing="8">
                         <TextBlock x:Uid="Usage_ApiEquivalentEyebrow" Text="API EQUIVALENT" Style="{StaticResource QueryLabelStyle}"/>
@@ -447,7 +451,8 @@
                         </StackPanel>
                     </StackPanel></Border>
                 </StackPanel>
-            </ScrollViewer>
+            </StackPanel>
         </Grid>
+        </ScrollViewer>
     </Grid>
 </Page>

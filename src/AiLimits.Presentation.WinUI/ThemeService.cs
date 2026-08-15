@@ -10,17 +10,9 @@ public sealed record ThemePreference(string ThemeId, ElementTheme Mode);
 
 public static class ThemeService
 {
-    private static readonly string PreferencePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard",
-        "theme.json"
-    );
+    private static readonly string PreferencePath = AppDataDirectory.File("theme.json");
 
-    private static readonly string LegacyPreferencePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard",
-        "theme.preference"
-    );
+    private static readonly string LegacyPreferencePath = AppDataDirectory.File("theme.preference");
 
     private static ResourceDictionary? _injected;
     private static ThemePalette _palette = ThemeCatalog.Default;

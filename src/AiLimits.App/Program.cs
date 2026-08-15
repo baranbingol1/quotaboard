@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 using System.Collections.Concurrent;
 using System.Threading;
+using AiLimits.Presentation.WinUI;
 using Microsoft.UI.Dispatching;
 using Microsoft.Windows.AppLifecycle;
 using Velopack;
@@ -18,10 +19,17 @@ internal static class Program
     private static AppInstance? _primaryInstance;
 
     internal static ActivationRequest InitialActivation { get; private set; }
+    internal static bool IsolatedEmptyState { get; private set; }
 
     [STAThread]
     private static void Main()
     {
+        string? isolatedRoot = ReadIsolatedRoot(Environment.GetCommandLineArgs().Skip(1).ToArray());
+        if (isolatedRoot is not null)
+        {
+            AppDataDirectory.UseIsolatedRoot(isolatedRoot);
+            IsolatedEmptyState = true;
+        }
         VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
         RunAsync().GetAwaiter().GetResult();
     }
@@ -32,7 +40,9 @@ internal static class Program
 
         AppActivationArguments activation = AppInstance.GetCurrent().GetActivatedEventArgs();
         InitialActivation = ActivationRequest.From(activation, includeProcessArguments: true);
-        AppInstance primary = AppInstance.FindOrRegisterForKey(InstanceKey);
+        AppInstance primary = AppInstance.FindOrRegisterForKey(
+            IsolatedEmptyState ? InstanceKey + ".IsolatedE2E" : InstanceKey
+        );
         if (!primary.IsCurrent)
         {
             await primary.RedirectActivationToAsync(activation);
@@ -82,6 +92,33 @@ internal static class Program
         {
             dispatcher.TryEnqueue(() => app.HandleRedirectedActivation(request));
         }
+    }
+
+    private static string? ReadIsolatedRoot(IReadOnlyList<string> arguments)
+    {
+        const string option = "--e2e-clean-state";
+        int index = -1;
+        for (int candidate = 0; candidate < arguments.Count; candidate++)
+        {
+            if (!string.Equals(arguments[candidate], option, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            if (index >= 0)
+            {
+                throw new ArgumentException($"{option} can be specified only once.");
+            }
+            index = candidate;
+        }
+        if (index < 0)
+        {
+            return null;
+        }
+        if (index + 1 >= arguments.Count || string.IsNullOrWhiteSpace(arguments[index + 1]))
+        {
+            throw new ArgumentException($"{option} requires a temporary data directory.");
+        }
+        return arguments[index + 1].Trim('"');
     }
 
     internal readonly record struct ActivationRequest(bool KeepHidden)

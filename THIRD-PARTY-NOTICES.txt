@@ -1,7 +1,23 @@
-QuotaBoard includes third-party software.
+QuotaBoard includes the third-party components listed below. The portable
+package includes complete upstream license and notice files in LICENSE,
+Assets\Fonts, and Licenses.
 
-Velopack
-Copyright (c) 2021-present Velopack contributors
+MIT-licensed components
+-----------------------
+
+- CommunityToolkit.Mvvm 8.4.2
+  Copyright (c) .NET Foundation and Contributors
+- H.NotifyIcon.WinUI 2.4.1, H.NotifyIcon 2.4.1, and
+  H.GeneratedIcons.System.Drawing 2.4.1
+  Copyright (c) 2020 havendv
+- Microsoft.Data.Sqlite and Microsoft.Data.Sqlite.Core 10.0.9
+- Microsoft.Extensions libraries 10.0.9
+- Microsoft.Win32.SystemEvents and System.Drawing.Common 10.0.0
+- System.Numerics.Tensors 9.0.0
+  Copyright (c) .NET Foundation and Contributors
+- Velopack 1.2.0
+  Copyright (c) 2021 Caelan Sayler
+  Copyright (c) 2024 Velopack Ltd.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -20,3 +36,46 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+SQLitePCLRaw and SQLite
+-----------------------
+
+SQLitePCLRaw.bundle_e_sqlite3, SQLitePCLRaw.config.e_sqlite3,
+SQLitePCLRaw.core, and SQLitePCLRaw.provider.e_sqlite3 3.0.3 use the Apache
+License 2.0. The full Apache License is included in LICENSE.
+
+SQLitePCLRaw contains material from Microsoft Open Technologies, Inc., under
+the Apache License 2.0. Copyright (c) Microsoft Open Technologies, Inc. All
+rights reserved.
+
+Versions of SQLitePCLRaw before 2.0 used the Zumero name. Versions from 2.0
+use the SourceGear name. Zumero is a DBA name for SourceGear. There is no
+legal distinction, and both use the Apache License 2.0.
+
+The SQLite author disclaims copyright to the source code. In place of a legal
+notice, here is a blessing:
+
+May you do good and not evil.
+May you find forgiveness for yourself and forgive others.
+May you share freely, never taking more than you give.
+
+SourceGear.sqlite3 3.50.4.5 contains SQLite. SQLite is in the public domain.
+See Licenses\SourceGear-SQLite-LICENSE.txt and https://sqlite.org/copyright.html.
+
+Microsoft components
+--------------------
+
+- Microsoft Windows App SDK 2.2.0 and its runtime components
+- Microsoft Windows App SDK ML 2.1.70
+- Microsoft WebView2 1.0.3719.77
+- The self-contained .NET 10 runtime
+
+Their complete license and third-party notice files are included in Licenses.
+WebView2 uses the Microsoft BSD 3-Clause license. Copyright (c) Microsoft
+Corporation. All rights reserved.
+
+Fonts
+-----
+
+Familjen Grotesk and Azeret Mono use the SIL Open Font License 1.1. Their
+complete license files are included in Assets\Fonts.

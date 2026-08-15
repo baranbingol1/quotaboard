@@ -28,6 +28,18 @@ Require-File 'App.xbf' | Out-Null
 Require-File 'MainWindow.xbf' | Out-Null
 Require-File 'AiLimits.Presentation.WinUI' | Out-Null
 Require-File 'Microsoft.WindowsAppRuntime.Bootstrap.dll' | Out-Null
+Require-File 'LICENSE' | Out-Null
+Require-File 'THIRD-PARTY-NOTICES.txt' | Out-Null
+Require-File 'Assets\Fonts\OFL-AzeretMono.txt' | Out-Null
+Require-File 'Assets\Fonts\OFL-FamiljenGrotesk.txt' | Out-Null
+Require-File 'Licenses\CommunityToolkit-Mvvm-LICENSE.md' | Out-Null
+Require-File 'Licenses\CommunityToolkit-Mvvm-ThirdPartyNotices.txt' | Out-Null
+Require-File 'Licenses\dotnet-ThirdPartyNotices.txt' | Out-Null
+Require-File 'Licenses\Microsoft-WebView2-LICENSE.txt' | Out-Null
+Require-File 'Licenses\Microsoft-WebView2-NOTICE.txt' | Out-Null
+Require-File 'Licenses\Microsoft-Windows-App-SDK-LICENSE.txt' | Out-Null
+Require-File 'Licenses\Microsoft-Windows-App-SDK-ML-ThirdPartyNotices.txt' | Out-Null
+Require-File 'Licenses\SourceGear-SQLite-LICENSE.txt' | Out-Null
 # Native SQLite ships with Microsoft.Data.Sqlite's SQLitePCLRaw bundle.
 if (-not (Get-ChildItem -Path $root -Recurse -Filter 'e_sqlite3.dll' -ErrorAction SilentlyContinue)) {
     $failures.Add('Missing native SQLite (e_sqlite3.dll).')

@@ -10,11 +10,7 @@ namespace AiLimits.Presentation.WinUI;
 /// </summary>
 public static class ProviderVisibilityPreference
 {
-    private static readonly string PreferencePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard",
-        "provider-visibility.json"
-    );
+    private static readonly string PreferencePath = AppDataDirectory.File("provider-visibility.json");
 
     public static ProviderVisibilitySet Load()
     {

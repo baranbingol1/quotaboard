@@ -16,11 +16,7 @@ public sealed record DashboardDisplayOptions(
 public static class DashboardDisplayPreference
 {
     private static readonly object Gate = new();
-    private static readonly string PreferencePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard",
-        "display-preferences.json"
-    );
+    private static readonly string PreferencePath = AppDataDirectory.File("display-preferences.json");
     private static DashboardDisplayOptions _current = LoadCore();
 
     public static DashboardDisplayOptions Current
@@ -89,11 +85,7 @@ public static class DashboardDisplayPreference
 
 public static class TrayMonitorPreference
 {
-    private static readonly string PreferencePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "QuotaBoard",
-        "tray-monitor.preference"
-    );
+    private static readonly string PreferencePath = AppDataDirectory.File("tray-monitor.preference");
     private static bool _enabled = LoadCore();
 
     public static bool Enabled => _enabled;

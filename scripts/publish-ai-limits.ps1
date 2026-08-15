@@ -71,6 +71,65 @@ if ($LASTEXITCODE -ne 0) {
     throw "AI Limits publish failed with exit code $LASTEXITCODE."
 }
 
+$packageAssetsPath = Join-Path $repositoryRoot 'src\AiLimits.App\obj\project.assets.json'
+if (-not (Test-Path -LiteralPath $packageAssetsPath -PathType Leaf)) {
+    throw "Package assets were not generated: $packageAssetsPath"
+}
+
+$packageAssets = Get-Content -Raw -LiteralPath $packageAssetsPath | ConvertFrom-Json
+$packageRoots = @($packageAssets.packageFolders.PSObject.Properties | ForEach-Object { $_.Name })
+$licenseOutput = Join-Path $resolvedOutput 'Licenses'
+New-Item -ItemType Directory -Path $licenseOutput -Force | Out-Null
+
+function Copy-PackageNotice {
+    param(
+        [Parameter(Mandatory = $true)][string]$PackageId,
+        [Parameter(Mandatory = $true)][string]$RelativePath,
+        [Parameter(Mandatory = $true)][string]$OutputName
+    )
+
+    $package = @(
+        $packageAssets.libraries.PSObject.Properties |
+            Where-Object { $_.Name -match ('^' + [regex]::Escape($PackageId) + '/[^/]+$') }
+    )
+    if ($package.Count -ne 1) {
+        throw "Could not resolve exactly one $PackageId package from project.assets.json."
+    }
+
+    $sourcePath = $null
+    foreach ($packageRoot in $packageRoots) {
+        $candidate = Join-Path $packageRoot (Join-Path ([string]$package[0].Value.path) $RelativePath)
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+            $sourcePath = $candidate
+            break
+        }
+    }
+    if (-not $sourcePath) {
+        throw "Missing notice file for $PackageId package: $RelativePath"
+    }
+
+    Copy-Item -LiteralPath $sourcePath -Destination (Join-Path $licenseOutput $OutputName) -Force
+}
+
+$packageNotices = @(
+    @{ PackageId = 'CommunityToolkit.Mvvm'; RelativePath = 'License.md'; OutputName = 'CommunityToolkit-Mvvm-LICENSE.md' },
+    @{ PackageId = 'CommunityToolkit.Mvvm'; RelativePath = 'ThirdPartyNotices.txt'; OutputName = 'CommunityToolkit-Mvvm-ThirdPartyNotices.txt' },
+    @{ PackageId = 'Microsoft.Web.WebView2'; RelativePath = 'LICENSE.txt'; OutputName = 'Microsoft-WebView2-LICENSE.txt' },
+    @{ PackageId = 'Microsoft.Web.WebView2'; RelativePath = 'NOTICE.txt'; OutputName = 'Microsoft-WebView2-NOTICE.txt' },
+    @{ PackageId = 'Microsoft.WindowsAppSDK'; RelativePath = 'license.txt'; OutputName = 'Microsoft-Windows-App-SDK-LICENSE.txt' },
+    @{ PackageId = 'Microsoft.WindowsAppSDK.ML'; RelativePath = 'ThirdPartyNotices.txt'; OutputName = 'Microsoft-Windows-App-SDK-ML-ThirdPartyNotices.txt' },
+    @{ PackageId = 'SourceGear.sqlite3'; RelativePath = 'LICENSE.txt'; OutputName = 'SourceGear-SQLite-LICENSE.txt' }
+)
+foreach ($notice in $packageNotices) {
+    Copy-PackageNotice @notice
+}
+
+$dotnetNoticePath = Join-Path (Split-Path $dotnet.Source -Parent) 'ThirdPartyNotices.txt'
+if (-not (Test-Path -LiteralPath $dotnetNoticePath -PathType Leaf)) {
+    throw ".NET third-party notices were not found: $dotnetNoticePath"
+}
+Copy-Item -LiteralPath $dotnetNoticePath -Destination (Join-Path $licenseOutput 'dotnet-ThirdPartyNotices.txt') -Force
+
 # WinUI's unpackaged publish currently omits the executable project's PRI/XBF
 # layout. Copy the compiled XAML layout from the RID build output explicitly.
 $layoutRoot = Join-Path $repositoryRoot "src\AiLimits.App\bin\$Architecture\$Configuration\$targetFramework\$runtimeIdentifier"

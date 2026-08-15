@@ -25,7 +25,13 @@
                 <Button Grid.Column="1" x:Uid="Diagnostics_Refresh" Command="{x:Bind ViewModel.RefreshCommand}"
                         HorizontalAlignment="Right" VerticalAlignment="Bottom" Style="{StaticResource AccentButtonStyle}" />
             </Grid>
-            <Grid x:Name="StatusGrid" Grid.Row="1" ColumnSpacing="14">
+            <Grid x:Name="StatusGrid" Grid.Row="1" ColumnSpacing="14" RowSpacing="14"
+                  SizeChanged="OnStatusGridSizeChanged">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" MinWidth="150" />
                     <ColumnDefinition Width="*" MinWidth="150" />
