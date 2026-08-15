@@ -73,7 +73,17 @@ public sealed class PresentationWiringTests
         Assert.Contains("StackedLayoutWidth", usage, StringComparison.Ordinal);
         Assert.Contains("NarrowConnections", providersXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("MinWidth=\"1000\"", providersXaml, StringComparison.Ordinal);
-        Assert.Contains("NarrowLayoutWidth", providersCode, StringComparison.Ordinal);
+        Assert.Contains("private const double NarrowLayoutWidth = 1030;", providersCode, StringComparison.Ordinal);
+        Assert.Contains(
+            "ChartPlotHost.Visibility = result.MatchingRecordCount == 0 ? Visibility.Collapsed : Visibility.Visible;",
+            usage,
+            StringComparison.Ordinal
+        );
+        Assert.DoesNotContain(
+            "ChartScrollViewer.Visibility = result.MatchingRecordCount == 0",
+            usage,
+            StringComparison.Ordinal
+        );
         Assert.Contains("StackedStatusWidth", diagnostics, StringComparison.Ordinal);
     }
 

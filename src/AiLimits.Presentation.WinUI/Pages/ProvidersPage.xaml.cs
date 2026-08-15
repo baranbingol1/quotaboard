@@ -11,7 +11,7 @@ namespace AiLimits.Presentation.WinUI.Pages;
 
 public sealed partial class ProvidersPage : Page
 {
-    private const double NarrowLayoutWidth = 900;
+    private const double NarrowLayoutWidth = 1030;
     private NotifyCollectionChangedEventHandler? _connectionsChangedHandler;
 
     public ProvidersPage(LiveDashboardViewModel viewModel)

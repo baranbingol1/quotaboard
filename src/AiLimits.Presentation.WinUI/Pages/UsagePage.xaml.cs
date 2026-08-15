@@ -350,7 +350,7 @@ public sealed partial class UsagePage : Page
         ComparisonText.Text = ComparisonLabel(result.Comparison);
         EmptyStateText.Visibility = result.MatchingRecordCount == 0 ? Visibility.Visible : Visibility.Collapsed;
         EmptyStateText.Text = EmptyText(result.EmptyReason, "Usage_ChartNoHistory", "Usage_ChartEmpty.Text");
-        ChartScrollViewer.Visibility = result.MatchingRecordCount == 0 ? Visibility.Collapsed : Visibility.Visible;
+        ChartPlotHost.Visibility = result.MatchingRecordCount == 0 ? Visibility.Collapsed : Visibility.Visible;
 
         double coverage = result.TotalTokens == 0 ? 0 : 100.0 * result.PricedTokens / result.TotalTokens;
         PricingCoverageText.Text = result.ApiEquivalentCostUsd.HasValue

@@ -6,7 +6,9 @@ telemetry.
 ## Install
 
 1. Download the archive for your CPU — `win-x64` for Intel/AMD, `win-arm64` for
-   Snapdragon and other ARM machines.
+   Snapdragon and other ARM machines. For most PCs, choose the file ending in
+   `win-x64.zip`. The `.nupkg` files support in-app updates and are not for
+   manual installation.
 2. Extract it anywhere and run `QuotaBoard.exe`. There is no installer and no
    administrator rights are needed; nothing is written outside the folder you
    extracted to and `%LOCALAPPDATA%\QuotaBoard`.
@@ -18,11 +20,21 @@ telemetry.
 Verify a download against its `.sha256` file:
 
 ```powershell
-Get-FileHash .\QuotaBoard-*-win-x64.zip -Algorithm SHA256
+$zip = Get-Item .\QuotaBoard-*-win-x64.zip
+$expected = ((Get-Content -LiteralPath "$($zip.FullName).sha256").Trim() -split '\s+')[0]
+$actual = (Get-FileHash -LiteralPath $zip.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actual -ne $expected) { throw "Checksum mismatch" }
+"Checksum verified: $actual"
 ```
 
 Requires Windows 10 22H2 (build 19045) or newer. The runtime is self-contained,
 so there is no .NET to install.
+
+## Update
+
+Keep launching the `QuotaBoard.exe` at the root of the extracted folder. Use
+**Settings → About & updates** to check for an update. Download and restart are
+separate actions.
 
 ## Uninstall
 
