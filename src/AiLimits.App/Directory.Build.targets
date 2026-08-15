@@ -1,0 +1,11 @@
+<Project>
+  <Import Project="..\..\Directory.Build.targets" />
+
+  <!-- Windows App SDK self-containment belongs to the executable only. Do not
+       leak the publish property into referenced WinUI class libraries. -->
+  <ItemGroup>
+    <ProjectReference Update="@(ProjectReference)">
+      <GlobalPropertiesToRemove>$(GlobalPropertiesToRemove);WindowsAppSDKSelfContained</GlobalPropertiesToRemove>
+    </ProjectReference>
+  </ItemGroup>
+</Project>

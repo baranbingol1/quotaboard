@@ -1,0 +1,15 @@
+# CSharpier is the C# formatter. Markup and MSBuild files keep the
+# indentation already used by WinUI and the SDK.
+**/*.xaml
+**/*.xaml.cs
+**/*.targets
+**/*.props
+**/*.csproj
+**/*.slnx
+**/*.pubxml
+**/*.manifest
+**/*.resw
+**/*.json
+**/bin/**
+**/obj/**
+**/CodexBar/**

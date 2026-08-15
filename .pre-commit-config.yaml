@@ -1,0 +1,28 @@
+# Local hooks call the same scripts CI runs. Install with:
+#   ./scripts/install-git-hooks.ps1
+# or, if you use the pre-commit Python package:
+#   pre-commit install
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=512"]
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: end-of-file-fixer
+        exclude: >
+          (?x)^(
+            assets/|
+            src/AiLimits.App/Assets/
+          )
+      - id: trailing-whitespace
+        exclude: '\.md$'
+
+  - repo: local
+    hooks:
+      - id: quotaboard-quality-gates
+        name: QuotaBoard quality gates
+        language: system
+        pass_filenames: false
+        entry: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/invoke-quality-gates.ps1 -Quick

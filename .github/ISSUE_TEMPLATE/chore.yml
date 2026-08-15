@@ -1,0 +1,12 @@
+name: Chore
+description: Docs, CI, cleanup, or other maintenance
+title: "chore: "
+labels: ["type:chore"]
+body:
+  - type: textarea
+    id: work
+    attributes:
+      label: Work
+      description: What needs to change?
+    validations:
+      required: true

@@ -1,0 +1,324 @@
+﻿<Page
+    x:Class="AiLimits.Presentation.WinUI.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:AiLimits.Presentation.WinUI.Controls"
+    xmlns:converters="using:AiLimits.Presentation.WinUI.Converters"
+    Background="{ThemeResource PageBackgroundBrush}">
+    <Page.Resources>
+        <converters:BooleanVisibilityConverter x:Key="BooleanVisibility" />
+    </Page.Resources>
+    <ScrollViewer>
+        <Grid Padding="32,26,32,44" RowSpacing="18" MaxWidth="940" HorizontalAlignment="Left" MinWidth="360">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <StackPanel>
+                <TextBlock x:Uid="Settings_Eyebrow" Text="LOCAL PREFERENCES" Style="{StaticResource EyebrowTextStyle}" />
+                <TextBlock x:Uid="Settings_Title" Text="Settings" Style="{StaticResource PageTitleTextStyle}" Margin="0,5,0,0" />
+                <TextBlock x:Uid="Settings_Description" Text="Appearance, refresh, tray, alerts, privacy, and language." Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <Border Grid.Row="1" Style="{StaticResource SurfaceBorderStyle}">
+                <StackPanel Spacing="18">
+                    <TextBlock x:Uid="Settings_AppearanceLifecycle" Text="Appearance &amp; lifecycle" Style="{StaticResource SectionTitleTextStyle}" />
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="200"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Uid="Settings_ThemeName" Text="Theme" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Uid="Settings_ThemeNameDescription" Text="Color palette used across the app" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ComboBox x:Name="ThemeNamePicker" Grid.Column="1" MaxWidth="200" MinWidth="130" SelectionChanged="OnThemeNameChanged" />
+                    </Grid>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="200"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Uid="Settings_ThemeMode" Text="Appearance mode" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Uid="Settings_ThemeModeDescription" Text="Follow Windows, or force light or dark" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ComboBox x:Name="ThemePicker" Grid.Column="1" MaxWidth="200" MinWidth="130" SelectionChanged="OnThemeChanged">
+                            <ComboBoxItem x:Uid="Settings_ThemeSystem" Content="Use system"/>
+                            <ComboBoxItem x:Uid="Settings_ThemeLight" Content="Light"/>
+                            <ComboBoxItem x:Uid="Settings_ThemeDark" Content="Dark"/>
+                        </ComboBox>
+                    </Grid>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="200"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Uid="Settings_ContentFont" Text="Interface font" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Uid="Settings_ContentFontDescription" Text="Font for headings and body text" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ComboBox x:Name="ContentFontPicker" Grid.Column="1" MaxWidth="200" MinWidth="130" SelectionChanged="OnFontChanged" />
+                    </Grid>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="200"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Uid="Settings_MetricFont" Text="Numeric font" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Uid="Settings_MetricFontDescription" Text="Monospace font for metrics and labels" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ComboBox x:Name="MetricFontPicker" Grid.Column="1" MaxWidth="200" MinWidth="130" SelectionChanged="OnFontChanged" />
+                    </Grid>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="200"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Uid="Settings_LanguageLabel" Text="Language" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Uid="Settings_LanguageDescription" Text="Follow Windows or override the display language" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ComboBox x:Name="LanguagePicker" Grid.Column="1" MaxWidth="180" MinWidth="130" SelectionChanged="OnLanguageChanged">
+                            <ComboBoxItem x:Name="SystemLanguageItem" Tag="" Content="Use system"/>
+                            <ComboBoxItem x:Name="EnglishLanguageItem" Tag="en-US" Content="English"/>
+                            <ComboBoxItem x:Name="TurkishLanguageItem" Tag="tr-TR" Content="Türkçe"/>
+                        </ComboBox>
+                    </Grid>
+                    <InfoBar x:Name="LanguageRestartInfo" IsOpen="False" Severity="Informational" IsClosable="True" />
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="200"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Uid="Settings_StartWithWindowsLabel" Text="Start with Windows" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Uid="Settings_StartWithWindowsDescription" Text="Launch QuotaBoard when you sign in. It starts in the tray when tray monitoring is on." FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ToggleSwitch x:Uid="Settings_StartToggle" x:Name="StartWithWindowsToggle" Grid.Column="1" Toggled="OnStartWithWindowsToggled" OffContent="Off" OnContent="On"/>
+                    </Grid>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="200"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Uid="Settings_TrayLabel" Text="Keep tray monitor running" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Uid="Settings_TrayDescription" Text="Closing the window keeps quota monitoring active" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ToggleSwitch x:Uid="Settings_TrayToggle" x:Name="TrayMonitorToggle" Grid.Column="1" Toggled="OnTrayMonitorToggled" OffContent="Off" OnContent="On"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="2" Style="{StaticResource SurfaceBorderStyle}">
+                <StackPanel Spacing="18">
+                    <TextBlock x:Uid="Settings_Display" Text="Meter display" Style="{StaticResource SectionTitleTextStyle}" />
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="200"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Uid="Settings_RemainingLabel" Text="Show usage as remaining" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Uid="Settings_RemainingDescription" Text="Invert percentages and progress bars to show quota left" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ToggleSwitch x:Uid="Settings_RemainingToggle" x:Name="ShowRemainingToggle" Grid.Column="1" Toggled="OnShowRemainingToggled" OffContent="Used" OnContent="Remaining"/>
+                    </Grid>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="200"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Uid="Settings_AbsoluteResetLabel" Text="Show absolute reset time" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Uid="Settings_AbsoluteResetDescription" Text="Switch between “in 3h 12m” and the local clock time" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ToggleSwitch x:Uid="Settings_AbsoluteToggle" x:Name="AbsoluteResetToggle" Grid.Column="1" Toggled="OnAbsoluteResetToggled" OffContent="Relative" OnContent="Absolute"/>
+                    </Grid>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="200"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Uid="Settings_HideZeroLabel" Text="Hide empty meters" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Uid="Settings_HideZeroDescription" Text="Hide zero-usage and not-applicable meters from provider cards" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ToggleSwitch x:Uid="Settings_HideZeroToggle" x:Name="HideZeroToggle" Grid.Column="1" Toggled="OnHideZeroToggled" OffContent="Show" OnContent="Hide"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="3" Style="{StaticResource SurfaceBorderStyle}">
+                <StackPanel Spacing="18">
+                    <TextBlock x:Uid="Settings_OverviewProviders" Text="Overview providers" Style="{StaticResource SectionTitleTextStyle}" />
+                    <TextBlock x:Uid="Settings_OverviewProvidersDescription" Text="Choose which providers appear as cards on Overview. Hidden providers keep refreshing and stay available in Connections and Usage."
+                               FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextSecondaryBrush}" />
+                    <ItemsControl x:Name="ProviderVisibilityList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Padding="0,7" ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="180"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                               ToolTipService.ToolTip="{Binding Name}"/>
+                                        <TextBlock Text="{Binding Account}" FontSize="11" Foreground="{ThemeResource TextQuietBrush}" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                    <ToggleSwitch Grid.Column="1" IsOn="{Binding Visible}" Tag="{Binding Id}" Toggled="OnProviderVisibilityToggled"
+                                                  OnContent="{Binding OnLabel}" OffContent="{Binding OffLabel}" Margin="0,-4,0,-4"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="4" Style="{StaticResource SurfaceBorderStyle}">
+                <StackPanel Spacing="18">
+                    <TextBlock x:Uid="Settings_PlanValue" Text="Plan value" Style="{StaticResource SectionTitleTextStyle}" />
+                    <TextBlock x:Uid="Settings_PlanValueDescription" Text="Enter what you pay per month for each connected provider. Only providers detected on this machine are listed; the plan value metric on Overview compares their total against the API-equivalent estimate."
+                               FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextSecondaryBrush}" />
+                    <ItemsControl x:Name="PlanCostList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Padding="0,7" ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="180"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <Grid ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                                       ToolTipService.ToolTip="{Binding Name}"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding PlanBadge}" FontSize="11" VerticalAlignment="Center" Foreground="{ThemeResource TextSecondaryBrush}"/>
+                                        </Grid>
+                                        <TextBlock Text="{Binding Account}" FontSize="11" Foreground="{ThemeResource TextQuietBrush}" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                    <TextBox Grid.Column="1" MaxWidth="160" MinWidth="110" InputScope="Number"
+                                             PlaceholderText="{Binding Placeholder}"
+                                             Tag="{Binding Id}" Text="{Binding Value}" LostFocus="OnPlanCostBoxLostFocus"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock x:Uid="Settings_NoProviders" x:Name="PlanCostEmptyHint" Text="No connected providers detected yet. Refresh live data on Overview first."
+                               FontSize="12" Foreground="{ThemeResource TextQuietBrush}" TextWrapping="Wrap" Visibility="Collapsed" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="5" Style="{StaticResource SurfaceBorderStyle}">
+                <StackPanel Spacing="14">
+                    <TextBlock x:Uid="Settings_ModelCatalog" Text="Model catalog" Style="{StaticResource SectionTitleTextStyle}" />
+                    <TextBlock x:Uid="Settings_ModelCatalogDescription"
+                               Text="Token prices come from models.dev. It refreshes twice a day on its own; refresh here if you want it now."
+                               FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextSecondaryBrush}" />
+                    <controls:AdaptiveHeaderPanel MinContentWidth="240" Spacing="16">
+                        <StackPanel Spacing="4" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="{x:Bind ViewModel.ModelCatalogStatusLabel, Mode=OneWay}"
+                                           FontFamily="{ThemeResource MetricFont}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <TextBlock x:Uid="Settings_ModelCatalogSource" Text="models.dev/api.json"
+                                           FontSize="11" Foreground="{ThemeResource TextQuietBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Text="{x:Bind ViewModel.ModelCatalogDetail, Mode=OneWay}"
+                                       FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextSecondaryBrush}" />
+                            <TextBlock Text="{x:Bind ViewModel.ModelCatalogSchedule, Mode=OneWay}"
+                                       FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource TextQuietBrush}" />
+                        </StackPanel>
+                        <StackPanel Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Right">
+                            <Button x:Uid="Settings_ModelCatalogRefresh" Content="Refresh now"
+                                    Command="{x:Bind ViewModel.RefreshModelCatalogCommand}" HorizontalAlignment="Right" />
+                            <ProgressBar IsIndeterminate="True" Width="130" HorizontalAlignment="Right"
+                                         Visibility="{x:Bind ViewModel.IsRefreshingModelCatalog, Mode=OneWay, Converter={StaticResource BooleanVisibility}}" />
+                        </StackPanel>
+                    </controls:AdaptiveHeaderPanel>
+                    <InfoBar IsOpen="{x:Bind ViewModel.ModelCatalogHasError, Mode=OneWay}" Severity="Warning" IsClosable="False"
+                             Message="{x:Bind ViewModel.ModelCatalogError, Mode=OneWay}" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="6" Style="{StaticResource SurfaceBorderStyle}">
+                <StackPanel Spacing="18">
+                    <TextBlock x:Uid="Settings_ModelPricing" Text="Model pricing" Style="{StaticResource SectionTitleTextStyle}" />
+                    <TextBlock x:Uid="Settings_ModelPricingDescription" Text="Set USD per 1M tokens for models the catalog can't price. These fill gaps only; catalog pricing is never overridden."
+                               FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextSecondaryBrush}" />
+                    <AutoSuggestBox x:Name="ModelPricingSearchBox" x:Uid="Settings_ModelPricingSearch"
+                                    QueryIcon="Find" MaxWidth="360" HorizontalAlignment="Left"
+                                    TextChanged="OnModelPricingSearchChanged"/>
+                    <ItemsControl x:Name="ModelPricingList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Padding="0,9" RowSpacing="6">
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Model}" FontFamily="{ThemeResource MetricFont}" FontWeight="SemiBold" VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{Binding Model}"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Source}" FontSize="11" VerticalAlignment="Center" Foreground="{ThemeResource TextQuietBrush}"/>
+                                    </Grid>
+                                    <controls:WrapRowPanel Grid.Row="1">
+                                        <TextBox x:Uid="Settings_InputPer1M" Header="Input / 1M" Width="120" Margin="0,0,10,10" InputScope="Number"
+                                                 Tag="{Binding Key}" Text="{Binding Input}" LostFocus="OnModelPriceBoxLostFocus"/>
+                                        <TextBox x:Uid="Settings_OutputPer1M" Header="Output / 1M" Width="120" Margin="0,0,10,10" InputScope="Number"
+                                                 Tag="{Binding Key}" Text="{Binding Output}" LostFocus="OnModelPriceBoxLostFocus"/>
+                                        <TextBox x:Uid="Settings_CacheReadPer1M" Header="Cache read / 1M" Width="130" Margin="0,0,10,10" InputScope="Number"
+                                                 PlaceholderText="—" Tag="{Binding Key}" Text="{Binding CacheRead}" LostFocus="OnModelPriceBoxLostFocus"/>
+                                        <TextBox x:Uid="Settings_CacheWritePer1M" Header="Cache write / 1M" Width="130" Margin="0,0,10,10" InputScope="Number"
+                                                 PlaceholderText="—" Tag="{Binding Key}" Text="{Binding CacheWrite}" LostFocus="OnModelPriceBoxLostFocus"/>
+                                    </controls:WrapRowPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="ModelPricingShowMoreButton" Click="OnModelPricingShowMore" Visibility="Collapsed"/>
+                        <Button x:Name="ModelPricingShowLessButton" Click="OnModelPricingShowLess" Visibility="Collapsed"/>
+                    </StackPanel>
+                    <TextBlock x:Uid="Settings_ModelPricingEmpty" x:Name="ModelPricingEmptyHint" Text="No unpriced models in the last 30 days."
+                               FontSize="12" Foreground="{ThemeResource TextQuietBrush}" TextWrapping="Wrap" Visibility="Collapsed" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="7" Style="{StaticResource SurfaceBorderStyle}">
+                <StackPanel Spacing="18">
+                    <TextBlock x:Uid="Settings_Alerts" Text="Alerts" Style="{StaticResource SectionTitleTextStyle}" />
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="200"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Uid="Settings_QuotaAlertsLabel" Text="Quota alerts" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Uid="Settings_QuotaAlertsDescription" Text="Notify at 80%, 95%, and 30 minutes before reset" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ToggleSwitch x:Uid="Settings_AlertsToggle" x:Name="QuotaAlertsToggle" Grid.Column="1" Toggled="OnQuotaAlertsToggled" OffContent="Off" OnContent="On"/>
+                    </Grid>
+                    <InfoBar x:Uid="Settings_AlertDedup" IsOpen="True" Severity="Informational" Message="Each provider, account, meter, threshold, and reset cycle notifies exactly once." />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="8" Style="{StaticResource SurfaceBorderStyle}">
+                <StackPanel Spacing="18">
+                    <TextBlock x:Uid="Settings_Privacy" Text="Privacy" Style="{StaticResource SectionTitleTextStyle}" />
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="200"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Uid="Settings_BlurEmailsLabel" Text="Blur account emails" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Uid="Settings_BlurEmailsDescription" Text="Mask account emails everywhere so screenshots are safe to share" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ToggleSwitch x:Uid="Settings_BlurEmailsToggle" x:Name="BlurEmailsToggle" Grid.Column="1" Toggled="OnBlurEmailsToggled" OffContent="Off" OnContent="On"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="9" Style="{StaticResource SurfaceBorderStyle}">
+                <StackPanel Spacing="18">
+                    <TextBlock x:Uid="Settings_AboutUpdates" Text="About &amp; updates" Style="{StaticResource SectionTitleTextStyle}" />
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Name="UpdateVersionText" FontWeight="SemiBold" />
+                        <TextBlock x:Uid="Settings_UpdateSource" Text="Updates come from the official GitHub release."
+                                   Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <TextBlock x:Name="UpdateStatusText" Text="{x:Bind UpdateViewModel.StatusMessage, Mode=OneWay}"
+                               Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"
+                               AutomationProperties.LiveSetting="Polite" />
+                    <Grid Height="8">
+                        <ProgressBar Maximum="100" Value="{x:Bind UpdateViewModel.DownloadPercentage, Mode=OneWay}"
+                                     IsIndeterminate="{x:Bind UpdateViewModel.IsChecking, Mode=OneWay}"
+                                     Visibility="{x:Bind UpdateViewModel.IsBusy, Mode=OneWay, Converter={StaticResource BooleanVisibility}}"
+                                     HorizontalAlignment="Stretch" VerticalAlignment="Center" />
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Uid="Settings_UpdateCheck" Content="Check for updates" Click="OnCheckForUpdates"
+                                Visibility="{x:Bind UpdateViewModel.ShowCheckAction, Mode=OneWay, Converter={StaticResource BooleanVisibility}}" />
+                        <Button x:Uid="Settings_UpdateDownload" Content="Download update" Click="OnDownloadUpdate"
+                                Visibility="{x:Bind UpdateViewModel.ShowDownloadAction, Mode=OneWay, Converter={StaticResource BooleanVisibility}}" />
+                        <Button x:Uid="Settings_UpdateRestart" Content="Restart QuotaBoard" Click="OnRestartForUpdate"
+                                Visibility="{x:Bind UpdateViewModel.ShowRestartAction, Mode=OneWay, Converter={StaticResource BooleanVisibility}}" />
+                        <HyperlinkButton x:Uid="Settings_UpdateNotes" Content="View release notes" Click="OnViewReleaseNotes"
+                                         Visibility="{x:Bind UpdateViewModel.HasReleaseNotes, Mode=OneWay, Converter={StaticResource BooleanVisibility}}" />
+                    </StackPanel>
+                    <InfoBar x:Uid="Settings_UpdateFailure" IsOpen="{x:Bind UpdateViewModel.HasFailure, Mode=OneWay}"
+                             Severity="Warning" IsClosable="False"
+                             Message="Couldn't check for updates. Your current version is unchanged." />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </ScrollViewer>
+</Page>

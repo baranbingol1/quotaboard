@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AiLimits.Domain/AiLimits.Domain.csproj" />
+    <Project Path="src/AiLimits.Application/AiLimits.Application.csproj" />
+    <Project Path="src/AiLimits.Infrastructure/AiLimits.Infrastructure.csproj" />
+    <Project Path="src/AiLimits.Platform.Windows/AiLimits.Platform.Windows.csproj" />
+    <Project Path="src/AiLimits.Presentation.WinUI/AiLimits.Presentation.WinUI.csproj" />
+    <Project Path="src/AiLimits.App/AiLimits.App.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AiLimits.Tests/AiLimits.Tests.csproj" />
+    <Project Path="tests/AiLimits.IntegrationTests/AiLimits.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

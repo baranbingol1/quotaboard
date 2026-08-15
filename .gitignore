@@ -1,0 +1,58 @@
+bin/
+obj/
+# Canonical local click-test install. Layout matches publish-ai-limits.ps1
+# defaults: `app\win-x64\` and `app\win-arm64\`. Treated as ephemeral output
+# and rebuilt via `scripts/publish-ai-limits.ps1`.
+app/
+.vs/
+.idea/
+.vscode/
+TestResults/
+coverage/
+artifacts/
+publish/
+*.user
+*.suo
+*.log
+*.db
+*.db-shm
+*.db-wal
+AppPackages/
+BundleArtifacts/
+GeneratedFiles/
+*.appx
+*.appxbundle
+*.msix
+*.msixbundle
+*.msixupload
+*.nupkg
+*.pfx
+*.snk
+
+# Local tooling state
+.dotnet-home/
+.patch-tool-check
+.env
+.env.*
+!.env.example
+
+# Local AI coding-assistant instructions and skills.
+# AGENTS.md is committed; local CLAUDE.md / .agents remain private.
+/.agents/
+/.claude/
+/CLAUDE.md
+
+# Internal design notes. Keep them on disk; do not publish them.
+/docs/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Vendored reference clone of the upstream macOS app (has its own .git)
+CodexBar/
+/cb_changelog.md
+
+# Generated per release from the build's dependency manifest.
+/THIRD-PARTY-NOTICES.md

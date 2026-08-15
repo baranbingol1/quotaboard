@@ -1,0 +1,186 @@
+﻿<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Default palette (Tokyo Night). ThemeDictionaryBuilder injects the
+         selected theme's palette over these at runtime; keeping a full default
+         set here guarantees {ThemeResource} always resolves during XAML load. -->
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+            <SolidColorBrush x:Key="PageBackgroundBrush" Color="#FFE1E2E7" />
+            <SolidColorBrush x:Key="SurfaceBrush" Color="#FFD5D6DB" />
+            <SolidColorBrush x:Key="SurfaceSecondaryBrush" Color="#FFC8C9CE" />
+            <SolidColorBrush x:Key="SurfaceStrokeBrush" Color="#FF737A8C" />
+            <SolidColorBrush x:Key="SurfaceStrokeActiveBrush" Color="#FF5A607D" />
+            <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FF3258AF" />
+            <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF555B6C" />
+            <SolidColorBrush x:Key="TextQuietBrush" Color="#FF6A6F7E" />
+            <SolidColorBrush x:Key="HealthyBrush" Color="#FF587539" />
+            <SolidColorBrush x:Key="WarningBrush" Color="#FFB15C00" />
+            <SolidColorBrush x:Key="CriticalBrush" Color="#FFF52A65" />
+            <SolidColorBrush x:Key="FocusBrush" Color="#FF2E7DE9" />
+            <SolidColorBrush x:Key="AccentBrush" Color="#FFB15C00" />
+            <SolidColorBrush x:Key="PillPositiveBackgroundBrush" Color="#FFBEC5BE" />
+            <SolidColorBrush x:Key="PillPositiveForegroundBrush" Color="#FF587539" />
+            <SolidColorBrush x:Key="PillInfoBackgroundBrush" Color="#FFB7C6DE" />
+            <SolidColorBrush x:Key="PillInfoForegroundBrush" Color="#FF2E7DE9" />
+            <SolidColorBrush x:Key="PillWarningBackgroundBrush" Color="#FFCFC0B4" />
+            <SolidColorBrush x:Key="PillWarningForegroundBrush" Color="#FFB15C00" />
+            <SolidColorBrush x:Key="PillNeutralBackgroundBrush" Color="#FFC8C9CE" />
+            <SolidColorBrush x:Key="PillNeutralForegroundBrush" Color="#FF555B6C" />
+            <LinearGradientBrush x:Key="ChartBarBrush" StartPoint="0,0" EndPoint="0,1">
+                <GradientStop Color="#FF2E7DE9" Offset="0" />
+                <GradientStop Color="#FF7FAAE8" Offset="1" />
+            </LinearGradientBrush>
+            <SolidColorBrush x:Key="ChartSeriesOthersBrush" Color="#FF717685" />
+            <SolidColorBrush x:Key="ChartSeries1Brush" Color="#FF2E7DE9" />
+            <SolidColorBrush x:Key="ChartSeries2Brush" Color="#FF587539" />
+            <SolidColorBrush x:Key="ChartSeries3Brush" Color="#FFB15C00" />
+            <SolidColorBrush x:Key="ChartSeries4Brush" Color="#FF9854F1" />
+            <SolidColorBrush x:Key="ChartSeries5Brush" Color="#FF118C74" />
+            <SolidColorBrush x:Key="ChartSeries6Brush" Color="#FFF52A65" />
+            <SolidColorBrush x:Key="IncidentBackgroundBrush" Color="#24B15C00" />
+            <SolidColorBrush x:Key="IncidentBorderBrush" Color="#99B15C00" />
+            <SolidColorBrush x:Key="IncidentForegroundBrush" Color="#FFB15C00" />
+            <FontFamily x:Key="ContentFont">ms-appx:///Assets/Fonts/FamiljenGrotesk-VariableFont_wght.ttf#Familjen Grotesk</FontFamily>
+            <FontFamily x:Key="MetricFont">ms-appx:///Assets/Fonts/AzeretMono-VariableFont_wght.ttf#Azeret Mono</FontFamily>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+            <SolidColorBrush x:Key="PageBackgroundBrush" Color="#FF1A1B26" />
+            <SolidColorBrush x:Key="SurfaceBrush" Color="#FF1E2030" />
+            <SolidColorBrush x:Key="SurfaceSecondaryBrush" Color="#FF222436" />
+            <SolidColorBrush x:Key="SurfaceStrokeBrush" Color="#FF737AA2" />
+            <SolidColorBrush x:Key="SurfaceStrokeActiveBrush" Color="#FF9099B2" />
+            <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFC8D3F5" />
+            <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF828BB8" />
+            <SolidColorBrush x:Key="TextQuietBrush" Color="#FF727AA2" />
+            <SolidColorBrush x:Key="HealthyBrush" Color="#FFC3E88D" />
+            <SolidColorBrush x:Key="WarningBrush" Color="#FFFF966C" />
+            <SolidColorBrush x:Key="CriticalBrush" Color="#FFFF757F" />
+            <SolidColorBrush x:Key="FocusBrush" Color="#FF82AAFF" />
+            <SolidColorBrush x:Key="AccentBrush" Color="#FFFF966C" />
+            <SolidColorBrush x:Key="PillPositiveBackgroundBrush" Color="#FF3C4441" />
+            <SolidColorBrush x:Key="PillPositiveForegroundBrush" Color="#FFC3E88D" />
+            <SolidColorBrush x:Key="PillInfoBackgroundBrush" Color="#FF303955" />
+            <SolidColorBrush x:Key="PillInfoForegroundBrush" Color="#FF82AAFF" />
+            <SolidColorBrush x:Key="PillWarningBackgroundBrush" Color="#FF47353B" />
+            <SolidColorBrush x:Key="PillWarningForegroundBrush" Color="#FFFF966C" />
+            <SolidColorBrush x:Key="PillNeutralBackgroundBrush" Color="#FF222436" />
+            <SolidColorBrush x:Key="PillNeutralForegroundBrush" Color="#FF828BB8" />
+            <LinearGradientBrush x:Key="ChartBarBrush" StartPoint="0,0" EndPoint="0,1">
+                <GradientStop Color="#FF82AAFF" Offset="0" />
+                <GradientStop Color="#FF536A9D" Offset="1" />
+            </LinearGradientBrush>
+            <SolidColorBrush x:Key="ChartSeriesOthersBrush" Color="#FF6D759B" />
+            <SolidColorBrush x:Key="ChartSeries1Brush" Color="#FF82AAFF" />
+            <SolidColorBrush x:Key="ChartSeries2Brush" Color="#FFC3E88D" />
+            <SolidColorBrush x:Key="ChartSeries3Brush" Color="#FFFF966C" />
+            <SolidColorBrush x:Key="ChartSeries4Brush" Color="#FFC099FF" />
+            <SolidColorBrush x:Key="ChartSeries5Brush" Color="#FF73DACA" />
+            <SolidColorBrush x:Key="ChartSeries6Brush" Color="#FFFF757F" />
+            <SolidColorBrush x:Key="IncidentBackgroundBrush" Color="#24FF966C" />
+            <SolidColorBrush x:Key="IncidentBorderBrush" Color="#99FF966C" />
+            <SolidColorBrush x:Key="IncidentForegroundBrush" Color="#FFFF966C" />
+            <FontFamily x:Key="ContentFont">ms-appx:///Assets/Fonts/FamiljenGrotesk-VariableFont_wght.ttf#Familjen Grotesk</FontFamily>
+            <FontFamily x:Key="MetricFont">ms-appx:///Assets/Fonts/AzeretMono-VariableFont_wght.ttf#Azeret Mono</FontFamily>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="HighContrast">
+            <SolidColorBrush x:Key="PageBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="SurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="SurfaceSecondaryBrush" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="SurfaceStrokeBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SurfaceStrokeActiveBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="TextPrimaryBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="TextSecondaryBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="TextQuietBrush" Color="{ThemeResource SystemColorGrayTextColor}" />
+            <SolidColorBrush x:Key="HealthyBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="WarningBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="CriticalBrush" Color="{ThemeResource SystemColorHotlightColor}" />
+            <SolidColorBrush x:Key="FocusBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="AccentBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="PillPositiveBackgroundBrush" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="PillPositiveForegroundBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
+            <SolidColorBrush x:Key="PillInfoBackgroundBrush" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="PillInfoForegroundBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
+            <SolidColorBrush x:Key="PillWarningBackgroundBrush" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="PillWarningForegroundBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
+            <SolidColorBrush x:Key="PillNeutralBackgroundBrush" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="PillNeutralForegroundBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
+            <SolidColorBrush x:Key="ChartBarBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="ChartSeriesOthersBrush" Color="{ThemeResource SystemColorGrayTextColor}" />
+            <SolidColorBrush x:Key="ChartSeries1Brush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="ChartSeries2Brush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="ChartSeries3Brush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="ChartSeries4Brush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="ChartSeries5Brush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="ChartSeries6Brush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="IncidentBackgroundBrush" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="IncidentBorderBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="IncidentForegroundBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <FontFamily x:Key="ContentFont">ms-appx:///Assets/Fonts/FamiljenGrotesk-VariableFont_wght.ttf#Familjen Grotesk</FontFamily>
+            <FontFamily x:Key="MetricFont">ms-appx:///Assets/Fonts/AzeretMono-VariableFont_wght.ttf#Azeret Mono</FontFamily>
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+
+    <!-- ContentFont/MetricFont are defined inside the ThemeDictionaries above so
+         they can be swapped at runtime by the font selector via {ThemeResource}. -->
+
+    <Style TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentFont}" />
+        <Setter Property="Foreground" Value="{ThemeResource TextPrimaryBrush}" />
+    </Style>
+
+    <!-- Eyebrows carry wide character spacing, which makes them the first
+         thing to overrun a narrowed column. Trimming here rather than at each
+         call site is what keeps a resized window from slicing labels
+         mid-glyph. (Inert for a direct child of a horizontal StackPanel,
+         which measures with infinite width — those need a Grid instead.) -->
+    <Style x:Key="EyebrowTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{ThemeResource MetricFont}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="CharacterSpacing" Value="150" />
+        <Setter Property="Foreground" Value="{ThemeResource TextSecondaryBrush}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style x:Key="PageTitleTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentFont}" />
+        <Setter Property="FontSize" Value="36" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="SectionTitleTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <!-- Metrics are single values that must stay on one line, so they trim
+         rather than wrap; a wrapped "$3846.30" reads as two numbers. -->
+    <Style x:Key="MetricTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{ThemeResource MetricFont}" />
+        <Setter Property="FontSize" Value="28" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style x:Key="SurfaceBorderStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource SurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SurfaceStrokeBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="18" />
+    </Style>
+
+    <Style TargetType="Button">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentFont}" />
+        <Setter Property="CornerRadius" Value="7" />
+    </Style>
+
+    <Style TargetType="ProgressBar">
+        <Setter Property="Height" Value="6" />
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="Background" Value="{ThemeResource SurfaceSecondaryBrush}" />
+    </Style>
+</ResourceDictionary>

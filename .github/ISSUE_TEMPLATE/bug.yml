@@ -1,0 +1,28 @@
+name: Bug
+description: Something is broken
+title: "bug: "
+labels: ["type:bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Do not paste credentials, cookies, or provider payloads. Security issues go to Advisories, not here.
+  - type: textarea
+    id: describe
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Settings → About, or the release tag.

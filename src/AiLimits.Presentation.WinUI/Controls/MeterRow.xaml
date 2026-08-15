@@ -1,0 +1,56 @@
+﻿<UserControl
+    x:Class="AiLimits.Presentation.WinUI.Controls.MeterRow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="using:AiLimits.Presentation.WinUI.Converters">
+    <UserControl.Resources>
+        <converters:StatusBrushConverter x:Key="StatusBrushConverter" />
+    </UserControl.Resources>
+    <Grid
+        Padding="0,11,0,8"
+        AutomationProperties.Name="{Binding AutomationName}"
+        IsTabStop="False">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis"
+                   Margin="0,0,8,0" ToolTipService.ToolTip="{Binding DisplayName}" />
+        <TextBlock
+            Grid.Column="1"
+            Text="{Binding PercentLabel}"
+            FontFamily="{ThemeResource MetricFont}"
+            FontWeight="SemiBold"
+            Foreground="{Binding Status, Converter={StaticResource StatusBrushConverter}}" />
+
+        <ProgressBar
+            Grid.Row="1"
+            Grid.ColumnSpan="2"
+            Margin="0,9,0,7"
+            Maximum="100"
+            Value="{Binding DisplayPercent}"
+            Foreground="{Binding Status, Converter={StaticResource StatusBrushConverter}}" />
+
+        <!-- The reset label is Auto, so it takes its full width first and the
+             usage label gets whatever is left. Without trimming and a gutter
+             the two strings butt together and the left one is sliced. -->
+        <Grid Grid.Row="2" Grid.ColumnSpan="2" ColumnSpacing="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="{Binding DisplayUsageLabel}" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}"
+                       TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{Binding DisplayUsageLabel}" />
+            <TextBlock Grid.Column="1" Text="{Binding DisplayResetLabel}" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}"
+                       TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{Binding DisplayResetLabel}" />
+        </Grid>
+    </Grid>
+</UserControl>
+

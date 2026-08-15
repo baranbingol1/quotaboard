@@ -1,0 +1,427 @@
+name: Release
+
+# Tag-driven: pushing v1.0.0 builds both architectures and publishes the
+# release. workflow_dispatch is for rehearsing the build without a tag —
+# it uploads artifacts and stops short of creating a release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  quality:
+    name: Quality gates
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Set up .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+      - name: Restore local tools
+        run: dotnet tool restore
+      - name: CSharpier
+        run: dotnet csharpier check src tests
+      - name: Large files, complexity, debt, duplicates
+        shell: pwsh
+        run: ./scripts/invoke-quality-gates.ps1 -SkipFormat
+
+  # Tags do not trigger ci.yml (it matches branches: [main] only), so without
+  # this job a tag on an untested or red commit would still ship.
+  tests:
+    name: Tests (Windows x64)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore local tools
+        run: dotnet tool restore
+
+      - name: Restore
+        run: >
+          dotnet restore tests/AiLimits.Tests/AiLimits.Tests.csproj;
+          dotnet restore tests/AiLimits.IntegrationTests/AiLimits.IntegrationTests.csproj
+
+      - name: Test
+        run: >
+          dotnet test tests/AiLimits.Tests/AiLimits.Tests.csproj
+          --configuration Release
+          --no-restore
+          --collect:"XPlat Code Coverage"
+          --logger "trx;LogFileName=unit.trx"
+          --results-directory TestResults/unit
+          --blame-hang-timeout 5m
+          --blame-hang-dump-type none
+          --settings tests/coverlet.runsettings
+
+      - name: Integration tests
+        run: >
+          dotnet test tests/AiLimits.IntegrationTests/AiLimits.IntegrationTests.csproj
+          --configuration Release
+          --no-restore
+          --collect:"XPlat Code Coverage"
+          --logger "trx;LogFileName=integration.trx"
+          --results-directory TestResults/integration
+          --blame-hang-timeout 5m
+          --blame-hang-dump-type none
+          --settings tests/coverlet.runsettings
+
+      - name: Coverage threshold
+        shell: pwsh
+        run: ./scripts/quality/Assert-Coverage.ps1 -ResultsDirectory TestResults/unit,TestResults/integration -Minimum 40
+
+      - name: Test duration assertion
+        shell: pwsh
+        run: ./scripts/quality/Assert-TestDurations.ps1 -ResultsDirectory TestResults/unit -MaxSeconds 30
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: test-results
+          path: |
+            TestResults/**/*.trx
+            TestResults/**/coverage.cobertura.xml
+          if-no-files-found: warn
+
+  build:
+    name: Build (${{ matrix.arch }})
+    needs: [quality, tests]
+    runs-on: windows-latest
+    timeout-minutes: 45
+    # id-token + attestations are for the provenance attestation step.
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore local tools
+        run: dotnet tool restore
+
+      # runner.temp is unavailable while GitHub evaluates job-level env.
+      # Set the path after the runner starts so every later step can use it.
+      - name: Set publish directory
+        shell: pwsh
+        run: >-
+          "PUBLISH_DIR=$env:RUNNER_TEMP\AiLimits\release\win-${{ matrix.arch }}"
+          | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "PACKAGE_DIR=$env:RUNNER_TEMP\AiLimits\packages\win-${{ matrix.arch }}"
+          | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
+      # A tag that disagrees with Directory.Build.props would ship binaries
+      # whose file version contradicts their download name. Fail loudly here
+      # rather than let someone discover it after the release is public.
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $props = [xml](Get-Content Directory.Build.props)
+          $version = $props.Project.PropertyGroup.Version
+          if (-not $version) { throw 'No <Version> in Directory.Build.props.' }
+          if ($env:GITHUB_REF -like 'refs/tags/*') {
+              $tag = $env:GITHUB_REF -replace '^refs/tags/', ''
+              if ($tag -ne "v$version") {
+                  throw "Tag $tag does not match <Version> $version. Update one of them."
+              }
+          }
+          Write-Host "Version $version"
+          "version=$version" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Publish self-contained (${{ matrix.arch }})
+        shell: pwsh
+        run: >-
+          ./scripts/publish-ai-limits.ps1
+          -Architecture ${{ matrix.arch }}
+          -Configuration Release
+          -OutputPath $env:PUBLISH_DIR
+          -PackageOutputPath $env:PACKAGE_DIR
+
+      - name: Validate publish output
+        shell: pwsh
+        run: >-
+          ./scripts/validate-publish.ps1
+          -Architecture ${{ matrix.arch }}
+          -OutputPath $env:PUBLISH_DIR
+
+      # microsoft/sbom-tool ships as a standalone binary rather than a pinned
+      # action, so the download is pinned by version and sha256 instead.
+      - name: Generate SBOM
+        shell: pwsh
+        run: |
+          $tool = Join-Path $env:RUNNER_TEMP 'sbom-tool.exe'
+          Invoke-WebRequest -Uri 'https://github.com/microsoft/sbom-tool/releases/download/v4.1.5/sbom-tool-win-x64.exe' -OutFile $tool
+          $expected = '625767b371b7fdd58f40f618b8a86da0247a33c89e419039c86b4edba1dad4b5'
+          $actual = (Get-FileHash $tool -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $expected) { throw "sbom-tool sha256 mismatch: expected $expected, got $actual" }
+          $portable = Join-Path $env:PACKAGE_DIR "QuotaBoard-${{ steps.version.outputs.version }}-win-${{ matrix.arch }}.zip"
+          $portableRoot = Join-Path $env:RUNNER_TEMP "portable-${{ matrix.arch }}"
+          Expand-Archive -LiteralPath $portable -DestinationPath $portableRoot -Force
+          $realApp = Join-Path $portableRoot 'current'
+          & $tool generate -b $realApp -bc . -pn QuotaBoard -pv "${{ steps.version.outputs.version }}" -ps 'Baran Bingöl' -nsb 'https://github.com/baranbingol1/quotaboard'
+          if ($LASTEXITCODE -ne 0) { throw "sbom-tool exited $LASTEXITCODE" }
+          $manifest = Join-Path $realApp '_manifest\spdx_2.2\manifest.spdx.json'
+          if (-not (Test-Path $manifest)) { throw "SBOM was not generated at $manifest" }
+          # Ship the SBOM as its own release asset, not inside the zip: it
+          # describes the zip's contents and should be verifiable separately.
+          # "Separately" still has to mean "verifiably": the SBOM gets the same
+          # sha256 sidecar as the archive and is attested alongside it below,
+          # so a stale or substituted SPDX document cannot pass verification.
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $sbomName = "QuotaBoard-${{ steps.version.outputs.version }}-win-${{ matrix.arch }}.sbom.spdx.json"
+          Move-Item $manifest "dist\$sbomName"
+          $sbomHash = (Get-FileHash "dist\$sbomName" -Algorithm SHA256).Hash.ToLower()
+          "$sbomHash  $sbomName" | Out-File "dist\$sbomName.sha256" -Encoding ascii
+          Remove-Item (Join-Path $realApp '_manifest') -Recurse -Force
+
+      - name: Stage package assets and checksums
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $names = @(
+            "QuotaBoard-${{ steps.version.outputs.version }}-win-${{ matrix.arch }}.zip",
+            "QuotaBoard-${{ steps.version.outputs.version }}-win-${{ matrix.arch }}-full.nupkg",
+            "releases.win-${{ matrix.arch }}.json"
+          )
+          foreach ($name in $names) {
+            Copy-Item (Join-Path $env:PACKAGE_DIR $name) (Join-Path dist $name)
+            $hash = (Get-FileHash "dist\$name" -Algorithm SHA256).Hash.ToLower()
+            "$hash  $name" | Out-File "dist\$name.sha256" -Encoding ascii
+          }
+
+      # The SBOM is a subject too, not just the archive: attesting only the zip
+      # would leave the SBOM as the one asset with no cryptographic tie to the
+      # build that produced it.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: |
+            dist/*.zip
+            dist/*.nupkg
+            dist/releases.*.json
+            dist/*.spdx.json
+
+      - name: Upload package
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: package-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Upload binlog on failure
+        if: failure()
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: binlog-${{ matrix.arch }}
+          path: "**/*.binlog"
+          if-no-files-found: ignore
+
+  rehearsal:
+    name: Verify rehearsal artifacts
+    needs: build
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      attestations: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Download packages
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          pattern: package-*
+          merge-multiple: true
+          path: dist
+
+      - name: Verify inventory, hashes, provenance, and package metadata
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [xml]$props = Get-Content -Raw Directory.Build.props
+          $version = [string]$props.Project.PropertyGroup.Version
+          ./scripts/verify-release.ps1 `
+            -DistDir dist `
+            -Repository $env:GITHUB_REPOSITORY `
+            -ExpectedSignerWorkflow "$env:GITHUB_REPOSITORY/.github/workflows/release.yml" `
+            -ExpectedSourceRef $env:GITHUB_REF `
+            -ExpectedSourceDigest $env:GITHUB_SHA `
+            -ExpectedVersion $version
+
+  native-package:
+    name: Native package (${{ matrix.arch }})
+    needs: build
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+          - arch: arm64
+            runner: windows-11-arm
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Download package
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: package-${{ matrix.arch }}
+          path: dist
+
+      - name: Validate and launch extracted package
+        shell: pwsh
+        run: |
+          [xml]$props = Get-Content -Raw Directory.Build.props
+          $version = [string]$props.Project.PropertyGroup.Version
+          $archive = Join-Path dist "QuotaBoard-$version-win-${{ matrix.arch }}.zip"
+          ./scripts/validate-portable-package.ps1 `
+            -Architecture ${{ matrix.arch }} `
+            -ArchivePath $archive `
+            -Version $version
+
+          $root = Join-Path $env:RUNNER_TEMP 'QuotaBoard native smoke test'
+          Expand-Archive -LiteralPath $archive -DestinationPath $root -Force
+          $appRoot = Join-Path $root 'current'
+          Start-Process -FilePath (Join-Path $appRoot 'QuotaBoard.exe') -WorkingDirectory $appRoot | Out-Null
+          try {
+            $deadline = (Get-Date).AddSeconds(30)
+            $application = $null
+            do {
+              Start-Sleep -Milliseconds 500
+              $application = Get-Process QuotaBoard -ErrorAction SilentlyContinue |
+                Where-Object { $_.Path -and $_.Path.StartsWith($appRoot, [StringComparison]::OrdinalIgnoreCase) } |
+                Select-Object -First 1
+            } while ($null -eq $application -and (Get-Date) -lt $deadline)
+            if ($null -eq $application) { throw 'The native application did not stay running.' }
+            Start-Sleep -Seconds 5
+            if ($application.HasExited) { throw "The native application exited with code $($application.ExitCode)." }
+          }
+          finally {
+            Get-Process QuotaBoard -ErrorAction SilentlyContinue |
+              Where-Object { $_.Path -and $_.Path.StartsWith($appRoot, [StringComparison]::OrdinalIgnoreCase) } |
+              Stop-Process -Force -ErrorAction SilentlyContinue
+          }
+
+  release:
+    name: Publish release
+    needs: [build, native-package]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Download packages
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          pattern: package-*
+          merge-multiple: true
+          path: dist
+
+      # Notes live in a file rather than a heredoc: a heredoc terminator has
+      # to sit at column 0, which YAML block indentation cannot give it.
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          ls -l dist
+          gh release create "$TAG" dist/* \
+            --title "QuotaBoard $TAG" \
+            --notes-file .github/release-body.md \
+            --draft \
+            --verify-tag
+
+  # Re-download the draft assets and re-check them. Verifying the build
+  # artifacts on disk would miss corruption or tampering during upload.
+  verify:
+    name: Verify release assets
+    needs: release
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      attestations: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Download release assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          gh release download $env:TAG --dir dist
+
+      - name: Verify hashes, attestation, and SBOM
+        shell: pwsh
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if (-not $env:GITHUB_REF_NAME.StartsWith('v')) {
+            throw "Release tag must start with v: $env:GITHUB_REF_NAME"
+          }
+          ./scripts/verify-release.ps1 `
+            -DistDir dist `
+            -Repository $env:GITHUB_REPOSITORY `
+            -ExpectedSignerWorkflow "$env:GITHUB_REPOSITORY/.github/workflows/release.yml" `
+            -ExpectedSourceRef $env:GITHUB_REF `
+            -ExpectedSourceDigest $env:GITHUB_SHA `
+            -ExpectedVersion $env:GITHUB_REF_NAME.Substring(1)
+
+      - name: Publish verified release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release edit $env:TAG --draft=false

@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>QuotaBoard</AssemblyName>
+    <ApplicationIcon>Assets\QuotaBoard.ico</ApplicationIcon>
+    <ApplicationTitle>QuotaBoard</ApplicationTitle>
+    <Product>QuotaBoard</Product>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19045.0</TargetPlatformMinVersion>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <PublishProfile>win-$(Platform).pubxml</PublishProfile>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AiLimits.Domain\AiLimits.Domain.csproj" />
+    <ProjectReference Include="..\AiLimits.Application\AiLimits.Application.csproj" />
+    <ProjectReference Include="..\AiLimits.Infrastructure\AiLimits.Infrastructure.csproj" />
+    <ProjectReference Include="..\AiLimits.Platform.Windows\AiLimits.Platform.Windows.csproj" />
+    <ProjectReference Include="..\AiLimits.Presentation.WinUI\AiLimits.Presentation.WinUI.csproj" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="H.NotifyIcon.WinUI" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" />
+    <PackageReference Include="Velopack" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Assets\Fonts\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\QuotaBoard.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\QuotaBoard-Light.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\QuotaBoard-Tray-Glyph.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\THIRD-PARTY-NOTICES.txt" Link="THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AiLimits.Tests" />
+  </ItemGroup>
+  <Import Project="PublishLayout.targets" />
+</Project>

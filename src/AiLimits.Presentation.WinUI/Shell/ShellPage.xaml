@@ -1,0 +1,38 @@
+<Page
+    x:Class="AiLimits.Presentation.WinUI.Shell.ShellPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <NavigationView
+        x:Name="Navigation"
+        PaneDisplayMode="Auto"
+        IsBackButtonVisible="Collapsed"
+        IsSettingsVisible="True"
+        CompactPaneLength="52"
+        OpenPaneLength="214"
+        Loaded="OnNavigationLoaded"
+        SelectionChanged="OnSelectionChanged"
+        Background="{ThemeResource PageBackgroundBrush}">
+        <NavigationView.PaneHeader>
+            <Grid Margin="14,0,0,0" VerticalAlignment="Stretch">
+                <TextBlock x:Uid="Shell_Brand" VerticalAlignment="Center" FontFamily="{ThemeResource MetricFont}" FontWeight="SemiBold" CharacterSpacing="120" />
+            </Grid>
+        </NavigationView.PaneHeader>
+        <NavigationView.MenuItems>
+            <NavigationViewItem x:Uid="Shell_Overview" Tag="overview">
+                <NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem x:Uid="Shell_Usage" Tag="usage">
+                <NavigationViewItem.Icon><SymbolIcon Symbol="AllApps" /></NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem x:Uid="Shell_Connections" x:Name="ConnectionsNavigationItem" Tag="providers">
+                <NavigationViewItem.Icon><SymbolIcon Symbol="People" /></NavigationViewItem.Icon>
+            </NavigationViewItem>
+        </NavigationView.MenuItems>
+        <NavigationView.FooterMenuItems>
+            <NavigationViewItem x:Uid="Shell_Diagnostics" Tag="diagnostics">
+                <NavigationViewItem.Icon><SymbolIcon Symbol="Document" /></NavigationViewItem.Icon>
+            </NavigationViewItem>
+        </NavigationView.FooterMenuItems>
+        <Frame x:Name="ContentFrame" />
+    </NavigationView>
+</Page>
