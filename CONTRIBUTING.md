@@ -20,7 +20,8 @@ a real on-disk database.
 ## Quality gates
 
 Formatting, naming, complexity, file size, dead-code, duplication,
-unused packages, and TODO tracking are enforced locally and in CI:
+unused packages, and TODO tracking are enforced locally and in CI.
+Run the Quality gates job before every push. Do not wait for GitHub.
 
 ```powershell
 dotnet tool restore
