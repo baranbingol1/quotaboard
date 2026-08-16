@@ -505,7 +505,48 @@ public sealed class ClineTokenRefreshTests : IDisposable
         Assert.Equal("blob-refresh", credential.RefreshToken);
         Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1784772484), credential.ExpiresAt);
         Assert.True(credential.IsWorkOsSession);
-        Assert.False(string.IsNullOrWhiteSpace(credential.AccountFingerprint));
+        Assert.Null(credential.AccountFingerprint);
+        Assert.Null(credential.BillingScope);
+    }
+
+    [Fact]
+    public async Task Cache_for_one_organization_is_not_used_after_an_organization_switch()
+    {
+        ClineSessionStore store = Store();
+        await store.SaveAsync(
+            new ClineSession("org-a-token", "org-a-refresh", Now + TimeSpan.FromHours(1), "fingerprint-org-a"),
+            default
+        );
+        var handler = new RoutedHandler(_ =>
+            Json(
+                """
+                {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":7,"resetsAt":null}]}}
+                """
+            )
+        );
+        var strategy = new ClinePassLimitStrategy(
+            new HttpClient(handler),
+            new FixedClock(),
+            () =>
+                new ClineCredential(
+                    "org-b-token",
+                    "Cline CLI account (organization)",
+                    ExpiresAt: Now + TimeSpan.FromMinutes(30),
+                    RefreshToken: "org-b-refresh",
+                    IsWorkOsSession: true,
+                    Email: "same@example.com",
+                    AccountFingerprint: "fingerprint-org-b",
+                    BillingScope: new ClineBillingScope.Organization("org-b")
+                ),
+            store
+        );
+
+        FetchResult result = await strategy.FetchAsync(Account(), default);
+
+        Assert.True(result.IsSuccess, result.SafeMessage);
+        Assert.Equal("Bearer workos:org-b-token", Assert.Single(handler.Requests).Authorization);
+        Assert.Null(await _secrets.GetAsync("cline", "session.access-token", default));
+        Assert.Null(await _secrets.GetAsync("cline", "session.account-fingerprint", default));
     }
 
     [Fact]

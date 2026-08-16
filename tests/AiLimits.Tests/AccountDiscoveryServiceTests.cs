@@ -128,6 +128,34 @@ public sealed class AccountDiscoveryServiceTests
     }
 
     [Fact]
+    public async Task Cline_organization_switch_increments_configuration_revision_when_login_is_unchanged()
+    {
+        FakeAccountRepository repository = new FakeAccountRepository();
+        ProviderAccount saved = new ProviderAccount(
+            new AccountKey(new ProviderId("cline"), "default"),
+            "Cline",
+            "same@example.com",
+            "Cline CLI account (organization)",
+            2,
+            true
+        );
+        await repository.UpsertAsync(saved, CancellationToken.None);
+        ProviderAccount switched = saved with
+        {
+            AuthSource = "Cline CLI account (personal)",
+            ConfigurationRevision = 0,
+        };
+        AccountDiscoveryService service = Service(repository, new ScriptedAdapter("cline", switched));
+
+        IReadOnlyList<ProviderAccount> result = (await service.DiscoverAsync(CancellationToken.None)).Accounts;
+
+        ProviderAccount account = Assert.Single(result);
+        Assert.Equal("same@example.com", account.Login);
+        Assert.Equal("Cline CLI account (personal)", account.AuthSource);
+        Assert.Equal(3, account.ConfigurationRevision);
+    }
+
+    [Fact]
     public async Task Failed_provider_skips_disconnect_even_when_other_accounts_are_discovered()
     {
         FakeAccountRepository repository = new FakeAccountRepository();
