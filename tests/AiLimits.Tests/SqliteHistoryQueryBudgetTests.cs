@@ -61,11 +61,12 @@ public sealed class SqliteHistoryQueryBudgetTests
                 DataConfidence.Exact,
                 new Dictionary<string, JsonElement>()
             );
-            await snapshots.SaveAsync(snapshot, i + 1, default);
+            await snapshots.SaveAsync(snapshot, i + 1, account.ConfigurationRevision, default);
         }
 
         IReadOnlyList<ProviderSnapshot> history = await snapshots.GetHistoryAsync(
             account.Key,
+            account.ConfigurationRevision,
             start.AddHours(-1),
             default
         );
@@ -97,6 +98,7 @@ public sealed class SqliteHistoryQueryBudgetTests
 
         IReadOnlyList<ProviderSnapshot> history = await snapshots.GetHistoryAsync(
             account,
+            1,
             DateTimeOffset.UnixEpoch,
             default
         );

@@ -84,6 +84,50 @@ public sealed class RefreshCoordinatorTests
         Assert.Equal(RefreshPublicationStatus.StaleResultRejected, result.Status);
     }
 
+    [Fact]
+    public async Task Failed_refresh_after_account_switch_does_not_publish_the_previous_snapshot()
+    {
+        var account = new ProviderAccount(
+            new AccountKey(new ProviderId("fake"), "one"),
+            "one",
+            "account-a@example.com",
+            "fixture",
+            1,
+            true
+        );
+        var accounts = new MemoryAccounts(account);
+        var snapshots = new MemorySnapshots();
+        var successful = new ControlledStrategy(account.Key);
+        successful.Release.SetResult();
+        var firstCoordinator = new RefreshCoordinator(
+            [new FakeAdapter(successful)],
+            accounts,
+            snapshots,
+            new SnapshotMerger(),
+            new FixedClock(),
+            NullLogger<RefreshCoordinator>.Instance
+        );
+        RefreshPublication first = await firstCoordinator.RefreshAsync(new RefreshRequest(account.Key, 1));
+        Assert.Equal(RefreshPublicationStatus.Published, first.Status);
+
+        accounts.Current = account with { Login = "account-b@example.com", ConfigurationRevision = 2 };
+        var secondCoordinator = new RefreshCoordinator(
+            [new FakeAdapter(new FailingStrategy(FetchFailureKind.Authentication))],
+            accounts,
+            snapshots,
+            new SnapshotMerger(),
+            new FixedClock(),
+            NullLogger<RefreshCoordinator>.Instance
+        );
+
+        RefreshPublication second = await secondCoordinator.RefreshAsync(new RefreshRequest(account.Key, 2));
+
+        Assert.Equal(RefreshPublicationStatus.FailedWithoutData, second.Status);
+        Assert.Null(second.Snapshot);
+        Assert.NotNull(await snapshots.GetLatestAsync(account.Key, 1, default));
+        Assert.Null(await snapshots.GetLatestAsync(account.Key, 2, default));
+    }
+
     [RetryFact(3, 500)]
     public async Task CancelingOneCoalescedCallerDoesNotCancelTheSharedOperation()
     {
@@ -368,7 +412,7 @@ public sealed class RefreshCoordinatorTests
         );
         var publication = await coordinator.RefreshAsync(new RefreshRequest(account.Key, 1));
         Assert.Equal(RefreshPublicationStatus.Published, publication.Status);
-        var reloaded = await snapshots.GetLatestAsync(account.Key, default);
+        var reloaded = await snapshots.GetLatestAsync(account.Key, account.ConfigurationRevision, default);
         Assert.NotNull(reloaded);
         Assert.Equal(2, reloaded.Meters.Count);
         Assert.Contains(reloaded.Meters, meter => meter.DisplayName == "Fable");
@@ -527,23 +571,39 @@ public sealed class RefreshCoordinatorTests
 
     private sealed class MemorySnapshots : ISnapshotRepository
     {
-        private ProviderSnapshot? _snapshot;
+        private readonly Dictionary<(AccountKey Account, long ConfigurationRevision), ProviderSnapshot> _snapshots = [];
+
         public List<FetchAttempt> Attempts { get; } = [];
 
-        public Task<ProviderSnapshot?> GetLatestAsync(AccountKey account, CancellationToken cancellationToken) =>
-            Task.FromResult(_snapshot);
+        public Task<ProviderSnapshot?> GetLatestAsync(
+            AccountKey account,
+            long configurationRevision,
+            CancellationToken cancellationToken
+        ) => Task.FromResult(_snapshots.GetValueOrDefault((account, configurationRevision)));
 
-        public Task SaveAsync(ProviderSnapshot snapshot, long generation, CancellationToken cancellationToken)
+        public Task SaveAsync(
+            ProviderSnapshot snapshot,
+            long generation,
+            long configurationRevision,
+            CancellationToken cancellationToken
+        )
         {
-            _snapshot = snapshot;
+            _snapshots[(snapshot.Account, configurationRevision)] = snapshot;
             return Task.CompletedTask;
         }
 
         public Task<IReadOnlyList<ProviderSnapshot>> GetHistoryAsync(
             AccountKey account,
+            long configurationRevision,
             DateTimeOffset from,
             CancellationToken cancellationToken
-        ) => Task.FromResult<IReadOnlyList<ProviderSnapshot>>(_snapshot is null ? [] : [_snapshot]);
+        ) =>
+            Task.FromResult<IReadOnlyList<ProviderSnapshot>>(
+                _snapshots.TryGetValue((account, configurationRevision), out ProviderSnapshot? snapshot)
+                && snapshot.ObservedAt >= from
+                    ? [snapshot]
+                    : []
+            );
 
         public Task RecordAttemptAsync(FetchAttempt attempt, CancellationToken cancellationToken)
         {

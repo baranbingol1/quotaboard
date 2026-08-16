@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 using System.Globalization;
-using System.Text.Json;
 using AiLimits.Application.Abstractions;
 
 namespace AiLimits.Infrastructure.Providers.Cline;
 
 /// <summary>A ClinePass session the app refreshed itself.</summary>
-internal sealed record ClineSession(string AccessToken, string? RefreshToken, DateTimeOffset ExpiresAt);
+internal sealed record ClineSession(
+    string AccessToken,
+    string? RefreshToken,
+    DateTimeOffset ExpiresAt,
+    string? AccountFingerprint
+);
 
 /// <summary>
 /// Persists app-refreshed Cline sessions through <see cref="ISecretStore"/> —
@@ -47,12 +51,14 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
     private const string AccessTokenKey = "session.access-token";
     private const string RefreshTokenKey = "session.refresh-token";
     private const string ExpiresAtKey = "session.expires-at";
+    private const string AccountFingerprintKey = "session.account-fingerprint";
 
     // Staging keys: written first, promoted to the live keys above only after
     // every field succeeds. LoadAsync never reads these.
     private const string StagingAccessTokenKey = "session.access-token.staging";
     private const string StagingExpiresAtKey = "session.expires-at.staging";
     private const string StagingRefreshTokenKey = "session.refresh-token.staging";
+    private const string StagingAccountFingerprintKey = "session.account-fingerprint.staging";
 
     // "1" = the live refresh key should be deleted during promotion;
     // "0" = the staging refresh value should be copied to the live key.
@@ -63,9 +69,9 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
     // promotion before reading.
     private const string CommitKey = "session.commit";
 
-    private bool _legacyMigrationAttempted;
+    private bool _legacyCleanupAttempted;
 
-    public async Task<ClineSession?> LoadAsync(CancellationToken cancellationToken)
+    public async Task<ClineSession?> LoadAsync(string? expectedAccountFingerprint, CancellationToken cancellationToken)
     {
         try
         {
@@ -83,6 +89,15 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
             ClineSession? live = await ReadLiveSessionAsync(cancellationToken).ConfigureAwait(false);
             if (live is not null)
             {
+                if (
+                    expectedAccountFingerprint is null
+                    || !string.Equals(live.AccountFingerprint, expectedAccountFingerprint, StringComparison.Ordinal)
+                )
+                {
+                    await DeleteLiveSessionBestEffortAsync(cancellationToken).ConfigureAwait(false);
+                    CleanupLegacyFilesBestEffort();
+                    return null;
+                }
                 // A committed, structurally valid vault session is authoritative.
                 // In particular, never write a retained legacy file back over a
                 // newer session merely because an earlier deletion was denied.
@@ -97,23 +112,27 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
             return null;
         }
 
-        // The vault was available but had no structurally valid live session.
-        // Only this state is allowed to migrate legacy plaintext into it.
-        await MigrateLegacyCacheAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            return await ReadLiveSessionAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (IsRecoverable(ex))
-        {
-            return null;
-        }
+        // Legacy plaintext has no trustworthy account identity. Delete it, but
+        // never promote it into a reusable credential.
+        CleanupLegacyFilesBestEffort();
+        return null;
     }
 
     private async Task<ClineSession?> ReadLiveSessionAsync(CancellationToken cancellationToken)
     {
         string? accessToken = await secrets.GetAsync(Scope, AccessTokenKey, cancellationToken).ConfigureAwait(false);
         string? expires = await secrets.GetAsync(Scope, ExpiresAtKey, cancellationToken).ConfigureAwait(false);
+        string? fingerprint = await secrets
+            .GetAsync(Scope, AccountFingerprintKey, cancellationToken)
+            .ConfigureAwait(false);
+        if (
+            string.IsNullOrWhiteSpace(fingerprint)
+            && (!string.IsNullOrWhiteSpace(accessToken) || !string.IsNullOrWhiteSpace(expires))
+        )
+        {
+            await DeleteLiveSessionBestEffortAsync(cancellationToken).ConfigureAwait(false);
+            return null;
+        }
         if (
             string.IsNullOrWhiteSpace(accessToken)
             || expires is null
@@ -128,7 +147,16 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
             return null;
         }
         string? refreshToken = await secrets.GetAsync(Scope, RefreshTokenKey, cancellationToken).ConfigureAwait(false);
-        return new ClineSession(accessToken, string.IsNullOrWhiteSpace(refreshToken) ? null : refreshToken, expiresAt);
+        if (string.IsNullOrWhiteSpace(fingerprint))
+        {
+            return null;
+        }
+        return new ClineSession(
+            accessToken,
+            string.IsNullOrWhiteSpace(refreshToken) ? null : refreshToken,
+            expiresAt,
+            fingerprint
+        );
     }
 
     public Task SaveAsync(ClineSession session, CancellationToken cancellationToken) =>
@@ -136,18 +164,23 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
 
     /// <summary>
     /// Same write path as <see cref="SaveAsync"/>, but reports recoverable
-    /// failures to the caller instead of swallowing them, so a caller holding
-    /// the only other copy of the session (the legacy plaintext cache) can
-    /// keep it for a later retry rather than losing the tokens outright.
+    /// failures to the caller instead of swallowing them.
     /// </summary>
     public async Task<bool> TrySaveAsync(ClineSession session, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(session.AccountFingerprint))
+        {
+            return false;
+        }
         // Phase 1: stage every field. If any write fails, clean up whatever
         // staging was written and leave the live keys untouched.
         try
         {
             await secrets
                 .SetAsync(Scope, StagingAccessTokenKey, session.AccessToken, cancellationToken)
+                .ConfigureAwait(false);
+            await secrets
+                .SetAsync(Scope, StagingAccountFingerprintKey, session.AccountFingerprint, cancellationToken)
                 .ConfigureAwait(false);
             await secrets
                 .SetAsync(
@@ -196,92 +229,19 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
         catch (Exception ex) when (IsRecoverable(ex))
         {
             // Promotion was interrupted. The commit marker is still set, so
-            // the next LoadAsync will finish it. Report failure so a caller
-            // holding the plaintext cache keeps it for a retry.
+            // the next LoadAsync will finish it.
             return false;
         }
         return true;
     }
 
-    /// <summary>
-    /// Moves a session left behind by an older build's plaintext
-    /// <c>cline-session.json</c> into the secret store, then deletes it. Runs
-    /// at most once per instance, and is a no-op once the files are gone.
-    ///
-    /// <para>
-    /// Older builds wrote a sibling <c>.tmp</c> and renamed it over the real
-    /// path, so a crash mid-write can leave either file — or only the
-    /// <c>.tmp</c>, when the real path had never been written — holding a
-    /// complete token pair. Both are candidates, and both have to end up gone.
-    /// </para>
-    ///
-    /// <para>
-    /// A candidate that cannot be parsed is deleted rather than kept. It holds
-    /// no session anyone can recover, but it does hold credential material in
-    /// plaintext under the user's profile, and every later run reaches the same
-    /// verdict — so keeping it only means keeping tokens at rest forever. That
-    /// is the opposite trade from a vault that is merely unavailable, where the
-    /// file is still the only copy of a usable session and is kept for retry.
-    /// </para>
-    /// </summary>
-    private async Task MigrateLegacyCacheAsync(CancellationToken cancellationToken)
-    {
-        if (_legacyMigrationAttempted || legacyCachePath is null)
-        {
-            return;
-        }
-        _legacyMigrationAttempted = true;
-        string tempPath = legacyCachePath + ".tmp";
-        try
-        {
-            ClineSession? session = null;
-            bool anyPresent = false;
-            foreach (string path in new[] { legacyCachePath, tempPath })
-            {
-                if (!File.Exists(path))
-                {
-                    continue;
-                }
-                anyPresent = true;
-                session ??= TryReadLegacyFile(path);
-            }
-            if (!anyPresent)
-            {
-                return;
-            }
-            if (session is not null && !await TrySaveAsync(session, cancellationToken).ConfigureAwait(false))
-            {
-                // The vault is unavailable right now; keep the plaintext copy
-                // and retry on the next load instead of deleting the only
-                // remaining copy of the tokens.
-                _legacyMigrationAttempted = false;
-                return;
-            }
-            File.Delete(legacyCachePath);
-            File.Delete(tempPath);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            _legacyMigrationAttempted = false;
-            throw;
-        }
-        catch (Exception ex) when (IsRecoverable(ex))
-        {
-            // A locked or unreadable file, or a vault fault. The migration is
-            // idempotent — re-reading and re-saving a candidate that is still
-            // there costs nothing — so let the next load retry it rather than
-            // latching a half-finished cleanup.
-            _legacyMigrationAttempted = false;
-        }
-    }
-
     private void CleanupLegacyFilesBestEffort()
     {
-        if (_legacyMigrationAttempted || legacyCachePath is null)
+        if (_legacyCleanupAttempted || legacyCachePath is null)
         {
             return;
         }
-        _legacyMigrationAttempted = true;
+        _legacyCleanupAttempted = true;
         try
         {
             File.Delete(legacyCachePath);
@@ -289,28 +249,7 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
         }
         catch (Exception ex) when (IsRecoverable(ex))
         {
-            _legacyMigrationAttempted = false;
-        }
-    }
-
-    /// <summary>
-    /// Reads a legacy candidate, returning null when the file is present but
-    /// holds no usable session. Genuine I/O faults propagate so the caller can
-    /// retry instead of deleting a file it never managed to read.
-    /// </summary>
-    private static ClineSession? TryReadLegacyFile(string path)
-    {
-        try
-        {
-            return ReadLegacyFile(path);
-        }
-        catch (JsonException)
-        {
-            // Truncated or corrupt. The old writer emitted accessToken and
-            // refreshToken before expiresAt, so a truncated file can still
-            // hold both tokens intact — which is exactly why it must not stay
-            // on disk.
-            return null;
+            _legacyCleanupAttempted = false;
         }
     }
 
@@ -345,6 +284,9 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
         string? stagingRefresh = await secrets
             .GetAsync(Scope, StagingRefreshTokenKey, cancellationToken)
             .ConfigureAwait(false);
+        string? stagingFingerprint = await secrets
+            .GetAsync(Scope, StagingAccountFingerprintKey, cancellationToken)
+            .ConfigureAwait(false);
         string? clearFlag = await secrets
             .GetAsync(Scope, StagingClearRefreshKey, cancellationToken)
             .ConfigureAwait(false);
@@ -352,6 +294,7 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
         if (
             stagingAccess is null
             || stagingExpires is null
+            || string.IsNullOrWhiteSpace(stagingFingerprint)
             || clearFlag is not ("0" or "1")
             || (clearFlag == "0" && stagingRefresh is null)
         )
@@ -361,6 +304,9 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
 
         await secrets.SetAsync(Scope, AccessTokenKey, stagingAccess, cancellationToken).ConfigureAwait(false);
         await secrets.SetAsync(Scope, ExpiresAtKey, stagingExpires, cancellationToken).ConfigureAwait(false);
+        await secrets
+            .SetAsync(Scope, AccountFingerprintKey, stagingFingerprint, cancellationToken)
+            .ConfigureAwait(false);
         if (clearFlag == "1")
         {
             await secrets.DeleteAsync(Scope, RefreshTokenKey, cancellationToken).ConfigureAwait(false);
@@ -377,6 +323,7 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
         await TryDeleteAsync(StagingAccessTokenKey, cancellationToken).ConfigureAwait(false);
         await TryDeleteAsync(StagingExpiresAtKey, cancellationToken).ConfigureAwait(false);
         await TryDeleteAsync(StagingRefreshTokenKey, cancellationToken).ConfigureAwait(false);
+        await TryDeleteAsync(StagingAccountFingerprintKey, cancellationToken).ConfigureAwait(false);
         await TryDeleteAsync(StagingClearRefreshKey, cancellationToken).ConfigureAwait(false);
     }
 
@@ -389,35 +336,12 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
         catch (Exception ex) when (IsRecoverable(ex)) { }
     }
 
-    private static ClineSession? ReadLegacyFile(string path)
+    private async Task DeleteLiveSessionBestEffortAsync(CancellationToken cancellationToken)
     {
-        using FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        using JsonDocument document = JsonDocument.Parse(stream);
-        JsonElement root = document.RootElement;
-        if (
-            root.ValueKind != JsonValueKind.Object
-            || !root.TryGetProperty("accessToken", out JsonElement token)
-            || token.ValueKind != JsonValueKind.String
-            || string.IsNullOrWhiteSpace(token.GetString())
-            || !root.TryGetProperty("expiresAt", out JsonElement expires)
-            || expires.ValueKind != JsonValueKind.String
-            || !DateTimeOffset.TryParse(
-                expires.GetString(),
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
-                out DateTimeOffset expiresAt
-            )
-        )
-        {
-            return null;
-        }
-        string? refreshToken =
-            root.TryGetProperty("refreshToken", out JsonElement refresh)
-            && refresh.ValueKind == JsonValueKind.String
-            && !string.IsNullOrWhiteSpace(refresh.GetString())
-                ? refresh.GetString()
-                : null;
-        return new ClineSession(token.GetString()!, refreshToken, expiresAt);
+        await TryDeleteAsync(AccessTokenKey, cancellationToken).ConfigureAwait(false);
+        await TryDeleteAsync(ExpiresAtKey, cancellationToken).ConfigureAwait(false);
+        await TryDeleteAsync(RefreshTokenKey, cancellationToken).ConfigureAwait(false);
+        await TryDeleteAsync(AccountFingerprintKey, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -429,7 +353,6 @@ internal sealed class ClineSessionStore(ISecretStore secrets, string? legacyCach
         ex
             is IOException
                 or UnauthorizedAccessException
-                or JsonException
                 or ArgumentOutOfRangeException
                 or System.ComponentModel.Win32Exception;
 }

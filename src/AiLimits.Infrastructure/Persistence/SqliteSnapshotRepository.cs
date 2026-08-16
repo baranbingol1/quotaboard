@@ -27,7 +27,11 @@ public sealed class SqliteSnapshotRepository(SqliteDatabase database) : ISnapsho
     /// </summary>
     internal int LastHistoryCommandCount { get; private set; }
 
-    public async Task<ProviderSnapshot?> GetLatestAsync(AccountKey account, CancellationToken cancellationToken)
+    public async Task<ProviderSnapshot?> GetLatestAsync(
+        AccountKey account,
+        long configurationRevision,
+        CancellationToken cancellationToken
+    )
     {
         SqliteConnection connection = await database.OpenAsync(cancellationToken).ConfigureAwait(false);
         ProviderSnapshot result;
@@ -38,9 +42,10 @@ public sealed class SqliteSnapshotRepository(SqliteDatabase database) : ISnapsho
             try
             {
                 command.CommandText =
-                    "SELECT id, completeness, observed_at, confidence, extensions_json\nFROM snapshots\nWHERE provider_id = $provider AND account_id = $account\nORDER BY observed_at DESC, id DESC\nLIMIT 1;";
+                    "SELECT id, completeness, observed_at, confidence, extensions_json\nFROM snapshots\nWHERE provider_id = $provider AND account_id = $account AND configuration_revision = $revision\nORDER BY observed_at DESC, id DESC\nLIMIT 1;";
                 command.Parameters.AddWithValue("$provider", account.Provider.Value);
                 command.Parameters.AddWithValue("$account", account.Value);
+                command.Parameters.AddWithValue("$revision", configurationRevision);
                 SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
                 ProviderSnapshot providerSnapshot;
                 try
@@ -85,7 +90,12 @@ public sealed class SqliteSnapshotRepository(SqliteDatabase database) : ISnapsho
         return result;
     }
 
-    public async Task SaveAsync(ProviderSnapshot snapshot, long generation, CancellationToken cancellationToken)
+    public async Task SaveAsync(
+        ProviderSnapshot snapshot,
+        long generation,
+        long configurationRevision,
+        CancellationToken cancellationToken
+    )
     {
         SqliteConnection connection = await database.OpenAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -98,13 +108,14 @@ public sealed class SqliteSnapshotRepository(SqliteDatabase database) : ISnapsho
             {
                 snapshotCommand.Transaction = (SqliteTransaction)transaction;
                 snapshotCommand.CommandText =
-                    "INSERT INTO snapshots(\n    provider_id, account_id, completeness, observed_at, confidence, generation, extensions_json)\nVALUES($provider, $account, $completeness, $observed, $confidence, $generation, $extensions);\nSELECT last_insert_rowid();";
+                    "INSERT INTO snapshots(\n    provider_id, account_id, completeness, observed_at, confidence, generation, configuration_revision, extensions_json)\nVALUES($provider, $account, $completeness, $observed, $confidence, $generation, $revision, $extensions);\nSELECT last_insert_rowid();";
                 snapshotCommand.Parameters.AddWithValue("$provider", snapshot.Account.Provider.Value);
                 snapshotCommand.Parameters.AddWithValue("$account", snapshot.Account.Value);
                 snapshotCommand.Parameters.AddWithValue("$completeness", (int)snapshot.Completeness);
                 snapshotCommand.Parameters.AddWithValue("$observed", Format(snapshot.ObservedAt));
                 snapshotCommand.Parameters.AddWithValue("$confidence", (int)snapshot.Confidence);
                 snapshotCommand.Parameters.AddWithValue("$generation", generation);
+                snapshotCommand.Parameters.AddWithValue("$revision", configurationRevision);
                 snapshotCommand.Parameters.AddWithValue(
                     "$extensions",
                     JsonSerializer.Serialize(snapshot.Extensions, JsonOptions)
@@ -162,6 +173,7 @@ public sealed class SqliteSnapshotRepository(SqliteDatabase database) : ISnapsho
 
     public async Task<IReadOnlyList<ProviderSnapshot>> GetHistoryAsync(
         AccountKey account,
+        long configurationRevision,
         DateTimeOffset from,
         CancellationToken cancellationToken
     )
@@ -180,9 +192,10 @@ public sealed class SqliteSnapshotRepository(SqliteDatabase database) : ISnapsho
             try
             {
                 command.CommandText =
-                    "SELECT id, completeness, observed_at, confidence, extensions_json\nFROM snapshots\nWHERE provider_id = $provider AND account_id = $account AND observed_at >= $from\nORDER BY observed_at;";
+                    "SELECT id, completeness, observed_at, confidence, extensions_json\nFROM snapshots\nWHERE provider_id = $provider AND account_id = $account AND configuration_revision = $revision AND observed_at >= $from\nORDER BY observed_at;";
                 command.Parameters.AddWithValue("$provider", account.Provider.Value);
                 command.Parameters.AddWithValue("$account", account.Value);
+                command.Parameters.AddWithValue("$revision", configurationRevision);
                 command.Parameters.AddWithValue("$from", Format(from));
                 commands++;
                 SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);

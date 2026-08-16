@@ -15,7 +15,6 @@ It reads the existing CLI sessions and local usage histories on your PC to show 
 - Codex
 - Claude Code
 - Factory (Droid)
-- GitHub Copilot
 - Amp
 - Google Antigravity
 - OpenCode

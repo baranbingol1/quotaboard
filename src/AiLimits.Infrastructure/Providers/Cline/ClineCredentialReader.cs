@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace AiLimits.Infrastructure.Providers.Cline;
@@ -21,7 +23,8 @@ public sealed record ClineCredential(
     DateTimeOffset? ExpiresAt = null,
     string? RefreshToken = null,
     bool IsWorkOsSession = false,
-    string? Email = null
+    string? Email = null,
+    string? AccountFingerprint = null
 );
 
 /// <summary>
@@ -89,6 +92,7 @@ internal static class ClineCredentialReader
         string candidate = stored;
         string? refreshToken = null;
         string? email = null;
+        string? accountFingerprint = null;
         DateTimeOffset? expiresAt = null;
         bool workOsSession = false;
         if (stored.StartsWith('{'))
@@ -121,6 +125,7 @@ internal static class ClineCredentialReader
                     }
                     expiresAt = ParseExpiry(blob.RootElement);
                     email = ReadEmail(blob.RootElement);
+                    accountFingerprint = ReadAccountFingerprint(blob.RootElement, email);
                 }
             }
             catch (JsonException)
@@ -137,7 +142,8 @@ internal static class ClineCredentialReader
                 expiresAt,
                 refreshToken,
                 workOsSession || LooksLikeJwt(candidate),
-                email
+                email,
+                accountFingerprint
             )
             : null;
     }
@@ -150,6 +156,26 @@ internal static class ClineCredentialReader
         && !string.IsNullOrWhiteSpace(email.GetString())
             ? email.GetString()!.Trim()
             : null;
+
+    private static string? ReadAccountFingerprint(JsonElement root, string? email)
+    {
+        string? identity = null;
+        if (
+            root.TryGetProperty("userInfo", out JsonElement userInfo)
+            && userInfo.ValueKind == JsonValueKind.Object
+            && userInfo.TryGetProperty("id", out JsonElement id)
+            && id.ValueKind == JsonValueKind.String
+            && !string.IsNullOrWhiteSpace(id.GetString())
+        )
+        {
+            identity = "id:" + id.GetString()!.Trim().ToLowerInvariant();
+        }
+        else if (!string.IsNullOrWhiteSpace(email))
+        {
+            identity = "email:" + email.Trim().ToLowerInvariant();
+        }
+        return identity is null ? null : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity)));
+    }
 
     private static bool LooksLikeJwt(string value) =>
         value.Count(c => c == '.') == 2 && !value.StartsWith('.') && !value.EndsWith('.');

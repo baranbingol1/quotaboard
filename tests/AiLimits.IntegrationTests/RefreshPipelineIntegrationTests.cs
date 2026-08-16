@@ -53,7 +53,7 @@ public sealed class RefreshPipelineIntegrationTests
         );
 
         Assert.Equal(RefreshPublicationStatus.Published, published.Status);
-        ProviderSnapshot? loaded = await snapshots.GetLatestAsync(account.Key, default);
+        ProviderSnapshot? loaded = await snapshots.GetLatestAsync(account.Key, account.ConfigurationRevision, default);
         Assert.NotNull(loaded);
         Assert.Equal(SnapshotCompleteness.Authoritative, loaded.Completeness);
         UsageMeter meter = Assert.Single(loaded.Meters);

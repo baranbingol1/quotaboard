@@ -212,7 +212,9 @@ public sealed class RefreshCoordinator : IDisposable
         {
             return new RefreshPublication(
                 RefreshPublicationStatus.NoStrategyAvailable,
-                await _snapshots.GetLatestAsync(request.Account, cancellationToken).ConfigureAwait(false),
+                await _snapshots
+                    .GetLatestAsync(request.Account, request.ConfigurationRevision, cancellationToken)
+                    .ConfigureAwait(false),
                 Array.Empty<FetchAttempt>(),
                 generation,
                 "No provider adapter is registered."
@@ -378,7 +380,7 @@ public sealed class RefreshCoordinator : IDisposable
                 );
             }
             ProviderSnapshot cached = await _snapshots
-                .GetLatestAsync(request.Account, cancellationToken)
+                .GetLatestAsync(request.Account, request.ConfigurationRevision, cancellationToken)
                 .ConfigureAwait(false);
             return new RefreshPublication(
                 (cached is null)
@@ -420,10 +422,12 @@ public sealed class RefreshCoordinator : IDisposable
             return Rejected(generation, "A newer account configuration or refresh superseded this result.", attempts);
         }
         ProviderSnapshot previous = await _snapshots
-            .GetLatestAsync(request.Account, cancellationToken)
+            .GetLatestAsync(request.Account, request.ConfigurationRevision, cancellationToken)
             .ConfigureAwait(false);
         ProviderSnapshot merged = _snapshotMerger.Merge(previous, incoming);
-        await _snapshots.SaveAsync(merged, generation, cancellationToken).ConfigureAwait(false);
+        await _snapshots
+            .SaveAsync(merged, generation, request.ConfigurationRevision, cancellationToken)
+            .ConfigureAwait(false);
         return new RefreshPublication(
             RefreshPublicationStatus.Published,
             merged,

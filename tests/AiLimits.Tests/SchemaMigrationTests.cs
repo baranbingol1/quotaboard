@@ -28,7 +28,7 @@ public sealed class SchemaMigrationTests
             await connection.OpenAsync();
             await using var command = connection.CreateCommand();
             command.CommandText = "SELECT MAX(version) FROM schema_migrations;";
-            Assert.Equal(7L, Convert.ToInt64(await command.ExecuteScalarAsync()));
+            Assert.Equal(8L, Convert.ToInt64(await command.ExecuteScalarAsync()));
         }
         finally
         {
@@ -95,7 +95,7 @@ public sealed class SchemaMigrationTests
             await connection.OpenAsync();
             await using var command = connection.CreateCommand();
             command.CommandText = "SELECT MAX(version) FROM schema_migrations;";
-            Assert.Equal(7L, Convert.ToInt64(await command.ExecuteScalarAsync()));
+            Assert.Equal(8L, Convert.ToInt64(await command.ExecuteScalarAsync()));
 
             command.CommandText = "SELECT name FROM pragma_table_info('daily_usage');";
             var columns = new List<string>();
@@ -131,7 +131,9 @@ public sealed class SchemaMigrationTests
                 await connection.OpenAsync();
                 await using var seed = connection.CreateCommand();
                 seed.CommandText = """
-                    DELETE FROM schema_migrations WHERE version = 7;
+                    DROP INDEX ix_snapshots_account_revision_observed;
+                    ALTER TABLE snapshots DROP COLUMN configuration_revision;
+                    DELETE FROM schema_migrations WHERE version >= 7;
                     INSERT INTO accounts VALUES('windsurf', 'a', 'Windsurf', NULL, 'cache', 0, 1, NULL);
                     INSERT INTO accounts VALUES('claude', 'b', 'Claude', NULL, 'oauth', 0, 1, NULL);
                     INSERT INTO fetch_attempts VALUES('x', 'windsurf', 'a', 's', '2026-07-01T00:00:00Z', 1, 0, 'ok');
@@ -156,7 +158,7 @@ public sealed class SchemaMigrationTests
             Assert.Equal(0L, reader.GetInt64(0));
             Assert.Equal(0L, reader.GetInt64(1));
             Assert.Equal(1L, reader.GetInt64(2));
-            Assert.Equal(7L, reader.GetInt64(3));
+            Assert.Equal(8L, reader.GetInt64(3));
         }
         finally
         {
@@ -189,7 +191,11 @@ public sealed class SchemaMigrationTests
                     CREATE TABLE scanner_cursors(source_id TEXT NOT NULL, provider_id TEXT NOT NULL);
                     INSERT INTO scanner_cursors VALUES('old', 'codex');
                     CREATE TABLE accounts(provider_id TEXT NOT NULL);
-                    CREATE TABLE snapshots(provider_id TEXT NOT NULL);
+                    CREATE TABLE snapshots(
+                        provider_id TEXT NOT NULL,
+                        account_id TEXT NOT NULL,
+                        observed_at TEXT NOT NULL
+                    );
                     CREATE TABLE fetch_attempts(provider_id TEXT NOT NULL);
                     CREATE TABLE alert_state(provider_id TEXT NOT NULL);
                     """;
@@ -211,7 +217,7 @@ public sealed class SchemaMigrationTests
                 """;
             await using var reader = await verification.ExecuteReaderAsync();
             Assert.True(await reader.ReadAsync());
-            Assert.Equal(7L, reader.GetInt64(0));
+            Assert.Equal(8L, reader.GetInt64(0));
             Assert.Equal(0L, reader.GetInt64(1));
             Assert.Equal(0L, reader.GetInt64(2));
             Assert.Equal(0L, reader.GetInt64(3));

@@ -83,6 +83,11 @@ public sealed class SqliteDatabase
             if (version < 7)
             {
                 await ApplyVersionSevenAsync(connection, cancellationToken).ConfigureAwait(false);
+                version = 7;
+            }
+            if (version < 8)
+            {
+                await ApplyVersionEightAsync(connection, cancellationToken).ConfigureAwait(false);
             }
         }
         finally
@@ -421,6 +426,26 @@ public sealed class SqliteDatabase
         {
             await command.DisposeAsync();
         }
+    }
+
+    // v8: snapshots are account-configuration scoped. Existing rows receive
+    // revision zero and are therefore excluded from current positive revisions.
+    private static async Task ApplyVersionEightAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using DbTransaction transaction = await connection
+            .BeginTransactionAsync(cancellationToken)
+            .ConfigureAwait(false);
+        await using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction)transaction;
+        command.CommandText = """
+            ALTER TABLE snapshots ADD COLUMN configuration_revision INTEGER NOT NULL DEFAULT 0;
+            CREATE INDEX ix_snapshots_account_revision_observed
+                ON snapshots(provider_id, account_id, configuration_revision, observed_at DESC);
+            INSERT INTO schema_migrations(version, applied_at)
+            VALUES (8, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+            """;
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task ExecuteAsync(SqliteConnection connection, string sql, CancellationToken cancellationToken)

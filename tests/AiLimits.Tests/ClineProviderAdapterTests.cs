@@ -113,6 +113,7 @@ public sealed class ClineProviderAdapterTests
         Assert.Equal("opaque-token", credential.Token);
         Assert.Equal("Cline CLI account", credential.SourceLabel);
         Assert.False(credential.IsWorkOsSession);
+        Assert.Null(credential.AccountFingerprint);
     }
 
     [Fact]
@@ -135,6 +136,27 @@ public sealed class ClineProviderAdapterTests
         Assert.Equal("Cline CLI account", credential.SourceLabel);
         Assert.True(credential.IsWorkOsSession);
         Assert.Equal("someone@example.com", credential.Email);
+        Assert.False(string.IsNullOrWhiteSpace(credential.AccountFingerprint));
+        Assert.DoesNotContain("someone@example.com", credential.AccountFingerprint, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Session_fingerprint_prefers_normalized_user_id_over_email()
+    {
+        using var temp = new TempDir();
+        string firstPath = Path.Combine(temp.Path, "first.json");
+        string secondPath = Path.Combine(temp.Path, "second.json");
+        string emailOnlyPath = Path.Combine(temp.Path, "email-only.json");
+        WriteSession(firstPath, " User-123 ", "first@example.com");
+        WriteSession(secondPath, "user-123", "second@example.com");
+        WriteSession(emailOnlyPath, null, "first@example.com");
+
+        ClineCredential first = Assert.IsType<ClineCredential>(ClineCredentialReader.ResolveSecrets(firstPath));
+        ClineCredential second = Assert.IsType<ClineCredential>(ClineCredentialReader.ResolveSecrets(secondPath));
+        ClineCredential emailOnly = Assert.IsType<ClineCredential>(ClineCredentialReader.ResolveSecrets(emailOnlyPath));
+
+        Assert.Equal(first.AccountFingerprint, second.AccountFingerprint);
+        Assert.NotEqual(first.AccountFingerprint, emailOnly.AccountFingerprint);
     }
 
     [Fact]
@@ -206,6 +228,13 @@ public sealed class ClineProviderAdapterTests
     private sealed class FixedClock : IClock
     {
         public DateTimeOffset UtcNow => new(2026, 7, 16, 12, 0, 0, TimeSpan.Zero);
+    }
+
+    private static void WriteSession(string path, string? id, string email)
+    {
+        string userInfo = JsonSerializer.Serialize(new { id, email });
+        string blob = "{\"idToken\":\"header.payload.signature\",\"userInfo\":" + userInfo + "}";
+        File.WriteAllText(path, "{\"cline:clineAccountId\":" + JsonSerializer.Serialize(blob) + "}");
     }
 
     private sealed class TempDir : IDisposable
