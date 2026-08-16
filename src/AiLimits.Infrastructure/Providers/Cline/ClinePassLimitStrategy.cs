@@ -96,17 +96,15 @@ internal sealed class ClinePassLimitStrategy(
     {
         long started = Stopwatch.GetTimestamp();
 
-        // Read the store before anything can return early. Besides supplying a
-        // possibly fresher session, the first read is what migrates a plaintext
-        // cache an older build left on disk and deletes it — that has to happen
-        // even for a user who has since signed out of Cline entirely, which is
-        // exactly the case where the stale tokens would otherwise sit there
-        // forever.
+        ClineCredential? credential = ResolveCredential();
+        // Resolve identity first: fixed cache keys are safe only when the live
+        // credential proves they belong to the same account. A null identity
+        // also causes legacy/unsafe cache cleanup.
         ClineSession? cached = sessionStore is null
             ? null
-            : await sessionStore.LoadAsync(cancellationToken).ConfigureAwait(false);
+            : await sessionStore.LoadAsync(credential?.AccountFingerprint, cancellationToken).ConfigureAwait(false);
 
-        if (ResolveCredential() is not { } credential)
+        if (credential is null)
         {
             return FetchResult.Failure(
                 FetchFailureKind.Authentication,
@@ -136,7 +134,12 @@ internal sealed class ClinePassLimitStrategy(
         bool refreshedThisFetch = false;
         if (refreshToken is not null && expiresAt is { } expiry && expiry <= clock.UtcNow + ExpirySkew)
         {
-            (ClineSession? session, FetchResult? failure) = await RefreshAsync(refreshToken, started, cancellationToken)
+            (ClineSession? session, FetchResult? failure) = await RefreshAsync(
+                    refreshToken,
+                    credential.AccountFingerprint,
+                    started,
+                    cancellationToken
+                )
                 .ConfigureAwait(false);
             if (session is null)
             {
@@ -177,6 +180,7 @@ internal sealed class ClinePassLimitStrategy(
                 {
                     (ClineSession? session, FetchResult? failure) = await RefreshAsync(
                             refreshToken,
+                            credential.AccountFingerprint,
                             started,
                             cancellationToken
                         )
@@ -209,6 +213,7 @@ internal sealed class ClinePassLimitStrategy(
     // headroom; a response without a rotated refresh token keeps the old one.
     private async Task<(ClineSession? Session, FetchResult? Failure)> RefreshAsync(
         string refreshToken,
+        string? accountFingerprint,
         long started,
         CancellationToken cancellationToken
     )
@@ -265,8 +270,8 @@ internal sealed class ClinePassLimitStrategy(
                 ? rotatedElement.GetString()!.Trim()
                 : null;
         DateTimeOffset expiresAt = ClineCredentialReader.ParseExpiry(data) ?? clock.UtcNow + TimeSpan.FromMinutes(55);
-        ClineSession session = new(access.GetString()!.Trim(), rotated ?? refreshToken, expiresAt);
-        if (sessionStore is not null)
+        ClineSession session = new(access.GetString()!.Trim(), rotated ?? refreshToken, expiresAt, accountFingerprint);
+        if (sessionStore is not null && accountFingerprint is not null)
         {
             await sessionStore.SaveAsync(session, cancellationToken).ConfigureAwait(false);
         }

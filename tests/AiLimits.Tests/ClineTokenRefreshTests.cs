@@ -21,6 +21,7 @@ public sealed class ClineTokenRefreshTests : IDisposable
 
     private const string UsageUri = "https://api.cline.bot/api/v1/users/me/plan/usage-limits";
     private const string RefreshUri = "https://api.cline.bot/api/v1/auth/refresh";
+    private const string AccountFingerprint = "fingerprint-a";
 
     private readonly string _cacheDirectory = Path.Combine(
         Path.GetTempPath(),
@@ -73,7 +74,8 @@ public sealed class ClineTokenRefreshTests : IDisposable
                     "Cline CLI account",
                     ExpiresAt: Now - TimeSpan.FromHours(23),
                     RefreshToken: "stored-refresh",
-                    IsWorkOsSession: true
+                    IsWorkOsSession: true,
+                    AccountFingerprint: AccountFingerprint
                 ),
             Store()
         );
@@ -98,18 +100,22 @@ public sealed class ClineTokenRefreshTests : IDisposable
         Assert.Equal("Bearer workos:fresh-token", usage.authorization);
         Assert.Null(refresh.authorization);
 
-        ClineSession? cached = await Store().LoadAsync(default);
+        ClineSession? cached = await Store().LoadAsync(AccountFingerprint, default);
         Assert.NotNull(cached);
         Assert.Equal("fresh-token", cached!.AccessToken);
         Assert.Equal("rotated-refresh", cached.RefreshToken);
         Assert.Equal(new DateTimeOffset(2026, 7, 24, 13, 5, 0, TimeSpan.Zero), cached.ExpiresAt);
+        Assert.Equal(AccountFingerprint, cached.AccountFingerprint);
     }
 
     [Fact]
     public async Task Fresher_cached_session_is_used_without_refreshing()
     {
         await Store()
-            .SaveAsync(new ClineSession("cached-token", "cached-refresh", Now + TimeSpan.FromMinutes(40)), default);
+            .SaveAsync(
+                new ClineSession("cached-token", "cached-refresh", Now + TimeSpan.FromMinutes(40), AccountFingerprint),
+                default
+            );
         var handler = new RoutedHandler(_ =>
             Json(
                 """
@@ -126,7 +132,8 @@ public sealed class ClineTokenRefreshTests : IDisposable
                     "Cline CLI account",
                     ExpiresAt: Now - TimeSpan.FromHours(23),
                     RefreshToken: "stored-refresh",
-                    IsWorkOsSession: true
+                    IsWorkOsSession: true,
+                    AccountFingerprint: AccountFingerprint
                 ),
             Store()
         );
@@ -137,6 +144,104 @@ public sealed class ClineTokenRefreshTests : IDisposable
         (string method, string uri, string? authorization, string? body) only = Assert.Single(handler.Requests);
         Assert.Equal(UsageUri, only.uri);
         Assert.Equal("Bearer workos:cached-token", only.authorization);
+    }
+
+    [Fact]
+    public async Task Cache_for_one_account_is_not_used_after_an_account_switch()
+    {
+        ClineSessionStore store = Store();
+        await store.SaveAsync(
+            new ClineSession("account-a-token", "account-a-refresh", Now + TimeSpan.FromHours(1), "fingerprint-a"),
+            default
+        );
+        var handler = new RoutedHandler(_ =>
+            Json(
+                """
+                {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":7,"resetsAt":null}]}}
+                """
+            )
+        );
+        var strategy = new ClinePassLimitStrategy(
+            new HttpClient(handler),
+            new FixedClock(),
+            () =>
+                new ClineCredential(
+                    "account-b-token",
+                    "Cline CLI account",
+                    ExpiresAt: Now + TimeSpan.FromMinutes(30),
+                    RefreshToken: "account-b-refresh",
+                    IsWorkOsSession: true,
+                    AccountFingerprint: "fingerprint-b"
+                ),
+            store
+        );
+
+        FetchResult result = await strategy.FetchAsync(Account(), default);
+
+        Assert.True(result.IsSuccess, result.SafeMessage);
+        Assert.Equal("Bearer workos:account-b-token", Assert.Single(handler.Requests).Authorization);
+        Assert.Null(await _secrets.GetAsync("cline", "session.access-token", default));
+        Assert.Null(await _secrets.GetAsync("cline", "session.account-fingerprint", default));
+    }
+
+    [Fact]
+    public async Task Legacy_vault_session_without_a_fingerprint_is_removed()
+    {
+        await _secrets.SetAsync("cline", "session.access-token", "legacy-access", default);
+        await _secrets.SetAsync("cline", "session.expires-at", (Now + TimeSpan.FromHours(1)).ToString("o"), default);
+        await _secrets.SetAsync("cline", "session.refresh-token", "legacy-refresh", default);
+
+        Assert.Null(await Store().LoadAsync(AccountFingerprint, default));
+        Assert.Null(await _secrets.GetAsync("cline", "session.access-token", default));
+        Assert.Null(await _secrets.GetAsync("cline", "session.refresh-token", default));
+    }
+
+    [Fact]
+    public async Task Identityless_refresh_is_used_once_but_not_persisted()
+    {
+        var handler = new RoutedHandler(request =>
+            request.RequestUri!.ToString() == RefreshUri
+                ? Json(
+                    """
+                    {"success":true,"data":{"accessToken":"fresh-token","refreshToken":"fresh-refresh","expiresAt":"2026-07-24T13:05:00Z"}}
+                    """
+                )
+                : Json(
+                    """
+                    {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":7,"resetsAt":null}]}}
+                    """
+                )
+        );
+        var strategy = new ClinePassLimitStrategy(
+            new HttpClient(handler),
+            new FixedClock(),
+            () =>
+                new ClineCredential(
+                    "expired-token",
+                    "Cline CLI account",
+                    ExpiresAt: Now - TimeSpan.FromHours(1),
+                    RefreshToken: "refresh-token",
+                    IsWorkOsSession: true
+                ),
+            Store()
+        );
+
+        FetchResult result = await strategy.FetchAsync(Account(), default);
+
+        Assert.True(result.IsSuccess, result.SafeMessage);
+        Assert.Equal("Bearer workos:fresh-token", handler.Requests[^1].Authorization);
+        Assert.Null(await _secrets.GetAsync("cline", "session.access-token", default));
+        Assert.Null(await _secrets.GetAsync("cline", "session.account-fingerprint", default));
+    }
+
+    [Fact]
+    public async Task Identityless_session_is_rejected_by_the_store()
+    {
+        bool saved = await Store()
+            .TrySaveAsync(new ClineSession("access", "refresh", Now + TimeSpan.FromHours(1), null), default);
+
+        Assert.False(saved);
+        Assert.Empty(_secrets.Keys);
     }
 
     [Fact]
@@ -151,7 +256,8 @@ public sealed class ClineTokenRefreshTests : IDisposable
                 "Cline CLI account",
                 ExpiresAt: Now - TimeSpan.FromHours(1),
                 RefreshToken: "stored-refresh",
-                IsWorkOsSession: true
+                IsWorkOsSession: true,
+                AccountFingerprint: AccountFingerprint
             );
         var first = new ClinePassLimitStrategy(
             new HttpClient(handler),
@@ -244,7 +350,8 @@ public sealed class ClineTokenRefreshTests : IDisposable
                     "Cline CLI account",
                     ExpiresAt: Now - TimeSpan.FromHours(1),
                     RefreshToken: "stored-refresh",
-                    IsWorkOsSession: true
+                    IsWorkOsSession: true,
+                    AccountFingerprint: AccountFingerprint
                 ),
             Store(),
             new ContendedRefreshLock()
@@ -259,7 +366,7 @@ public sealed class ClineTokenRefreshTests : IDisposable
         Assert.Equal(FallbackPolicy.TryNextStrategy, result.FallbackPolicy);
         // Nothing in the protected load/refresh/save path may have run.
         Assert.Empty(handler.Requests);
-        Assert.Null(await Store().LoadAsync(default));
+        Assert.Null(await Store().LoadAsync(AccountFingerprint, default));
     }
 
     private sealed class ContendedRefreshLock : IClineRefreshLock
@@ -301,7 +408,8 @@ public sealed class ClineTokenRefreshTests : IDisposable
                     "Cline CLI account",
                     ExpiresAt: Now + TimeSpan.FromMinutes(30),
                     RefreshToken: "stored-refresh",
-                    IsWorkOsSession: true
+                    IsWorkOsSession: true,
+                    AccountFingerprint: AccountFingerprint
                 ),
             Store()
         );
@@ -339,7 +447,8 @@ public sealed class ClineTokenRefreshTests : IDisposable
                     "Cline CLI account",
                     ExpiresAt: Now - TimeSpan.FromHours(23),
                     RefreshToken: "stored-refresh",
-                    IsWorkOsSession: true
+                    IsWorkOsSession: true,
+                    AccountFingerprint: AccountFingerprint
                 ),
             Store()
         );
@@ -350,7 +459,7 @@ public sealed class ClineTokenRefreshTests : IDisposable
         Assert.Equal(FetchFailureKind.Authentication, result.FailureKind);
         Assert.DoesNotContain("stored-refresh", result.SafeMessage);
         Assert.DoesNotContain("stale-token", result.SafeMessage);
-        Assert.Null(await Store().LoadAsync(default));
+        Assert.Null(await Store().LoadAsync(AccountFingerprint, default));
     }
 
     [Fact]
@@ -396,10 +505,52 @@ public sealed class ClineTokenRefreshTests : IDisposable
         Assert.Equal("blob-refresh", credential.RefreshToken);
         Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1784772484), credential.ExpiresAt);
         Assert.True(credential.IsWorkOsSession);
+        Assert.Null(credential.AccountFingerprint);
+        Assert.Null(credential.BillingScope);
     }
 
     [Fact]
-    public async Task Legacy_plaintext_cache_is_migrated_into_the_secret_store_and_deleted()
+    public async Task Cache_for_one_organization_is_not_used_after_an_organization_switch()
+    {
+        ClineSessionStore store = Store();
+        await store.SaveAsync(
+            new ClineSession("org-a-token", "org-a-refresh", Now + TimeSpan.FromHours(1), "fingerprint-org-a"),
+            default
+        );
+        var handler = new RoutedHandler(_ =>
+            Json(
+                """
+                {"success":true,"data":{"limits":[{"type":"weekly","percentUsed":7,"resetsAt":null}]}}
+                """
+            )
+        );
+        var strategy = new ClinePassLimitStrategy(
+            new HttpClient(handler),
+            new FixedClock(),
+            () =>
+                new ClineCredential(
+                    "org-b-token",
+                    "Cline CLI account (organization)",
+                    ExpiresAt: Now + TimeSpan.FromMinutes(30),
+                    RefreshToken: "org-b-refresh",
+                    IsWorkOsSession: true,
+                    Email: "same@example.com",
+                    AccountFingerprint: "fingerprint-org-b",
+                    BillingScope: new ClineBillingScope.Organization("org-b")
+                ),
+            store
+        );
+
+        FetchResult result = await strategy.FetchAsync(Account(), default);
+
+        Assert.True(result.IsSuccess, result.SafeMessage);
+        Assert.Equal("Bearer workos:org-b-token", Assert.Single(handler.Requests).Authorization);
+        Assert.Null(await _secrets.GetAsync("cline", "session.access-token", default));
+        Assert.Null(await _secrets.GetAsync("cline", "session.account-fingerprint", default));
+    }
+
+    [Fact]
+    public async Task Legacy_plaintext_cache_is_deleted_without_becoming_reusable()
     {
         Directory.CreateDirectory(_cacheDirectory);
         await File.WriteAllTextAsync(
@@ -409,17 +560,15 @@ public sealed class ClineTokenRefreshTests : IDisposable
             """
         );
 
-        ClineSession? migrated = await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(default);
+        ClineSession? loaded = await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(
+            AccountFingerprint,
+            default
+        );
 
-        Assert.NotNull(migrated);
-        Assert.Equal("file-token", migrated!.AccessToken);
-        Assert.Equal("file-refresh", migrated.RefreshToken);
-        Assert.Equal(new DateTimeOffset(2026, 7, 24, 13, 5, 0, TimeSpan.Zero), migrated.ExpiresAt);
-
+        Assert.Null(loaded);
         Assert.False(File.Exists(LegacyCachePath));
-        // The tokens must now only exist in the vault.
-        Assert.Equal("file-token", await _secrets.GetAsync("cline", "session.access-token", default));
-        Assert.Equal("file-refresh", await _secrets.GetAsync("cline", "session.refresh-token", default));
+        Assert.Null(await _secrets.GetAsync("cline", "session.access-token", default));
+        Assert.Null(await _secrets.GetAsync("cline", "session.refresh-token", default));
     }
 
     [Fact]
@@ -436,7 +585,10 @@ public sealed class ClineTokenRefreshTests : IDisposable
             """{"accessToken":"file-token","refreshToken":"file-refresh","expiresAt":"2026-07-2"""
         );
 
-        ClineSession? migrated = await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(default);
+        ClineSession? migrated = await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(
+            AccountFingerprint,
+            default
+        );
 
         Assert.Null(migrated);
         Assert.False(File.Exists(LegacyCachePath));
@@ -454,12 +606,12 @@ public sealed class ClineTokenRefreshTests : IDisposable
             """
         );
 
-        Assert.Null(await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(default));
+        Assert.Null(await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(AccountFingerprint, default));
         Assert.False(File.Exists(LegacyCachePath));
     }
 
     [Fact]
-    public async Task An_orphaned_temp_file_is_migrated_even_when_the_real_path_never_existed()
+    public async Task An_orphaned_legacy_temp_file_is_deleted()
     {
         Directory.CreateDirectory(_cacheDirectory);
         // The old writer wrote a sibling .tmp and renamed it over the real
@@ -472,17 +624,18 @@ public sealed class ClineTokenRefreshTests : IDisposable
             """
         );
 
-        ClineSession? migrated = await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(default);
+        ClineSession? loaded = await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(
+            AccountFingerprint,
+            default
+        );
 
-        Assert.NotNull(migrated);
-        Assert.Equal("tmp-token", migrated!.AccessToken);
-        Assert.Equal("tmp-refresh", migrated.RefreshToken);
+        Assert.Null(loaded);
         Assert.False(File.Exists(LegacyCachePath + ".tmp"));
-        Assert.Equal("tmp-token", await _secrets.GetAsync("cline", "session.access-token", default));
+        Assert.Null(await _secrets.GetAsync("cline", "session.access-token", default));
     }
 
     [Fact]
-    public async Task An_unreadable_legacy_cache_keeps_a_readable_sibling_temp_file()
+    public async Task Legacy_real_and_temp_files_are_both_deleted()
     {
         Directory.CreateDirectory(_cacheDirectory);
         await File.WriteAllTextAsync(LegacyCachePath, "{ this is not json");
@@ -493,12 +646,12 @@ public sealed class ClineTokenRefreshTests : IDisposable
             """
         );
 
-        ClineSession? migrated = await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(default);
+        ClineSession? loaded = await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(
+            AccountFingerprint,
+            default
+        );
 
-        // The corrupt file yields nothing, but the sibling still holds the
-        // session, so the migration completes and both paths go away.
-        Assert.NotNull(migrated);
-        Assert.Equal("tmp-token", migrated!.AccessToken);
+        Assert.Null(loaded);
         Assert.False(File.Exists(LegacyCachePath));
         Assert.False(File.Exists(LegacyCachePath + ".tmp"));
     }
@@ -528,11 +681,11 @@ public sealed class ClineTokenRefreshTests : IDisposable
         Assert.False(result.IsSuccess);
         Assert.Equal(FetchFailureKind.Authentication, result.FailureKind);
         Assert.False(File.Exists(LegacyCachePath));
-        Assert.Equal("orphaned-token", await _secrets.GetAsync("cline", "session.access-token", default));
+        Assert.Null(await _secrets.GetAsync("cline", "session.access-token", default));
     }
 
     [Fact]
-    public async Task A_failed_migration_keeps_the_plaintext_cache_and_retries_on_next_load()
+    public async Task An_unavailable_secret_store_delays_legacy_cleanup()
     {
         Directory.CreateDirectory(_cacheDirectory);
         await File.WriteAllTextAsync(
@@ -545,22 +698,19 @@ public sealed class ClineTokenRefreshTests : IDisposable
         var store = new ClineSessionStore(_secrets, LegacyCachePath);
 
         // The vault is down: the session must not be deleted from disk.
-        Assert.Null(await store.LoadAsync(default));
+        Assert.Null(await store.LoadAsync(AccountFingerprint, default));
         Assert.True(File.Exists(LegacyCachePath));
 
-        // The vault recovering lets the very next load finish the migration,
-        // because the failed attempt did not latch.
+        // The vault recovering lets the next load delete the unsafe file.
         _secrets.Fault = null;
-        ClineSession? migrated = await store.LoadAsync(default);
+        ClineSession? loaded = await store.LoadAsync(AccountFingerprint, default);
 
-        Assert.NotNull(migrated);
-        Assert.Equal("file-token", migrated!.AccessToken);
-        Assert.Equal("file-refresh", migrated.RefreshToken);
+        Assert.Null(loaded);
         Assert.False(File.Exists(LegacyCachePath));
     }
 
     [Fact]
-    public async Task Retained_legacy_file_never_overwrites_a_rotated_committed_vault_session()
+    public async Task Retained_legacy_file_never_overwrites_a_committed_vault_session()
     {
         Directory.CreateDirectory(_cacheDirectory);
         await File.WriteAllTextAsync(
@@ -570,139 +720,30 @@ public sealed class ClineTokenRefreshTests : IDisposable
             """
         );
         var store = new ClineSessionStore(_secrets, LegacyCachePath);
+        await store.SaveAsync(
+            new ClineSession("committed-access", "committed-refresh", Now + TimeSpan.FromHours(2), AccountFingerprint),
+            default
+        );
 
-        // Reads remain possible, but Windows denies deletion until this handle
-        // closes. This deterministically leaves plaintext after a successful
-        // stage/commit/promotion.
+        // Reads remain possible, but Windows denies deletion until this handle closes.
         using (new FileStream(LegacyCachePath, FileMode.Open, FileAccess.Read, FileShare.Read))
         {
-            ClineSession? migrated = await store.LoadAsync(default);
-            Assert.Equal("legacy-access", migrated!.AccessToken);
+            ClineSession? loaded = await store.LoadAsync(AccountFingerprint, default);
+            Assert.Equal("committed-access", loaded!.AccessToken);
             Assert.True(File.Exists(LegacyCachePath));
 
-            await store.SaveAsync(
-                new ClineSession("rotated-access", "rotated-refresh", Now + TimeSpan.FromHours(2)),
+            ClineSession? afterRestart = await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(
+                AccountFingerprint,
                 default
             );
-
-            ClineSession? sameStore = await store.LoadAsync(default);
-            Assert.Equal("rotated-access", sameStore!.AccessToken);
-            Assert.Equal("rotated-refresh", sameStore.RefreshToken);
-
-            ClineSession? afterRestart = await new ClineSessionStore(_secrets, LegacyCachePath).LoadAsync(default);
-            Assert.Equal("rotated-access", afterRestart!.AccessToken);
-            Assert.Equal("rotated-refresh", afterRestart.RefreshToken);
+            Assert.Equal("committed-access", afterRestart!.AccessToken);
+            Assert.Equal("committed-refresh", afterRestart.RefreshToken);
             Assert.True(File.Exists(LegacyCachePath));
         }
 
-        ClineSession? retried = await store.LoadAsync(default);
-        Assert.Equal("rotated-access", retried!.AccessToken);
+        ClineSession? retried = await store.LoadAsync(AccountFingerprint, default);
+        Assert.Equal("committed-access", retried!.AccessToken);
         Assert.False(File.Exists(LegacyCachePath));
-    }
-
-    [Fact]
-    public async Task A_partially_written_migration_keeps_the_plaintext_cache()
-    {
-        Directory.CreateDirectory(_cacheDirectory);
-        await File.WriteAllTextAsync(
-            LegacyCachePath,
-            """
-            {"accessToken":"file-token","refreshToken":"file-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
-            """
-        );
-        // The staging expires-at write fails after staging access succeeds:
-        // the vault now holds a half-written staging set, but the live keys are
-        // untouched and LoadAsync rejects them, so deleting the plaintext file
-        // here would strand the user.
-        _secrets.FaultFor = key =>
-            key is { Scope: "cline", Key: "session.expires-at.staging" }
-                ? new System.ComponentModel.Win32Exception(5)
-                : null;
-        var store = new ClineSessionStore(_secrets, LegacyCachePath);
-
-        Assert.Null(await store.LoadAsync(default));
-        Assert.True(File.Exists(LegacyCachePath));
-
-        _secrets.FaultFor = null;
-        ClineSession? migrated = await store.LoadAsync(default);
-
-        Assert.NotNull(migrated);
-        Assert.Equal("file-token", migrated!.AccessToken);
-        Assert.False(File.Exists(LegacyCachePath));
-    }
-
-    [Fact]
-    public async Task A_refresh_write_failure_after_access_and_expiry_succeed_keeps_plaintext_and_hides_partial_state()
-    {
-        Directory.CreateDirectory(_cacheDirectory);
-        await File.WriteAllTextAsync(
-            LegacyCachePath,
-            """
-            {"accessToken":"file-token","refreshToken":"file-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
-            """
-        );
-        // The staging refresh-token write fails after staging access and
-        // expiry succeed. The live keys must stay untouched so LoadAsync
-        // cannot return a session with the new access but a stale or missing
-        // refresh.
-        _secrets.FaultFor = key =>
-            key is { Scope: "cline", Key: "session.refresh-token.staging" }
-                ? new System.ComponentModel.Win32Exception(5)
-                : null;
-        var store = new ClineSessionStore(_secrets, LegacyCachePath);
-
-        // No partial session leaks, and the plaintext cache is kept for retry.
-        Assert.Null(await store.LoadAsync(default));
-        Assert.True(File.Exists(LegacyCachePath));
-
-        // The vault recovering lets the next load finish the migration.
-        _secrets.FaultFor = null;
-        ClineSession? migrated = await store.LoadAsync(default);
-
-        Assert.NotNull(migrated);
-        Assert.Equal("file-token", migrated!.AccessToken);
-        Assert.Equal("file-refresh", migrated.RefreshToken);
-        Assert.False(File.Exists(LegacyCachePath));
-    }
-
-    [Fact]
-    public async Task A_save_that_finds_no_staging_values_reports_failure_and_keeps_legacy_cache()
-    {
-        Directory.CreateDirectory(_cacheDirectory);
-        await File.WriteAllTextAsync(
-            LegacyCachePath,
-            """
-            {"accessToken":"file-token","refreshToken":"file-refresh","expiresAt":"2026-07-24T13:05:00+00:00"}
-            """
-        );
-        bool removed = false;
-        _secrets.BeforeGet = key =>
-        {
-            if (removed || key is not { Scope: "cline", Key: "session.access-token.staging" })
-            {
-                return;
-            }
-            removed = true;
-            foreach (
-                string stagingKey in new[]
-                {
-                    "session.access-token.staging",
-                    "session.expires-at.staging",
-                    "session.refresh-token.staging",
-                    "session.clear-refresh.staging",
-                }
-            )
-            {
-                _secrets.DeleteAsync("cline", stagingKey, default).GetAwaiter().GetResult();
-            }
-        };
-        var store = new ClineSessionStore(_secrets, LegacyCachePath);
-
-        ClineSession? loaded = await store.LoadAsync(default);
-
-        Assert.Null(loaded);
-        Assert.True(File.Exists(LegacyCachePath));
-        Assert.DoesNotContain(_secrets.Keys, key => key is { Scope: "cline", Key: "session.commit" });
     }
 
     [Fact]
@@ -710,8 +751,11 @@ public sealed class ClineTokenRefreshTests : IDisposable
     {
         ClineSessionStore store = Store();
         // Save a good session first.
-        await store.SaveAsync(new ClineSession("good-access", "good-refresh", Now + TimeSpan.FromHours(1)), default);
-        ClineSession? good = await store.LoadAsync(default);
+        await store.SaveAsync(
+            new ClineSession("good-access", "good-refresh", Now + TimeSpan.FromHours(1), AccountFingerprint),
+            default
+        );
+        ClineSession? good = await store.LoadAsync(AccountFingerprint, default);
         Assert.NotNull(good);
         Assert.Equal("good-access", good!.AccessToken);
 
@@ -720,11 +764,14 @@ public sealed class ClineTokenRefreshTests : IDisposable
             key is { Scope: "cline", Key: "session.expires-at.staging" }
                 ? new System.ComponentModel.Win32Exception(5)
                 : null;
-        await store.SaveAsync(new ClineSession("bad-access", "bad-refresh", Now + TimeSpan.FromHours(2)), default);
+        await store.SaveAsync(
+            new ClineSession("bad-access", "bad-refresh", Now + TimeSpan.FromHours(2), AccountFingerprint),
+            default
+        );
 
         // The previous good session must still be intact.
         _secrets.FaultFor = null;
-        ClineSession? loaded = await store.LoadAsync(default);
+        ClineSession? loaded = await store.LoadAsync(AccountFingerprint, default);
         Assert.NotNull(loaded);
         Assert.Equal("good-access", loaded!.AccessToken);
         Assert.Equal("good-refresh", loaded.RefreshToken);
@@ -734,7 +781,10 @@ public sealed class ClineTokenRefreshTests : IDisposable
     public async Task A_failed_interrupted_promotion_does_not_expose_a_mixed_session()
     {
         ClineSessionStore store = Store();
-        await store.SaveAsync(new ClineSession("old-access", "old-refresh", Now + TimeSpan.FromHours(1)), default);
+        await store.SaveAsync(
+            new ClineSession("old-access", "old-refresh", Now + TimeSpan.FromHours(1), AccountFingerprint),
+            default
+        );
 
         // Fail the live refresh-token promotion after the new access token and
         // expiry have already been promoted. The commit marker and staging
@@ -743,12 +793,15 @@ public sealed class ClineTokenRefreshTests : IDisposable
             key is { Scope: "cline", Key: "session.refresh-token" }
                 ? new System.ComponentModel.Win32Exception(5)
                 : null;
-        await store.SaveAsync(new ClineSession("new-access", "new-refresh", Now + TimeSpan.FromHours(2)), default);
+        await store.SaveAsync(
+            new ClineSession("new-access", "new-refresh", Now + TimeSpan.FromHours(2), AccountFingerprint),
+            default
+        );
 
-        Assert.Null(await store.LoadAsync(default));
+        Assert.Null(await store.LoadAsync(AccountFingerprint, default));
 
         _secrets.SetFaultFor = null;
-        ClineSession? recovered = await store.LoadAsync(default);
+        ClineSession? recovered = await store.LoadAsync(AccountFingerprint, default);
         Assert.NotNull(recovered);
         Assert.Equal("new-access", recovered!.AccessToken);
         Assert.Equal("new-refresh", recovered.RefreshToken);
@@ -758,17 +811,23 @@ public sealed class ClineTokenRefreshTests : IDisposable
     public async Task Incomplete_recovery_keeps_the_commit_marker_and_never_exposes_mixed_live_keys()
     {
         ClineSessionStore store = Store();
-        await store.SaveAsync(new ClineSession("old-access", "old-refresh", Now + TimeSpan.FromHours(1)), default);
+        await store.SaveAsync(
+            new ClineSession("old-access", "old-refresh", Now + TimeSpan.FromHours(1), AccountFingerprint),
+            default
+        );
         _secrets.SetFaultFor = key =>
             key is { Scope: "cline", Key: "session.refresh-token" }
                 ? new System.ComponentModel.Win32Exception(5)
                 : null;
-        await store.SaveAsync(new ClineSession("new-access", "new-refresh", Now + TimeSpan.FromHours(2)), default);
+        await store.SaveAsync(
+            new ClineSession("new-access", "new-refresh", Now + TimeSpan.FromHours(2), AccountFingerprint),
+            default
+        );
         await _secrets.DeleteAsync("cline", "session.refresh-token.staging", default);
         _secrets.SetFaultFor = null;
 
-        Assert.Null(await store.LoadAsync(default));
-        Assert.Null(await store.LoadAsync(default));
+        Assert.Null(await store.LoadAsync(AccountFingerprint, default));
+        Assert.Null(await store.LoadAsync(AccountFingerprint, default));
         Assert.Contains(_secrets.Keys, key => key is { Scope: "cline", Key: "session.commit" });
     }
 
@@ -778,19 +837,19 @@ public sealed class ClineTokenRefreshTests : IDisposable
         _secrets.Fault = new System.ComponentModel.Win32Exception(5);
 
         ClineSessionStore store = Store();
-        await store.SaveAsync(new ClineSession("t", "r", Now), default);
+        await store.SaveAsync(new ClineSession("t", "r", Now, AccountFingerprint), default);
 
-        Assert.Null(await store.LoadAsync(default));
+        Assert.Null(await store.LoadAsync(AccountFingerprint, default));
     }
 
     [Fact]
     public async Task Dropping_a_refresh_token_clears_the_stored_one()
     {
         ClineSessionStore store = Store();
-        await store.SaveAsync(new ClineSession("first", "rotating-refresh", Now), default);
-        await store.SaveAsync(new ClineSession("second", null, Now), default);
+        await store.SaveAsync(new ClineSession("first", "rotating-refresh", Now, AccountFingerprint), default);
+        await store.SaveAsync(new ClineSession("second", null, Now, AccountFingerprint), default);
 
-        ClineSession? loaded = await store.LoadAsync(default);
+        ClineSession? loaded = await store.LoadAsync(AccountFingerprint, default);
 
         Assert.NotNull(loaded);
         Assert.Equal("second", loaded!.AccessToken);

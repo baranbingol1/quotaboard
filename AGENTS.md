@@ -107,8 +107,27 @@ Before you finish a behavior change:
 
 1. `dotnet csharpier check src tests`
 2. The relevant `dotnet test` project(s) above
-3. `./scripts/invoke-quality-gates.ps1 -SkipFormat` if you changed scripts
-   or added sizeable source
+3. `./scripts/invoke-quality-gates.ps1 -SkipFormat`
+
+Step 3 is the same Quality gates job GitHub Actions runs. It checks file
+size, cyclomatic complexity (limit 40), tech-debt markers, unused
+packages, and duplicate code. Do not skip it because the source change
+looks small. The estimator is brace-based: an expression-bodied method
+or a `{` inside a string can merge later methods into one score.
+
+Before you push a branch or update a PR, run the same two CI jobs
+locally and wait for both to pass:
+
+```powershell
+dotnet csharpier check src tests
+./scripts/invoke-quality-gates.ps1 -SkipFormat
+dotnet test tests/AiLimits.Tests/AiLimits.Tests.csproj --configuration Release
+dotnet test tests/AiLimits.IntegrationTests/AiLimits.IntegrationTests.csproj --configuration Release
+```
+
+Do not push if either job fails. A green focused filter is not enough.
+`.githooks/pre-commit` runs the quality script with `-Quick`; that is a
+safety net, not a substitute for the full local CI pair above.
 
 A publish is required only when the change needs a running window
 (`./scripts/publish-ai-limits.ps1` then `explorer ./app/win-x64/QuotaBoard.exe`).

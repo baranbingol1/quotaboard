@@ -46,16 +46,6 @@ public static class BuiltInProviderDescriptors
         new string[] { "Existing Factory CLI session", "Local Droid logs", "Optional API key" }
     );
 
-    public static readonly ProviderDescriptor Copilot = new ProviderDescriptor(
-        new ProviderId("copilot"),
-        "GitHub Copilot",
-        ProviderColors.Copilot,
-        SupportsMultipleAccounts: true,
-        SupportsExactTokens: false,
-        "Quota and reported AI-credit cost only; no personal token inference.",
-        new string[] { "GitHub device authorization" }
-    );
-
     public static readonly ProviderDescriptor Amp = new(
         new ProviderId("amp"),
         "Amp",
@@ -97,5 +87,5 @@ public static class BuiltInProviderDescriptors
     );
 
     public static IReadOnlyList<ProviderDescriptor> All { get; } =
-        new ProviderDescriptor[] { Codex, Claude, OpenCode, Droid, Copilot, Amp, Antigravity, Cursor, Cline };
+        new ProviderDescriptor[] { Codex, Claude, OpenCode, Droid, Amp, Antigravity, Cursor, Cline };
 }

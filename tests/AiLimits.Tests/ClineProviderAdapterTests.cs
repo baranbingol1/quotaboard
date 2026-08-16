@@ -113,6 +113,7 @@ public sealed class ClineProviderAdapterTests
         Assert.Equal("opaque-token", credential.Token);
         Assert.Equal("Cline CLI account", credential.SourceLabel);
         Assert.False(credential.IsWorkOsSession);
+        Assert.Null(credential.AccountFingerprint);
     }
 
     [Fact]
@@ -135,6 +136,104 @@ public sealed class ClineProviderAdapterTests
         Assert.Equal("Cline CLI account", credential.SourceLabel);
         Assert.True(credential.IsWorkOsSession);
         Assert.Equal("someone@example.com", credential.Email);
+        Assert.Null(credential.AccountFingerprint);
+        Assert.Null(credential.BillingScope);
+    }
+
+    [Fact]
+    public void Session_fingerprint_prefers_normalized_user_id_over_email()
+    {
+        using var temp = new TempDir();
+        string firstPath = Path.Combine(temp.Path, "first.json");
+        string secondPath = Path.Combine(temp.Path, "second.json");
+        string emailOnlyPath = Path.Combine(temp.Path, "email-only.json");
+        WriteSession(firstPath, " User-123 ", "first@example.com", personal: true);
+        WriteSession(secondPath, "user-123", "second@example.com", personal: true);
+        WriteSession(emailOnlyPath, null, "first@example.com", personal: true);
+
+        ClineCredential first = Assert.IsType<ClineCredential>(ClineCredentialReader.ResolveSecrets(firstPath));
+        ClineCredential second = Assert.IsType<ClineCredential>(ClineCredentialReader.ResolveSecrets(secondPath));
+        ClineCredential emailOnly = Assert.IsType<ClineCredential>(ClineCredentialReader.ResolveSecrets(emailOnlyPath));
+
+        Assert.Equal(first.AccountFingerprint, second.AccountFingerprint);
+        Assert.NotEqual(first.AccountFingerprint, emailOnly.AccountFingerprint);
+        Assert.Equal(ClineBillingScope.Personal.Instance, first.BillingScope);
+    }
+
+    [Fact]
+    public void Session_fingerprint_changes_when_the_active_organization_changes()
+    {
+        using var temp = new TempDir();
+        string orgAPath = Path.Combine(temp.Path, "org-a.json");
+        string orgBPath = Path.Combine(temp.Path, "org-b.json");
+        string personalPath = Path.Combine(temp.Path, "personal.json");
+        string unknownPath = Path.Combine(temp.Path, "unknown.json");
+        WriteSession(orgAPath, "user-123", "same@example.com", organizationId: "org-a");
+        WriteSession(orgBPath, "user-123", "same@example.com", organizationId: "org-b");
+        WriteSession(personalPath, "user-123", "same@example.com", personal: true);
+        WriteSession(unknownPath, "user-123", "same@example.com");
+
+        ClineCredential orgA = Assert.IsType<ClineCredential>(ClineCredentialReader.ResolveSecrets(orgAPath));
+        ClineCredential orgB = Assert.IsType<ClineCredential>(ClineCredentialReader.ResolveSecrets(orgBPath));
+        ClineCredential personal = Assert.IsType<ClineCredential>(ClineCredentialReader.ResolveSecrets(personalPath));
+        ClineCredential unknown = Assert.IsType<ClineCredential>(ClineCredentialReader.ResolveSecrets(unknownPath));
+
+        Assert.NotEqual(orgA.AccountFingerprint, orgB.AccountFingerprint);
+        Assert.NotEqual(orgA.AccountFingerprint, personal.AccountFingerprint);
+        Assert.NotEqual(orgB.AccountFingerprint, personal.AccountFingerprint);
+        Assert.Null(unknown.AccountFingerprint);
+        Assert.Equal(new ClineBillingScope.Organization("org-a"), orgA.BillingScope);
+        Assert.Equal(new ClineBillingScope.Organization("org-b"), orgB.BillingScope);
+        Assert.Equal(ClineBillingScope.Personal.Instance, personal.BillingScope);
+        Assert.DoesNotContain("same@example.com", orgA.AccountFingerprint, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("org-a", orgA.AccountFingerprint, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Providers_json_organization_id_overrides_an_empty_session_organization_list()
+    {
+        using var temp = new TempDir();
+        string secretsPath = Path.Combine(temp.Path, "secrets.json");
+        string providersPath = Path.Combine(temp.Path, "providers.json");
+        WriteSession(secretsPath, "user-123", "same@example.com", personal: true);
+        File.WriteAllText(
+            providersPath,
+            """
+            {"providers":{"cline":{"settings":{"auth":{"accountId":"user-123","organizationId":"org-from-providers"}}}}}
+            """
+        );
+
+        ClineCredential credential = Assert.IsType<ClineCredential>(
+            ClineCredentialReader.ResolveSecrets(secretsPath, providersPath)
+        );
+
+        Assert.Equal(new ClineBillingScope.Organization("org-from-providers"), credential.BillingScope);
+        Assert.False(string.IsNullOrWhiteSpace(credential.AccountFingerprint));
+        Assert.Equal("Cline CLI account (organization)", credential.SourceLabel);
+    }
+
+    [Fact]
+    public async Task Organization_switch_changes_auth_source_so_discovery_bumps_revision()
+    {
+        var adapter = new ClineProviderAdapter(
+            new HttpClient(),
+            new FixedClock(),
+            roots: [],
+            credentialProbe: () =>
+                new ClineCredential(
+                    "header.payload.signature",
+                    "Cline CLI account (organization)",
+                    IsWorkOsSession: true,
+                    Email: "same@example.com",
+                    AccountFingerprint: "org-b-fingerprint",
+                    BillingScope: new ClineBillingScope.Organization("org-b")
+                )
+        );
+
+        ProviderAccount account = Assert.Single(await adapter.DiscoverAccountsAsync(default));
+
+        Assert.Equal("same@example.com", account.Login);
+        Assert.Equal("Cline CLI account (organization)", account.AuthSource);
     }
 
     [Fact]
@@ -206,6 +305,42 @@ public sealed class ClineProviderAdapterTests
     private sealed class FixedClock : IClock
     {
         public DateTimeOffset UtcNow => new(2026, 7, 16, 12, 0, 0, TimeSpan.Zero);
+    }
+
+    private static void WriteSession(
+        string path,
+        string? id,
+        string email,
+        string? organizationId = null,
+        bool personal = false
+    )
+    {
+        object userInfo =
+            personal
+                ? new
+                {
+                    id,
+                    email,
+                    organizations = Array.Empty<object>(),
+                }
+            : organizationId is null ? new { id, email }
+            : new
+            {
+                id,
+                email,
+                organizations = new object[]
+                {
+                    new
+                    {
+                        organizationId,
+                        active = true,
+                        name = organizationId,
+                    },
+                },
+            };
+        string blob =
+            "{\"idToken\":\"header.payload.signature\",\"userInfo\":" + JsonSerializer.Serialize(userInfo) + "}";
+        File.WriteAllText(path, "{\"cline:clineAccountId\":" + JsonSerializer.Serialize(blob) + "}");
     }
 
     private sealed class TempDir : IDisposable

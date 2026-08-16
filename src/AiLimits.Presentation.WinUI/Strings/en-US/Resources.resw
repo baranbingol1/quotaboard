@@ -423,7 +423,6 @@
   <data name="Data_OpenCodeCoverage" xml:space="preserve"><value>Usage is attributed to each model vendor. No OpenCode Go or Zen subscription is assumed.</value></data>
   <data name="Data_ExactLocalTokens" xml:space="preserve"><value>Exact local tokens</value></data>
   <data name="Data_ViewUsageOn" xml:space="preserve"><value>{0} usage</value></data>
-  <data name="Data_ViewCopilotSettings" xml:space="preserve"><value>Copilot settings</value></data>
   <data name="Data_FreshVia" xml:space="preserve"><value>Fresh · {0}</value></data>
   <data name="Data_SignInRequiredAge" xml:space="preserve"><value>Sign-in required · {0}</value></data>
   <data name="Data_CachedAge" xml:space="preserve"><value>Cached · {0}</value></data>
@@ -451,12 +450,10 @@
   <data name="Data_AuthClaude" xml:space="preserve"><value>Claude OAuth / API key</value></data>
   <data name="Data_AuthOpenCode" xml:space="preserve"><value>Local OpenCode history</value></data>
   <data name="Data_AuthDroid" xml:space="preserve"><value>Factory CLI session</value></data>
-  <data name="Data_AuthCopilot" xml:space="preserve"><value>GitHub account / Copilot API</value></data>
   <data name="Data_CoverageCodex" xml:space="preserve"><value>Quota limits and exact local Codex tokens</value></data>
   <data name="Data_CoverageClaude" xml:space="preserve"><value>Quota limits and exact local Claude tokens</value></data>
   <data name="Data_CoverageOpenCode" xml:space="preserve"><value>Exact local tokens attributed to each model vendor</value></data>
   <data name="Data_CoverageDroid" xml:space="preserve"><value>Factory quota limits and exact local Droid tokens</value></data>
-  <data name="Data_CoverageCopilot" xml:space="preserve"><value>Copilot quota limits and exact local usage when available</value></data>
   <data name="Meter_PercentUsed" xml:space="preserve"><value>{0:0.#}% used</value></data>
   <data name="Meter_MeasureUsed" xml:space="preserve"><value>{0} used</value></data>
   <data name="Meter_PercentRemaining" xml:space="preserve"><value>{0:0.#}% remaining</value></data>
@@ -508,7 +505,6 @@
   <data name="Runtime_AuthClaude" xml:space="preserve"><value>Claude Code OAuth</value></data>
   <data name="Runtime_AuthOpenCode" xml:space="preserve"><value>Local usage history</value></data>
   <data name="Runtime_AuthDroid" xml:space="preserve"><value>Factory CLI session / optional API key</value></data>
-  <data name="Runtime_AuthCopilot" xml:space="preserve"><value>GitHub device authorization</value></data>
   <data name="Runtime_AuthOpenCodeMetadata" xml:space="preserve"><value>Local history + provider auth metadata</value></data>
   <data name="Runtime_AuthOpenCodeDatabase" xml:space="preserve"><value>Local usage database</value></data>
   <data name="Runtime_AuthDroidSession" xml:space="preserve"><value>Factory CLI session</value></data>

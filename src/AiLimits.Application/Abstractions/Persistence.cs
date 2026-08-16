@@ -16,12 +16,22 @@ public interface IAccountRepository
 
 public interface ISnapshotRepository
 {
-    Task<ProviderSnapshot?> GetLatestAsync(AccountKey account, CancellationToken cancellationToken);
+    Task<ProviderSnapshot?> GetLatestAsync(
+        AccountKey account,
+        long configurationRevision,
+        CancellationToken cancellationToken
+    );
 
-    Task SaveAsync(ProviderSnapshot snapshot, long generation, CancellationToken cancellationToken);
+    Task SaveAsync(
+        ProviderSnapshot snapshot,
+        long generation,
+        long configurationRevision,
+        CancellationToken cancellationToken
+    );
 
     Task<IReadOnlyList<ProviderSnapshot>> GetHistoryAsync(
         AccountKey account,
+        long configurationRevision,
         DateTimeOffset from,
         CancellationToken cancellationToken
     );

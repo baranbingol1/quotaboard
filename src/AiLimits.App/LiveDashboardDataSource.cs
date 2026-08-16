@@ -28,7 +28,6 @@ using AiLimits.Infrastructure.Providers.Claude;
 using AiLimits.Infrastructure.Providers.Cline;
 using AiLimits.Infrastructure.Providers.Codex;
 using AiLimits.Infrastructure.Providers.Common;
-using AiLimits.Infrastructure.Providers.Copilot;
 using AiLimits.Infrastructure.Providers.Cursor;
 using AiLimits.Infrastructure.Providers.Droid;
 using AiLimits.Infrastructure.Providers.OpenCode;
@@ -190,7 +189,6 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                 new OpenCodeProviderAdapter(pathDiscovery),
                 new DroidProviderAdapter(_httpClient, _clock),
                 new AmpProviderAdapter(_httpClient, _clock, processRunner),
-                new CopilotProviderAdapter(_httpClient, _clock),
                 new AgyProviderAdapter(_clock),
                 new CursorProviderAdapter(
                     _cursorHttpClient,
@@ -688,7 +686,8 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             .ToArray();
         Dictionary<AccountKey, Task<ProviderSnapshot>> snapshotTasks = accounts.ToDictionary(
             (ProviderAccount account) => account.Key,
-            (ProviderAccount account) => _snapshots.GetLatestAsync(account.Key, cancellationToken)
+            (ProviderAccount account) =>
+                _snapshots.GetLatestAsync(account.Key, account.ConfigurationRevision, cancellationToken)
         );
         await Task.WhenAll(snapshotTasks.Values).ConfigureAwait(false);
         Dictionary<AccountKey, ProviderSnapshot> latest = snapshotTasks.ToDictionary(
@@ -1787,7 +1786,6 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
             "droid" => (F("Data_ViewUsageOn", "Factory"), "uri", "https://app.factory.ai/settings/usage"),
             "amp" => (F("Data_ViewUsageOn", "Amp"), "uri", "https://ampcode.com/settings/usage"),
             "cline" => (F("Data_ViewUsageOn", "Cline"), "uri", "https://app.cline.bot/dashboard/subscription"),
-            "copilot" => (L("Data_ViewCopilotSettings"), "uri", "https://github.com/settings/copilot"),
             "cursor" => (F("Data_ViewUsageOn", "Cursor"), "uri", "https://cursor.com/dashboard?tab=usage"),
             _ => ("", "", ""),
         };
@@ -2070,7 +2068,6 @@ private static string Health(ProviderAccount account, ProviderSnapshot? snapshot
             "codex" => row.ViewModel.AuthProvider is "OpenAI (Codex)" or "OpenAI (ChatGPT OAuth)",
             "claude" => row.ViewModel.AuthProvider is "Anthropic (Claude Code)",
             "droid" => row.ViewModel.Source == "Droid",
-            "copilot" => row.ViewModel.AuthProvider == "GitHub Copilot",
             _ => false,
         };
     }
@@ -2127,7 +2124,6 @@ private static string Health(ProviderAccount account, ProviderSnapshot? snapshot
             "claude" => L("Data_AuthClaude"),
             "opencode" => L("Data_AuthOpenCode"),
             "droid" => L("Data_AuthDroid"),
-            "copilot" => L("Data_AuthCopilot"),
             "amp" => L("Data_AuthAmp"),
             "cursor" => L("Data_AuthCursor"),
             _ => string.Empty,
@@ -2140,7 +2136,6 @@ private static string Health(ProviderAccount account, ProviderSnapshot? snapshot
             "claude" => L("Data_CoverageClaude"),
             "opencode" => L("Data_CoverageOpenCode"),
             "droid" => L("Data_CoverageDroid"),
-            "copilot" => L("Data_CoverageCopilot"),
             "amp" => L("Data_CoverageAmp"),
             "cursor" => L("Data_CoverageCursor"),
             _ => string.Empty,
