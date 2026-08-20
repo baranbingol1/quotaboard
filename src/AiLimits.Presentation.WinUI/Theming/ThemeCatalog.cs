@@ -69,32 +69,35 @@ public static class ThemeCatalog
         }
     );
 
+    // Macchiato is one of Catppuccin's dark flavours; upstream pairs every dark
+    // flavour with Latte, the palette's only light one. The light column below is
+    // Latte, matching the Catppuccin entry above.
     public static readonly ThemePalette Catppuccinmacchiato = new(
         "catppuccin-macchiato",
         "Catppuccin Macchiato",
-        new("#8aadf4", "#8aadf4"),
-        new("#c6a0f6", "#c6a0f6"),
-        new("#f5bde6", "#f5bde6"),
-        new("#24273a", "#24273a"),
-        new("#1e2030", "#1e2030"),
-        new("#181926", "#181926"),
-        new("#cad3f5", "#cad3f5"),
-        new("#939ab7", "#939ab7"),
-        new("#363a4f", "#363a4f"),
-        new("#494d64", "#494d64"),
-        new("#5b6078", "#5b6078"),
-        new("#a6da95", "#a6da95"),
-        new("#eed49f", "#eed49f"),
-        new("#ed8796", "#ed8796"),
-        new("#8bd5ca", "#8bd5ca"),
+        new("#8aadf4", "#1e66f5"),
+        new("#c6a0f6", "#8839ef"),
+        new("#f5bde6", "#ea76cb"),
+        new("#24273a", "#eff1f5"),
+        new("#1e2030", "#e6e9ef"),
+        new("#181926", "#dce0e8"),
+        new("#cad3f5", "#4c4f69"),
+        new("#939ab7", "#636679"),
+        new("#363a4f", "#ccd0da"),
+        new("#494d64", "#bcc0cc"),
+        new("#5b6078", "#acb0be"),
+        new("#a6da95", "#40a02b"),
+        new("#eed49f", "#df8e1d"),
+        new("#ed8796", "#d20f39"),
+        new("#8bd5ca", "#179299"),
         new ThemeColor[]
         {
-            new("#8aadf4", "#8aadf4"),
-            new("#a6da95", "#a6da95"),
-            new("#f5bde6", "#f5bde6"),
-            new("#c6a0f6", "#c6a0f6"),
-            new("#eed49f", "#eed49f"),
-            new("#ed8796", "#ed8796"),
+            new("#8aadf4", "#1e66f5"),
+            new("#a6da95", "#40a02b"),
+            new("#f5bde6", "#ea76cb"),
+            new("#c6a0f6", "#8839ef"),
+            new("#eed49f", "#df8e1d"),
+            new("#ed8796", "#d20f39"),
         }
     );
 
@@ -127,31 +130,34 @@ public static class ThemeCatalog
         }
     );
 
+    // Nord ships no official light variant: the light column keeps the Snow Storm
+    // greys upstream uses for light surfaces and darkens Frost/Aurora until each
+    // role clears ~3.5:1 on that background.
     public static readonly ThemePalette Nord = new(
         "nord",
         "Nord",
         new("#88C0D0", "#5E81AC"),
-        new("#81A1C1", "#81A1C1"),
-        new("#8FBCBB", "#8FBCBB"),
+        new("#81A1C1", "#5681AC"),
+        new("#8FBCBB", "#518785"),
         new("#2E3440", "#ECEFF4"),
         new("#3B4252", "#E5E9F0"),
         new("#434C5E", "#D8DEE9"),
         new("#ECEFF4", "#2E3440"),
         new("#8B95A7", "#3B4252"),
-        new("#434C5E", "#4C566A"),
-        new("#4C566A", "#434C5E"),
-        new("#434C5E", "#4C566A"),
-        new("#A3BE8C", "#A3BE8C"),
-        new("#D08770", "#D08770"),
+        new("#434C5E", "#C2CAD6"),
+        new("#4C566A", "#8A94A6"),
+        new("#434C5E", "#D5DCE6"),
+        new("#A3BE8C", "#67874C"),
+        new("#D08770", "#C26345"),
         new("#BF616A", "#BF616A"),
         new("#88C0D0", "#5E81AC"),
         new ThemeColor[]
         {
             new("#88C0D0", "#5E81AC"),
-            new("#A3BE8C", "#A3BE8C"),
-            new("#EBCB8B", "#EBCB8B"),
-            new("#81A1C1", "#81A1C1"),
-            new("#D08770", "#D08770"),
+            new("#A3BE8C", "#67874C"),
+            new("#EBCB8B", "#C38D22"),
+            new("#81A1C1", "#8A5F82"),
+            new("#D08770", "#C26345"),
             new("#BF616A", "#BF616A"),
         }
     );
@@ -185,61 +191,65 @@ public static class ThemeCatalog
         }
     );
 
+    // Light column is Kanagawa Lotus, the palette's official light variant.
     public static readonly ThemePalette Kanagawa = new(
         "kanagawa",
         "Kanagawa",
         new("#7E9CD8", "#2D4F67"),
-        new("#957FB8", "#957FB8"),
-        new("#D27E99", "#D27E99"),
+        new("#957FB8", "#624C83"),
+        new("#D27E99", "#B35B79"),
         new("#1F1F28", "#F2E9DE"),
         new("#2A2A37", "#EAE4D7"),
         new("#363646", "#E3DCD2"),
         new("#DCD7BA", "#54433A"),
-        new("#727169", "#9E9389"),
+        new("#727169", "#6C6A5D"),
         new("#54546D", "#D4CBBF"),
-        new("#C38D9D", "#C38D9D"),
+        new("#C38D9D", "#B35B79"),
         new("#363646", "#DCD4C9"),
-        new("#98BB6C", "#98BB6C"),
-        new("#D7A657", "#D7A657"),
-        new("#E82424", "#E82424"),
-        new("#76946A", "#76946A"),
+        new("#98BB6C", "#69824A"),
+        new("#D7A657", "#BC6400"),
+        new("#E82424", "#C84053"),
+        new("#76946A", "#498297"),
         new ThemeColor[]
         {
             new("#7E9CD8", "#2D4F67"),
-            new("#98BB6C", "#98BB6C"),
-            new("#D27E99", "#D27E99"),
-            new("#957FB8", "#957FB8"),
-            new("#D7A657", "#D7A657"),
-            new("#E82424", "#E82424"),
+            new("#98BB6C", "#69824A"),
+            new("#D27E99", "#B35B79"),
+            new("#957FB8", "#624C83"),
+            new("#D7A657", "#BC6400"),
+            new("#E82424", "#C84053"),
         }
     );
 
+    // Light column is Ayu Light (ayu-colors "light" flavour), with the syntax and
+    // accent hues darkened where the stock values fall below ~3.5:1 on its near-white
+    // background.
     public static readonly ThemePalette Ayu = new(
         "ayu",
         "Ayu",
-        new("#59C2FF", "#59C2FF"),
-        new("#D2A6FF", "#D2A6FF"),
-        new("#E6B450", "#E6B450"),
-        new("#0B0E14", "#0B0E14"),
-        new("#0F131A", "#0F131A"),
-        new("#0D1017", "#0D1017"),
-        new("#BFBDB6", "#BFBDB6"),
-        new("#565B66", "#565B66"),
-        new("#6C7380", "#6C7380"),
-        new("#6C7380", "#6C7380"),
-        new("#11151C", "#11151C"),
-        new("#7FD962", "#7FD962"),
-        new("#E6B673", "#E6B673"),
-        new("#D95757", "#D95757"),
-        new("#39BAE6", "#39BAE6"),
+        new("#59C2FF", "#1C8BDB"),
+        new("#D2A6FF", "#9E73C9"),
+        new("#E6B450", "#C47200"),
+        new("#0B0E14", "#FCFCFC"),
+        new("#0F131A", "#F3F4F5"),
+        new("#0D1017", "#E9EBEC"),
+        new("#BFBDB6", "#5C6166"),
+        new("#565B66", "#6E757E"),
+        new("#6C7380", "#D3D6DA"),
+        new("#6C7380", "#A8AEB6"),
+        new("#11151C", "#E6E8EA"),
+        new("#7FD962", "#6E9300"),
+        new("#E6B673", "#DE6106"),
+        new("#D95757", "#E65050"),
+        new("#39BAE6", "#2D90B2"),
         new ThemeColor[]
         {
-            new("#59C2FF", "#59C2FF"),
-            new("#7FD962", "#7FD962"),
-            new("#E6B450", "#E6B450"),
-            new("#D2A6FF", "#D2A6FF"),
-            new("#95E6CB", "#95E6CB"),
-            new("#D95757", "#D95757"),
+            new("#59C2FF", "#1C8BDB"),
+            new("#7FD962", "#64B33D"),
+            new("#E6B450", "#C47200"),
+            new("#D2A6FF", "#9E73C9"),
+            new("#95E6CB", "#40B38D"),
+            new("#D95757", "#E65050"),
         }
     );
 
@@ -272,32 +282,34 @@ public static class ThemeCatalog
         }
     );
 
+    // Light column keeps the phosphor-green identity but drops it onto paper: the
+    // neon greens, lime and cyan are far too pale to read on a light background.
     public static readonly ThemePalette Matrix = new(
         "matrix",
         "Matrix",
-        new("#2eff6a", "#1cc24b"),
-        new("#00efff", "#24f6d9"),
-        new("#c770ff", "#c770ff"),
+        new("#2eff6a", "#159339"),
+        new("#00efff", "#06907d"),
+        new("#c770ff", "#8f2fcc"),
         new("#0a0e0a", "#eef3ea"),
         new("#0e130d", "#e4ebe1"),
         new("#141c12", "#dae1d7"),
         new("#62ff94", "#203022"),
-        new("#8ca391", "#748476"),
-        new("#1e2a1b", "#748476"),
-        new("#2eff6a", "#1cc24b"),
+        new("#8ca391", "#5f6f62"),
+        new("#1e2a1b", "#c3cfbf"),
+        new("#2eff6a", "#159339"),
         new("#141c12", "#dae1d7"),
-        new("#62ff94", "#1cc24b"),
-        new("#e6ff57", "#e6ff57"),
-        new("#ff4b4b", "#ff4b4b"),
-        new("#30b3ff", "#30b3ff"),
+        new("#62ff94", "#159339"),
+        new("#e6ff57", "#748900"),
+        new("#ff4b4b", "#c62828"),
+        new("#30b3ff", "#0084d1"),
         new ThemeColor[]
         {
-            new("#2eff6a", "#1cc24b"),
-            new("#62ff94", "#1cc24b"),
-            new("#c770ff", "#c770ff"),
-            new("#00efff", "#24f6d9"),
-            new("#e6ff57", "#e6ff57"),
-            new("#ff4b4b", "#ff4b4b"),
+            new("#2eff6a", "#159339"),
+            new("#62ff94", "#3fa85c"),
+            new("#c770ff", "#8f2fcc"),
+            new("#00efff", "#06907d"),
+            new("#e6ff57", "#748900"),
+            new("#ff4b4b", "#c62828"),
         },
         ContentFontId: "cascadia-mono"
     );
