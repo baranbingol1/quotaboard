@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+﻿// SPDX-License-Identifier: Apache-2.0
 using System.Globalization;
 using AiLimits.Domain;
 using AiLimits.Presentation.WinUI.ViewModels;

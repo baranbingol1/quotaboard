@@ -6,6 +6,9 @@ using Microsoft.Win32.SafeHandles;
 
 namespace AiLimits.Infrastructure.Providers.Antigravity;
 
+/// <summary>A loopback port an <c>agy</c> process is listening on.</summary>
+internal readonly record struct AgyListener(int ProcessId, int Port);
+
 internal sealed class AgyProcessDiscovery
 {
     private const int AddressFamilyInterNetwork = 2;
@@ -14,9 +17,21 @@ internal sealed class AgyProcessDiscovery
 
     public IReadOnlyList<int> FindListeningPorts()
     {
+        return FindListeners().Select(listener => listener.Port).Distinct().Order().ToArray();
+    }
+
+    /// <summary>
+    /// Every loopback port owned by an <c>agy</c> process this user started.
+    ///
+    /// The pid travels with the port because the CLI session has to tell a
+    /// process it launched itself from one the user is already running: only
+    /// the former may be shut down when the warm window expires.
+    /// </summary>
+    public IReadOnlyList<AgyListener> FindListeners()
+    {
         if (!OperatingSystem.IsWindows())
         {
-            return Array.Empty<int>();
+            return Array.Empty<AgyListener>();
         }
 
         HashSet<int> agyProcessIds = new();
@@ -32,14 +47,14 @@ internal sealed class AgyProcessDiscovery
         }
         if (agyProcessIds.Count == 0)
         {
-            return Array.Empty<int>();
+            return Array.Empty<AgyListener>();
         }
 
         return ReadTcpListeners()
             .Where(listener => agyProcessIds.Contains(listener.ProcessId))
-            .Select(listener => listener.Port)
+            .Select(listener => new AgyListener(listener.ProcessId, listener.Port))
             .Distinct()
-            .Order()
+            .OrderBy(listener => listener.Port)
             .ToArray();
     }
 

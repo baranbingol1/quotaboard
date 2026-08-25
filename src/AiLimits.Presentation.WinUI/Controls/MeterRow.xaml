@@ -51,6 +51,19 @@
             <TextBlock Grid.Column="1" Text="{Binding DisplayResetLabel}" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}"
                        TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{Binding DisplayResetLabel}" />
         </Grid>
+
+        <!-- Burn-rate projection over the meter's own reset window. Collapsed
+             whenever the policy cannot produce a meaningful projection. -->
+        <TextBlock
+            Grid.Row="3"
+            Grid.ColumnSpan="2"
+            Margin="0,4,0,0"
+            Text="{Binding PaceLabel}"
+            Visibility="{Binding PaceVisibility}"
+            FontSize="12"
+            Foreground="{ThemeResource TextSecondaryBrush}"
+            TextTrimming="CharacterEllipsis"
+            ToolTipService.ToolTip="{Binding PaceLabel}" />
     </Grid>
 </UserControl>
 

@@ -228,9 +228,15 @@
   <data name="Settings_NoProviders.Text" xml:space="preserve"><value>No connected providers detected yet. Refresh live data on Overview first.</value></data>
   <data name="Settings_Alerts.Text" xml:space="preserve"><value>Alerts</value></data>
   <data name="Settings_QuotaAlertsLabel.Text" xml:space="preserve"><value>Quota alerts</value></data>
-  <data name="Settings_QuotaAlertsDescription.Text" xml:space="preserve"><value>Notify at 80%, 95%, and 30 minutes before reset</value></data>
+  <data name="Settings_QuotaAlertsDescription.Text" xml:space="preserve"><value>Notify as usage crosses your thresholds and before a quota resets</value></data>
   <data name="Settings_AlertsToggle.OffContent" xml:space="preserve"><value>Off</value></data>
   <data name="Settings_AlertsToggle.OnContent" xml:space="preserve"><value>On</value></data>
+  <data name="Settings_AlertWarnLabel.Text" xml:space="preserve"><value>Warn threshold (%)</value></data>
+  <data name="Settings_AlertWarnDescription.Text" xml:space="preserve"><value>First notification when usage crosses this share of the limit</value></data>
+  <data name="Settings_AlertCriticalLabel.Text" xml:space="preserve"><value>Critical threshold (%)</value></data>
+  <data name="Settings_AlertCriticalDescription.Text" xml:space="preserve"><value>Second notification when usage crosses this share of the limit</value></data>
+  <data name="Settings_AlertResetLabel.Text" xml:space="preserve"><value>Reset reminder (minutes)</value></data>
+  <data name="Settings_AlertResetDescription.Text" xml:space="preserve"><value>Notify this many minutes before a quota resets; 0 turns the reminder off</value></data>
   <data name="Settings_AlertDedup.Message" xml:space="preserve"><value>Each provider, account, meter, threshold, and reset cycle notifies exactly once.</value></data>
   <data name="Settings_Privacy.Text" xml:space="preserve"><value>Privacy</value></data>
   <data name="Settings_BlurEmailsLabel.Text" xml:space="preserve"><value>Blur account emails</value></data>
@@ -242,6 +248,11 @@
   <data name="Usage_Title.Text" xml:space="preserve"><value>Filter and break down your usage.</value></data>
   <data name="Usage_QuerySummary.Text" xml:space="preserve"><value>Last 30 days · all activity</value></data>
   <data name="Usage_ResetQuery.Content" xml:space="preserve"><value>Reset query</value></data>
+  <data name="Usage_Export.Content" xml:space="preserve"><value>Export</value></data>
+  <data name="Usage_Export.AutomationProperties.Name" xml:space="preserve"><value>Export the matching usage rows</value></data>
+  <data name="Usage_ExportCsvType" xml:space="preserve"><value>CSV (comma-separated)</value></data>
+  <data name="Usage_ExportJsonType" xml:space="preserve"><value>JSON</value></data>
+  <data name="Usage_ExportFailed" xml:space="preserve"><value>Export failed: {0}</value></data>
   <data name="Usage_RefreshData.Content" xml:space="preserve"><value>Refresh data</value></data>
   <data name="Usage_QueryEyebrow.Text" xml:space="preserve"><value>QUERY</value></data>
   <data name="Usage_QueryTitle.Text" xml:space="preserve"><value>Filter the ledger</value></data>
@@ -343,6 +354,7 @@
   <data name="Usage_ComparisonNew" xml:space="preserve"><value>New vs previous period</value></data>
   <data name="Usage_ComparisonNoBaseline" xml:space="preserve"><value>No previous-period baseline</value></data>
   <data name="Usage_ComparisonChange" xml:space="preserve"><value>{0:+0.#;-0.#;0}% vs previous period</value></data>
+  <data name="Usage_ComparisonCostChange" xml:space="preserve"><value>API cost {0:+0.#;-0.#;0}%</value></data>
   <data name="Common_Unknown" xml:space="preserve"><value>Unknown</value></data>
   <data name="Countdown_Now" xml:space="preserve"><value>now</value></data>
   <data name="Countdown_Minutes" xml:space="preserve"><value>in {0}m</value></data>

@@ -45,6 +45,9 @@ GeneratedFiles/
 # Internal design notes. Keep them on disk; do not publish them.
 /docs/
 
+# Generated local knowledge-base output from the repo-wiki skill.
+/repo-wiki/
+
 # OS metadata
 .DS_Store
 Thumbs.db

@@ -94,7 +94,20 @@ public sealed record UsageBreakdownItem(
     double SharePercent
 );
 
-public sealed record UsageComparison(long CurrentTokens, long PreviousTokens, double? PercentChange, bool IsNew);
+/// <summary>
+/// Current window versus the immediately preceding window of the same length.
+/// Token lanes always compare; the API-equivalent cost lanes compare only when
+/// both windows contain at least one priced row.
+/// </summary>
+public sealed record UsageComparison(
+    long CurrentTokens,
+    long PreviousTokens,
+    double? PercentChange,
+    bool IsNew,
+    decimal? CurrentCostUsd = null,
+    decimal? PreviousCostUsd = null,
+    double? CostPercentChange = null
+);
 
 /// <summary>
 /// What the matching rows are actually made of. Distinct from
@@ -146,8 +159,16 @@ public sealed record UsageAnalyticsResult(
     IReadOnlyList<UsageChartLegendItem> ChartLegend,
     IReadOnlyList<UsageBreakdownItem> Breakdown,
     IReadOnlyList<UsageModelTrend> ModelTrends,
-    UsageComposition Composition
-);
+    UsageComposition Composition,
+    IReadOnlyList<UsageAnalyticsRecord>? MatchingRecords = null
+)
+{
+    /// <summary>
+    /// The exact rows behind every aggregate above, honoring every query
+    /// filter. Export surfaces serialize these; nothing else should need them.
+    /// </summary>
+    public IReadOnlyList<UsageAnalyticsRecord> Records => MatchingRecords ?? [];
+}
 
 /// <summary>
 /// Pure, deterministic query engine for the local usage ledger. Empty filter
@@ -199,7 +220,8 @@ public static class UsageAnalyticsQueryEngine
             chart.Legend,
             BuildBreakdown(current, normalized.Breakdown),
             BuildModelTrends(current, chart.Buckets, normalized.TimeGrain),
-            BuildComposition(current, chart.Buckets)
+            BuildComposition(current, chart.Buckets),
+            current
         );
     }
 
@@ -297,10 +319,11 @@ public static class UsageAnalyticsQueryEngine
         DateOnly previousThrough = query.From.AddDays(-1);
         DateOnly previousFrom = previousThrough.AddDays(1 - days);
         long currentTokens = current.Sum(record => record.Tokens);
-        long previousTokens = records
+        UsageAnalyticsRecord[] previous = records
             .Where(record => record.Day >= previousFrom && record.Day <= previousThrough)
             .Where(record => MatchesFilters(record, query, null))
-            .Sum(record => record.Tokens);
+            .ToArray();
+        long previousTokens = previous.Sum(record => record.Tokens);
         bool isNew = previousTokens == 0 && currentTokens > 0;
         double? change =
             previousTokens == 0
@@ -308,7 +331,24 @@ public static class UsageAnalyticsQueryEngine
                     ? 0
                     : null
                 : 100.0 * (currentTokens - previousTokens) / previousTokens;
-        return new UsageComparison(currentTokens, previousTokens, change, isNew);
+        decimal? currentCost = SumCost(current);
+        decimal? previousCost = SumCost(previous);
+        // Cost compares only when both windows priced something: a missing
+        // catalog yesterday is not a 100% drop. Comparable coverage matters
+        // just as much — half-priced tokens this week against fully-priced
+        // tokens last week would render the catalog's blind spot as a spend
+        // cut, which is the opposite of what happened.
+        double? costChange =
+            currentCost is { } nowCost
+            && previousCost is { } thenCost
+            && IsCostComparable(PricedFraction(current), PricedFraction(previous))
+                ? thenCost == 0
+                    ? nowCost == 0
+                        ? 0
+                        : null
+                    : 100.0 * (double)(nowCost - thenCost) / (double)thenCost
+                : null;
+        return new UsageComparison(currentTokens, previousTokens, change, isNew, currentCost, previousCost, costChange);
     }
 
     private static UsageFacetSet BuildFacets(IReadOnlyList<UsageAnalyticsRecord> records, UsageAnalyticsQuery query) =>
@@ -526,6 +566,33 @@ public static class UsageAnalyticsQueryEngine
         IReadOnlyList<UsageChartLegendItem> Legend
     );
 
+    /// <summary>
+    /// How much of a window's tokens carry a price, in [0,1]. Pricing coverage
+    /// is routinely below 100% — models.dev does not price every model — so the
+    /// two windows of a comparison have to be checked against each other rather
+    /// than assumed complete.
+    /// </summary>
+    private static double PricedFraction(IReadOnlyList<UsageAnalyticsRecord> records)
+    {
+        long total = records.Sum(record => record.Tokens);
+        if (total == 0)
+        {
+            return 0.0;
+        }
+        long priced = records.Where(record => record.ApiEquivalentCostUsd.HasValue).Sum(record => record.Tokens);
+        return (double)priced / total;
+    }
+
+    /// <summary>
+    /// Widest coverage gap two windows may have and still be worth comparing.
+    /// Adjacent windows normally price the same models, so a gap this large
+    /// means the catalog changed underneath the user, not their spending.
+    /// </summary>
+    private const double MaxCoverageGap = 0.05;
+
+    private static bool IsCostComparable(double currentCoverage, double previousCoverage) =>
+        Math.Abs(currentCoverage - previousCoverage) <= MaxCoverageGap;
+
     private static decimal? SumCost(IEnumerable<UsageAnalyticsRecord> records)
     {
         UsageAnalyticsRecord[] values = records.ToArray();
@@ -593,5 +660,33 @@ public static class UsageChartLayout
         double barWidth = Math.Clamp(itemWidth * 0.68, 3, 48);
         double consumedWidth = itemWidth * itemCount + gapWidth;
         return new UsageChartGeometry(itemWidth, barWidth, consumedWidth);
+    }
+
+    /// <summary>
+    /// Plot height for a bucket bar. Empty buckets vanish entirely; any
+    /// non-empty bucket stays at least 2 px tall so a day with one tiny
+    /// request is still visible as a sliver.
+    /// </summary>
+    public static double BarHeight(long tokens, long maximum, double plotHeight)
+    {
+        if (tokens <= 0 || maximum <= 0)
+        {
+            return 0;
+        }
+        return Math.Max(2, plotHeight * tokens / maximum);
+    }
+
+    /// <summary>
+    /// Plot height for one stacked segment inside a bucket bar. Unlike whole
+    /// bars, a zero-token segment must collapse to zero height so the stack
+    /// stays honest.
+    /// </summary>
+    public static double SegmentHeight(long tokens, long maximum, double plotHeight)
+    {
+        if (tokens <= 0 || maximum <= 0)
+        {
+            return 0;
+        }
+        return plotHeight * tokens / maximum;
     }
 }

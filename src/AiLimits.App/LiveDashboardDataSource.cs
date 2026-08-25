@@ -57,17 +57,6 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         decimal CacheSavedUsd = 0m
     );
 
-    private static readonly TimeSpan ScanInterval = TimeSpan.FromMinutes(1L);
-
-    /// <summary>
-    /// How many telemetry sources are drained at once. They are I/O bound
-    /// (subprocesses, log files, SQLite reads), so this is about overlapping
-    /// waits, not CPU; it matches the provider fetch batch.
-    /// </summary>
-    private const int MaxScanConcurrency = 4;
-
-    private const int ScanBatchSize = 512;
-
     private readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(25L) };
 
     // Cursor's app-session cookie must never follow a redirect to another host.
@@ -125,22 +114,14 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
 
     private readonly SemaphoreSlim _loadGate = new SemaphoreSlim(1, 1);
 
-    private readonly SemaphoreSlim _usageWriteGate = new SemaphoreSlim(1, 1);
-
     private readonly string _databasePath;
 
     private bool _databaseInitialized;
 
-    private DateTimeOffset? _lastScanAt;
+    private readonly ResetCreditRefreshService _resetCreditRefresh;
 
-    private static readonly TimeSpan ResetCreditsTtl = TimeSpan.FromMinutes(15L);
+    private readonly TelemetryScanService _telemetryScan;
 
-    private readonly Dictionary<AccountKey, ResetCreditInventory?> _resetCredits =
-        new Dictionary<AccountKey, ResetCreditInventory?>();
-
-    private DateTimeOffset? _resetCreditsFetchedAt;
-
-    private bool _scanInFlight;
     private int _scannerCount;
 
     private int _successfulScannerCount;
@@ -153,10 +134,19 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
 
     private TimeSpan? _lastRetryAfterHint;
 
+    private bool _telemetryScanEmittedEvents;
+
     private readonly bool _isolatedEmptyState;
 
     /// <summary>Largest Retry-After any provider reported during the last refresh, if any.</summary>
     public TimeSpan? LastRetryAfterHint => _lastRetryAfterHint;
+
+    /// <summary>
+    /// True when the most recent telemetry scan found new usage rows — a local
+    /// agent was writing. The scheduler reads this after each refresh to cap
+    /// the idle cadence while agents are active.
+    /// </summary>
+    public bool TelemetryScanEmittedEvents => _telemetryScanEmittedEvents;
 
     public LiveDashboardDataSource(bool isolatedEmptyState = false)
     {
@@ -168,11 +158,13 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         _accounts = new SqliteAccountRepository(_database);
         _snapshots = new SqliteSnapshotRepository(_database);
         _usage = new SqliteUsageAggregateRepository(_database);
+        _telemetryScan = new TelemetryScanService(_usage, _clock);
         _providerStatusClient = new ProviderStatusClient(
             _httpClient,
             logger: StartupDiagnostics.CreateLogger<ProviderStatusClient>()
         );
         _providerStatuses = new ProviderStatusCache(_clock);
+        _resetCreditRefresh = new ResetCreditRefreshService(_clock);
         _quotaAlerts = new QuotaAlertMonitor(_database);
         _catalogModelResolver = new CatalogModelResolver(_modelResolver);
         if (isolatedEmptyState)
@@ -323,9 +315,6 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         }
         finally
         {
-            // Belt and braces: a cancelled scan leaves the flag set otherwise,
-            // and a stale "still indexing" caption would outlive the scan.
-            _scanInFlight = false;
             _loadGate.Release();
         }
     }
@@ -462,209 +451,42 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         return refreshPublication;
     }
 
+    /// <summary>
+    /// Runs a telemetry sweep when one is due and translates its counts into
+    /// the scanner caption. The arithmetic belongs to the service; only the
+    /// wording is this layer's business.
+    /// </summary>
     private async Task ScanTelemetryIfDueAsync(
         IReadOnlyList<ProviderAccount> accounts,
         IProgress<RefreshProgress>? progress,
         CancellationToken cancellationToken
     )
     {
-        DateTimeOffset? lastScanAt = _lastScanAt;
-        if (lastScanAt.HasValue)
-        {
-            DateTimeOffset valueOrDefault = lastScanAt.GetValueOrDefault();
-            if (_clock.UtcNow - valueOrDefault < ScanInterval)
-            {
-                return;
-            }
-        }
-        progress?.Report(new RefreshProgress(0, 0, string.Empty, RefreshStage.ScanningHistory));
-        // Read by ProjectAsync: a projection taken while this runs has real
-        // limits but incomplete usage totals, and has to say so.
-        _scanInFlight = true;
-        // Token sources only read local telemetry, so keep scanning known
-        // accounts even when their live credentials are gone (a CLI logout
-        // must not make recorded history vanish).
-        (ProviderAccount Account, ITokenUsageSource Source)[] work = accounts
-            .SelectMany(account =>
-                _adapterById.TryGetValue(account.Key.Provider, out IProviderAdapter adapter)
-                    ? adapter.CreateTokenSources(account).Select(source => (Account: account, Source: source))
-                    : []
-            )
-            .ToArray();
-
-        int total = work.Length;
-        int successful = 0;
-        int emitted = 0;
-        string? firstFailure = null;
-        object failureGate = new object();
-
-        // The sources share nothing: each reads its own logs, database or CLI
-        // and writes through the serialised gate below. Running them one after
-        // another meant the slowest (Amp, minutes of subprocess launches) held
-        // up six others that together take seconds.
-        await Parallel
-            .ForEachAsync(
-                work,
-                new ParallelOptions
-                {
-                    MaxDegreeOfParallelism = MaxScanConcurrency,
-                    CancellationToken = cancellationToken,
-                },
-                async (item, token) =>
-                {
-                    try
-                    {
-                        int scanned = await ScanSourceAsync(item.Account, item.Source, token).ConfigureAwait(false);
-                        Interlocked.Add(ref emitted, scanned);
-                        Interlocked.Increment(ref successful);
-                    }
-                    catch (OperationCanceledException) when (token.IsCancellationRequested)
-                    {
-                        throw;
-                    }
-                    catch (Exception ex)
-                    {
-                        // A scan failure used to vanish here, so a source that
-                        // returned nothing because it got a 401 was indistinguishable
-                        // from one that simply had no new events. Keep scanning the
-                        // remaining sources, but remember that this one did not
-                        // succeed and say so in diagnostics.
-                        string message = DiagnosticRedactor.Redact(
-                            ex is TokenScanException ? ex.Message : ex.GetType().Name
-                        );
-                        lock (failureGate)
-                        {
-                            firstFailure ??= message;
-                        }
-                    }
-                }
+        TelemetryScanOutcome? outcome = await _telemetryScan
+            .ScanIfDueAsync(
+                _adapterById,
+                accounts,
+                () => progress?.Report(new RefreshProgress(0, 0, string.Empty, RefreshStage.ScanningHistory)),
+                cancellationToken
             )
             .ConfigureAwait(false);
+        if (outcome is not { } scan)
+        {
+            // No sweep ran, so there is no fresh evidence of agent activity.
+            // Leaving the previous sweep's answer standing would re-arm the
+            // tightened cadence on every skipped tick.
+            _telemetryScanEmittedEvents = false;
+            return;
+        }
 
-        _scanInFlight = false;
-        _lastScanAt = _clock.UtcNow;
-        _scannerCount = total;
-        _successfulScannerCount = successful;
+        _telemetryScanEmittedEvents = scan.EmittedEvents;
+        _scannerCount = scan.SourceCount;
+        _successfulScannerCount = scan.SuccessfulSourceCount;
         _scannerDetail =
-            total == 0 ? L("Data_NoTelemetrySource")
-            : firstFailure is not null ? F("Data_ScannerFailed", total - successful, total, firstFailure)
-            : F("Data_EventsInspected", emitted);
-    }
-
-    /// <summary>
-    /// Drains one telemetry source into the usage store and advances its cursor.
-    /// Returns the number of events it emitted.
-    /// </summary>
-    private async Task<int> ScanSourceAsync(
-        ProviderAccount account,
-        ITokenUsageSource source,
-        CancellationToken cancellationToken
-    )
-    {
-        ScannerCursor? cursor = await _usage
-            .GetCursorAsync(account.Key, source.Id, cancellationToken)
-            .ConfigureAwait(false);
-        List<TokenUsageEvent> batch = new List<TokenUsageEvent>(ScanBatchSize);
-        // Only events that reached the database may advance the stored cursor;
-        // `pending` runs ahead of `committed` for whatever is still in the batch,
-        // so a mid-stream failure cannot skip past events that were never saved.
-        DateTimeOffset? committed = cursor?.LastObservedAt;
-        DateTimeOffset? pending = committed;
-        int emitted = 0;
-
-        // A source that tracks its own per-item state hands it back here; a null
-        // means "nothing to record", which must preserve what is already stored
-        // rather than erase it. Everything else keeps the historical marker.
-        string? SourcePosition() =>
-            source is IScanPositionSource stateful ? stateful.Position ?? cursor?.Position : "incremental";
-
-        // What the scan started from, for the failure path below.
-        string? StartingPosition() => source is IScanPositionSource ? cursor?.Position : "incremental";
-
-        ScannerCursor Checkpoint(string? position) => new ScannerCursor(source.Id, position, committed, null);
-
-        try
-        {
-            await foreach (
-                TokenUsageEvent item in source.ReadAsync(account, cursor, cancellationToken).ConfigureAwait(false)
-            )
-            {
-                batch.Add(item);
-                emitted++;
-                if (!pending.HasValue || item.OccurredAt > pending.Value)
-                {
-                    pending = item.OccurredAt;
-                }
-                if (batch.Count >= ScanBatchSize)
-                {
-                    await WriteEventsAsync(batch, cancellationToken).ConfigureAwait(false);
-                    batch.Clear();
-                    committed = pending;
-                }
-            }
-            if (batch.Count > 0)
-            {
-                await WriteEventsAsync(batch, cancellationToken).ConfigureAwait(false);
-            }
-            committed = pending;
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            // Keep the timestamp the writes actually reached, but NOT the
-            // source's new position. That position asserts each of its items was
-            // processed, and items it yielded may have died with the batch that
-            // failed to write — a skipped item would then never be revisited,
-            // because the position is consulted ahead of the timestamp window.
-            // Only `committed` is known to be on disk. Repeating a scan is the
-            // cheap mistake; silently dropping usage is not.
-            try
-            {
-                ScannerCursor failureCheckpoint = ScanFailureCheckpoint.ResolveCursor(
-                    source,
-                    source.Id,
-                    StartingPosition(),
-                    committed
-                );
-                await WriteCursorAsync(account.Key, failureCheckpoint, cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception checkpointFailure) when (checkpointFailure is not OperationCanceledException)
-            {
-                // Bookkeeping must not replace the failure that actually matters.
-            }
-            throw;
-        }
-
-        await WriteCursorAsync(account.Key, Checkpoint(SourcePosition()), cancellationToken).ConfigureAwait(false);
-        return emitted;
-    }
-
-    // SQLite takes one writer at a time. Reads scale fine under WAL, but the
-    // parallel scan would otherwise have several 512-row insert transactions
-    // racing for the write lock and burning the busy timeout.
-    private async Task WriteEventsAsync(IReadOnlyList<TokenUsageEvent> batch, CancellationToken cancellationToken)
-    {
-        await _usageWriteGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            await _usage.AddEventsAsync(batch, cancellationToken).ConfigureAwait(false);
-        }
-        finally
-        {
-            _usageWriteGate.Release();
-        }
-    }
-
-    private async Task WriteCursorAsync(AccountKey account, ScannerCursor cursor, CancellationToken cancellationToken)
-    {
-        await _usageWriteGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            await _usage.SaveCursorAsync(account, cursor, cancellationToken).ConfigureAwait(false);
-        }
-        finally
-        {
-            _usageWriteGate.Release();
-        }
+            scan.SourceCount == 0 ? L("Data_NoTelemetrySource")
+            : scan.FirstFailureMessage is { } failure
+                ? F("Data_ScannerFailed", scan.SourceCount - scan.SuccessfulSourceCount, scan.SourceCount, failure)
+            : F("Data_EventsInspected", scan.EmittedEventCount);
     }
 
     private async Task<DashboardData> ProjectAsync(
@@ -875,7 +697,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         // And a live projection taken mid-scan has real limits but partial
         // usage totals, which needs saying or the numbers look wrong.
         string statusMessage =
-            _scanInFlight ? L("Data_IndexingHistory")
+            _telemetryScan.IsScanning ? L("Data_IndexingHistory")
             : fromCache ? (firstRun ? L("Data_FirstRunSaved") : L("Data_ShowingSaved"))
             : string.Empty;
         string pricingCatalogStatus = catalog is null ? L("Data_UnavailableUpper") : L("Data_ValidUpper");
@@ -1056,34 +878,6 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
                 );
             })
             .ToArray();
-    }
-
-    /// <summary>
-    /// Memoises model resolution for one projection. The catalog is fixed for
-    /// the duration, so the same (service, model) pair always resolves the same
-    /// way — and the history aggregations below ask about the same few dozen
-    /// pairs hundreds of times each.
-    /// </summary>
-    private sealed class ModelResolutionCache(
-        ExplicitModelResolver explicitResolver,
-        CatalogModelResolver catalogResolver
-    )
-    {
-        private readonly Dictionary<(string Service, string Model), ModelResolution?> _entries = [];
-
-        public ModelResolution? Resolve(ServiceProviderId service, string rawModelId, PricingCatalogSnapshot? catalog)
-        {
-            (string, string) key = (service.Value, rawModelId);
-            if (_entries.TryGetValue(key, out ModelResolution? cached))
-            {
-                return cached;
-            }
-            ModelResolution? resolved = catalog is null
-                ? explicitResolver.Resolve(service, rawModelId)
-                : catalogResolver.Resolve(service, rawModelId, catalog);
-            _entries[key] = resolved;
-            return resolved;
-        }
     }
 
     /// <summary>
@@ -1423,38 +1217,9 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
         CancellationToken cancellationToken
     )
     {
-        if (!force && _resetCreditsFetchedAt.HasValue && _clock.UtcNow - _resetCreditsFetchedAt.Value < ResetCreditsTtl)
-        {
-            return;
-        }
-        _resetCredits.Clear();
-        foreach (
-            ProviderAccount account in accounts.Where((ProviderAccount providerAccount) => providerAccount.IsConnected)
-        )
-        {
-            if (
-                !_adapterById.TryGetValue(account.Key.Provider, out IProviderAdapter adapter)
-                || adapter is not IResetCreditSource source
-            )
-            {
-                continue;
-            }
-            try
-            {
-                _resetCredits[account.Key] = await source
-                    .FetchResetCreditsAsync(account, cancellationToken)
-                    .ConfigureAwait(false);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch
-            {
-                _resetCredits[account.Key] = null;
-            }
-        }
-        _resetCreditsFetchedAt = _clock.UtcNow;
+        await _resetCreditRefresh
+            .RefreshIfDueAsync(_adapterById, accounts, force, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private IReadOnlyList<ResetCycleViewModel> BuildResetCycles(
@@ -1463,7 +1228,7 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
     )
     {
         List<ResetCycleViewModel> list = new List<ResetCycleViewModel>();
-        foreach (KeyValuePair<AccountKey, ResetCreditInventory?> pair in _resetCredits)
+        foreach (KeyValuePair<AccountKey, ResetCreditInventory?> pair in _resetCreditRefresh.Inventories)
         {
             ResetCreditInventory inventory = pair.Value;
             if (inventory is null)
@@ -1830,42 +1595,17 @@ internal sealed class LiveDashboardDataSource : IDashboardDataSource, IDisposabl
 
     private static string PaceLabel(UsageMeter meter, DateTimeOffset now)
     {
-        if (
-            !meter.ResetsAt.HasValue
-            || !meter.WindowDuration.HasValue
-            || meter.Status is MeterStatus.Stale or MeterStatus.Exhausted
-        )
+        PaceProjection pace = MeterPacePolicy.Project(meter, now);
+        return pace.Kind switch
         {
-            return "";
-        }
-        TimeSpan window = meter.WindowDuration.Value;
-        DateTimeOffset resetsAt = meter.ResetsAt.Value;
-        if (window <= TimeSpan.Zero || resetsAt <= now)
-        {
-            return "";
-        }
-        DateTimeOffset windowStart = resetsAt - window;
-        TimeSpan elapsed = now - windowStart;
-        double used = meter.UsedPercent.GetValueOrDefault();
-        if (elapsed <= TimeSpan.Zero || used <= 0.0 || used >= 100.0)
-        {
-            return "";
-        }
-        double elapsedFraction = Math.Min(1.0, elapsed.TotalSeconds / window.TotalSeconds);
-        // Too little of the window has passed for the pace to mean anything.
-        if (elapsedFraction < 0.05)
-        {
-            return "";
-        }
-        double projected = used / elapsedFraction;
-        if (projected >= 100.0)
-        {
-            DateTimeOffset exhaustAt = windowStart + TimeSpan.FromSeconds(elapsed.TotalSeconds * (100.0 / used));
-            return exhaustAt <= now
-                ? L("Meter_PaceExhaustNow")
-                : F("Meter_PaceExhaustBeforeReset", Countdown(exhaustAt - now));
-        }
-        return F("Meter_PaceByReset", projected);
+            PaceProjectionKind.ExhaustedNow => L("Meter_PaceExhaustNow"),
+            PaceProjectionKind.ExhaustsBeforeReset when pace.ExhaustsAt is { } exhaustsAt => F(
+                "Meter_PaceExhaustBeforeReset",
+                Countdown(exhaustsAt - now)
+            ),
+            PaceProjectionKind.OnTrackByReset => F("Meter_PaceByReset", pace.ProjectedPercentByReset),
+            _ => "",
+        };
     }
 
     /*
@@ -2196,12 +1936,18 @@ private static string Health(ProviderAccount account, ProviderSnapshot? snapshot
             _loadGate.Wait(TimeSpan.FromSeconds(10));
         }
         catch (ObjectDisposedException) { }
+        foreach (IProviderAdapter adapter in _adapters)
+        {
+            // Adapters that hold OS resources - the Antigravity CLI session owns
+            // a background agy process - have to be told the app is going away.
+            (adapter as IDisposable)?.Dispose();
+        }
         _quotaAlerts.Dispose();
+        _telemetryScan.Dispose();
         _refresh.Dispose();
         _catalog.Dispose();
         _cursorHttpClient.Dispose();
         _httpClient.Dispose();
-        _usageWriteGate.Dispose();
         _loadGate.Dispose();
     }
 }

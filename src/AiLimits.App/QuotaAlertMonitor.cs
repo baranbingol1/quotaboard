@@ -34,7 +34,7 @@ internal sealed class QuotaAlertMonitor : IDisposable
         CancellationToken cancellationToken
     )
     {
-        AlertPolicy policy = AlertPolicy.Suggested with { Enabled = QuotaAlertPreference.LoadEnabled() };
+        AlertPolicy policy = QuotaAlertPreference.Load().ToPolicy();
         return _processor.ProcessAsync(snapshots, policy, now, cancellationToken);
     }
 
@@ -70,6 +70,9 @@ internal sealed class LocalizedAlertTextProvider : IAlertTextProvider
             "droid" => "Droid",
             "copilot" => "GitHub Copilot",
             "amp" => "Amp",
+            "antigravity" => "Antigravity",
+            "cursor" => "Cursor",
+            "cline" => "Cline",
             _ => providerId,
         };
 

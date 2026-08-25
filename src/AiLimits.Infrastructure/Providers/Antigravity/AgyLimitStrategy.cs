@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
-using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using AiLimits.Application.Abstractions;
@@ -10,6 +10,21 @@ using AiLimits.Infrastructure.Providers.Common;
 
 namespace AiLimits.Infrastructure.Providers.Antigravity;
 
+/// <summary>What one <c>agy</c> port was able to tell us.</summary>
+internal sealed record AgyPayload(JsonElement? Quota, JsonElement? Identity);
+
+/// <summary>
+/// Reads Google subscription quota from the Antigravity CLI.
+///
+/// <c>agy</c> exposes the same Connect endpoints as the Antigravity desktop
+/// language server, on loopback and without a CSRF token. It binds two ports and
+/// serves TLS on one and plaintext on the other, with no way to tell which is
+/// which ahead of time, so each port is tried under both schemes and the one
+/// that answers is remembered.
+///
+/// <see cref="AgyCliSession"/> owns getting a CLI running; this strategy only
+/// decides what to ask a reachable port and how to read the answer.
+/// </summary>
 internal sealed class AgyLimitStrategy : ILimitFetchStrategy
 {
     private const int MaximumResponseBytes = 1024 * 1024;
@@ -17,17 +32,20 @@ internal sealed class AgyLimitStrategy : ILimitFetchStrategy
     private const string GetUserStatusPath = "/exa.language_server_pb.LanguageServerService/GetUserStatus";
     private const string QuotaSummaryPath = "/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary";
     private static readonly HttpClient LoopbackClient = CreateLoopbackClient();
+    private static readonly string[] Schemes = ["https", "http"];
+
     private readonly IClock _clock;
-    private readonly Func<IReadOnlyList<int>> _findListeningPorts;
+    private readonly AgyCliSession _session;
     private readonly HttpClient _httpClient;
+    private readonly ConcurrentDictionary<int, string> _schemeByPort = new();
 
-    public AgyLimitStrategy(IClock clock, AgyProcessDiscovery processDiscovery)
-        : this(clock, processDiscovery.FindListeningPorts, LoopbackClient) { }
+    public AgyLimitStrategy(IClock clock, AgyCliSession session)
+        : this(clock, session, LoopbackClient) { }
 
-    internal AgyLimitStrategy(IClock clock, Func<IReadOnlyList<int>> findListeningPorts, HttpClient httpClient)
+    internal AgyLimitStrategy(IClock clock, AgyCliSession session, HttpClient httpClient)
     {
         _clock = clock;
-        _findListeningPorts = findListeningPorts;
+        _session = session;
         _httpClient = httpClient;
     }
 
@@ -42,11 +60,11 @@ internal sealed class AgyLimitStrategy : ILimitFetchStrategy
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(
-            _findListeningPorts().Count > 0
+            _session.IsUsable()
                 ? StrategyAvailabilityResult.Ready()
                 : new StrategyAvailabilityResult(
-                    StrategyAvailability.TemporarilyUnavailable,
-                    "Start an authenticated agy session to read Google AI subscription quota."
+                    StrategyAvailability.NotConfigured,
+                    "Install the Antigravity CLI and run agy once to sign in."
                 )
         );
     }
@@ -55,92 +73,163 @@ internal sealed class AgyLimitStrategy : ILimitFetchStrategy
     {
         cancellationToken.ThrowIfCancellationRequested();
         long started = Stopwatch.GetTimestamp();
-        IReadOnlyList<int> ports = _findListeningPorts();
-        if (ports.Count == 0)
-        {
-            return FetchResult.Failure(
+
+        // A snapshot that builds is the readiness signal. A starting CLI answers
+        // GetUserStatus about a second before its quota service is live, so
+        // treating any response as ready would accept a payload with no quota in
+        // it and report a malformed provider instead of waiting one more poll.
+        AgyAcquireResult<ProviderSnapshot> acquired = await _session
+            .AcquireAsync(
+                async (port, token) =>
+                {
+                    AgyPayload? payload = await ReadPayloadAsync(port, token).ConfigureAwait(false);
+                    if (payload is null)
+                    {
+                        return null;
+                    }
+                    try
+                    {
+                        return BuildSnapshot(account.Key, payload.Quota, payload.Identity, _clock.UtcNow);
+                    }
+                    catch (JsonException)
+                    {
+                        return null;
+                    }
+                },
+                cancellationToken
+            )
+            .ConfigureAwait(false);
+
+        return acquired.Payload is null
+            ? FetchResult.Failure(
                 FetchFailureKind.Unknown,
-                "No running agy session was found.",
+                acquired.Failure == AgyAcquireFailure.NotInstalled
+                    ? "The Antigravity CLI is not installed."
+                    : "The Antigravity CLI did not expose readable subscription quota. Run agy once and sign in.",
                 FallbackPolicy.TryNextStrategy,
                 Id,
                 Stopwatch.GetElapsedTime(started)
-            );
-        }
+            )
+            : FetchResult.Success(acquired.Payload, Id, Stopwatch.GetElapsedTime(started));
+    }
 
-        Exception? lastError = null;
-        foreach (int port in ports)
+    /// <summary>
+    /// Asks one port for quota and identity. Returns null when the port serves
+    /// neither, which is how a still-initializing CLI looks from outside.
+    /// </summary>
+    private async Task<AgyPayload?> ReadPayloadAsync(int port, CancellationToken cancellationToken)
+    {
+        JsonElement? quota = await TryPostAsync(port, QuotaSummaryPath, new { forceRefresh = true }, cancellationToken)
+            .ConfigureAwait(false);
+        JsonElement? identity = await TryPostAsync(
+                port,
+                GetUserStatusPath,
+                new
+                {
+                    metadata = new
+                    {
+                        ideName = "antigravity",
+                        extensionName = "antigravity",
+                        ideVersion = "unknown",
+                        locale = "en",
+                    },
+                },
+                cancellationToken
+            )
+            .ConfigureAwait(false);
+
+        // Identity alone is still worth having: older CLI builds answer
+        // GetUserStatus with per-model quota but have no quota summary endpoint.
+        return quota is null && identity is null ? null : new AgyPayload(quota, identity);
+    }
+
+    private async Task<JsonElement?> TryPostAsync(
+        int port,
+        string path,
+        object body,
+        CancellationToken cancellationToken
+    )
+    {
+        foreach (string scheme in SchemesFor(port))
         {
             try
             {
-                JsonElement quota = await PostAsync(
-                        port,
-                        QuotaSummaryPath,
-                        new { forceRefresh = true },
-                        cancellationToken
-                    )
-                    .ConfigureAwait(false);
-                JsonElement? identity = null;
-                try
-                {
-                    identity = await PostAsync(
-                            port,
-                            GetUserStatusPath,
-                            new
-                            {
-                                metadata = new
-                                {
-                                    ideName = "antigravity",
-                                    extensionName = "antigravity",
-                                    ideVersion = "unknown",
-                                    locale = "en",
-                                },
-                            },
-                            cancellationToken
-                        )
-                        .ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch
-                {
-                    // Quota remains useful when the optional identity request changes or times out.
-                }
-
-                ProviderSnapshot snapshot = BuildSnapshot(account.Key, quota, identity, _clock.UtcNow);
-                return FetchResult.Success(snapshot, Id, Stopwatch.GetElapsedTime(started));
+                JsonElement result = await PostAsync(scheme, port, path, body, cancellationToken).ConfigureAwait(false);
+                _schemeByPort[port] = scheme;
+                return result;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
             }
-            catch (Exception error)
+            catch (Exception error) when (error is HttpRequestException or JsonException or OperationCanceledException)
             {
-                lastError = error;
+                // Wrong scheme, endpoint not implemented on this build, or the
+                // CLI is not serving yet. The caller retries until it gives up.
             }
         }
+        return null;
+    }
 
-        return FetchResult.Failure(
-            lastError switch
+    /// <summary>The scheme known to work for this port first, then the other one.</summary>
+    private IEnumerable<string> SchemesFor(int port)
+    {
+        if (_schemeByPort.TryGetValue(port, out string? known))
+        {
+            yield return known;
+            foreach (string scheme in Schemes)
             {
-                JsonException => FetchFailureKind.MalformedResponse,
-                OperationCanceledException => FetchFailureKind.Timeout,
-                _ => FetchFailureKind.Network,
-            },
-            "The running agy session did not expose readable subscription quota.",
-            FallbackPolicy.TryNextStrategy,
-            Id,
-            Stopwatch.GetElapsedTime(started)
-        );
+                if (!string.Equals(scheme, known, StringComparison.Ordinal))
+                {
+                    yield return scheme;
+                }
+            }
+            yield break;
+        }
+        foreach (string scheme in Schemes)
+        {
+            yield return scheme;
+        }
     }
 
     internal ProviderSnapshot BuildSnapshot(
         AccountKey account,
-        JsonElement quotaRoot,
+        JsonElement? quotaRoot,
         JsonElement? identityRoot,
         DateTimeOffset observedAt
     )
+    {
+        List<UsageMeter> meters = quotaRoot.HasValue
+            ? ReadQuotaSummaryMeters(quotaRoot.Value, observedAt)
+            : new List<UsageMeter>();
+        if (meters.Count == 0)
+        {
+            meters = ReadModelConfigMeters(identityRoot, observedAt);
+        }
+        if (meters.Count == 0)
+        {
+            throw new JsonException("No usable quota buckets.");
+        }
+
+        (string? Email, string? Plan) identity = ReadIdentity(identityRoot);
+        List<(string Key, string Value)> extensions = new() { ("source", "agy-cli") };
+        if (!string.IsNullOrWhiteSpace(identity.Email))
+            extensions.Add(("email", identity.Email));
+        if (!string.IsNullOrWhiteSpace(identity.Plan))
+            extensions.Add(("plan_type", identity.Plan));
+        return new ProviderSnapshot(
+            account,
+            meters,
+            ReadBalances(identityRoot),
+            SnapshotCompleteness.Authoritative,
+            observedAt,
+            DataConfidence.High,
+            ProviderHttpSupport.SafeExtensions(extensions.ToArray())
+        );
+    }
+
+    /// <summary>The preferred source: the two grouped windows the CLI shows itself.</summary>
+    private List<UsageMeter> ReadQuotaSummaryMeters(JsonElement quotaRoot, DateTimeOffset observedAt)
     {
         JsonElement payload = ResolveQuotaPayload(quotaRoot);
         if (!payload.TryGetProperty("groups", out JsonElement groups) || groups.ValueKind != JsonValueKind.Array)
@@ -188,65 +277,178 @@ internal sealed class AgyLimitStrategy : ILimitFetchStrategy
 
                 double usedPercent = 100 - remainingFraction.Value * 100;
                 string bucketName = ReadString(bucket, "displayName") ?? bucketId;
-                TimeSpan? duration = ResolveWindowDuration(bucketId, bucketName);
-                DateTimeOffset? resetsAt = ReadDate(bucket, "resetTime");
-                string displayName = $"{FriendlyGroup(groupName)} {FriendlyWindow(bucketName, duration)}";
+                TimeSpan? duration = ResolveWindowDuration(
+                    ReadString(bucket, "window") ?? string.Empty,
+                    bucketId,
+                    bucketName
+                );
                 meters.Add(
-                    new UsageMeter(
-                        new MeterKey($"antigravity:{bucketId}"),
-                        displayName,
-                        MeterScope.Feature,
-                        MeterUnit.Percent,
-                        (decimal)usedPercent,
-                        100m,
+                    BuildMeter(
+                        $"antigravity:{bucketId}",
+                        $"{FriendlyGroup(groupName)} {FriendlyWindow(bucketName, duration)}",
                         usedPercent,
                         duration,
-                        resetsAt,
-                        null,
-                        StatusFor(usedPercent),
-                        new MeterProvenance(
-                            Id,
-                            $"$.groups[{groupName}].buckets[{bucketId}]",
-                            observedAt,
-                            IsAuthoritative: true
-                        )
+                        ReadDate(bucket, "resetTime"),
+                        $"$.groups[{groupName}].buckets[{bucketId}]",
+                        observedAt
                     )
                 );
             }
         }
-
-        if (meters.Count == 0)
-        {
-            throw new JsonException("No usable quota buckets.");
-        }
-
-        (string? Email, string? Plan) identity = ReadIdentity(identityRoot);
-        List<(string Key, string Value)> extensions = new() { ("source", "agy-local") };
-        if (!string.IsNullOrWhiteSpace(identity.Email))
-            extensions.Add(("email", identity.Email));
-        if (!string.IsNullOrWhiteSpace(identity.Plan))
-            extensions.Add(("plan_type", identity.Plan));
-        return new ProviderSnapshot(
-            account,
-            meters,
-            Array.Empty<BalanceMetric>(),
-            SnapshotCompleteness.Authoritative,
-            observedAt,
-            DataConfidence.High,
-            ProviderHttpSupport.SafeExtensions(extensions.ToArray())
-        );
+        return meters;
     }
 
-    private async Task<JsonElement> PostAsync(int port, string path, object body, CancellationToken cancellationToken)
+    /// <summary>
+    /// Fallback for CLI builds with no quota summary endpoint: collapse the
+    /// per-model rows of <c>GetUserStatus</c> into the same two families the
+    /// summary reports. Antigravity bills every model in a family against one
+    /// shared window, so the most-consumed row speaks for its family.
+    /// </summary>
+    private List<UsageMeter> ReadModelConfigMeters(JsonElement? identityRoot, DateTimeOffset observedAt)
     {
-        if (!_findListeningPorts().Contains(port))
+        if (
+            identityRoot is not { ValueKind: JsonValueKind.Object } root
+            || !root.TryGetProperty("userStatus", out JsonElement status)
+            || status.ValueKind != JsonValueKind.Object
+            || !status.TryGetProperty("cascadeModelConfigData", out JsonElement configData)
+            || configData.ValueKind != JsonValueKind.Object
+            || !configData.TryGetProperty("clientModelConfigs", out JsonElement configs)
+            || configs.ValueKind != JsonValueKind.Array
+        )
         {
-            throw new HttpRequestException("The agy listener is no longer available.");
+            return new List<UsageMeter>();
         }
 
+        Dictionary<string, (double UsedPercent, DateTimeOffset? ResetsAt)> worstByFamily = new(StringComparer.Ordinal);
+        foreach (JsonElement config in configs.EnumerateArray())
+        {
+            if (config.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+            string family = FriendlyGroup($"{ReadString(config, "modelId")} {ReadString(config, "label")}");
+            if (family.Length == 0)
+            {
+                continue;
+            }
+            if (
+                !config.TryGetProperty("quotaInfo", out JsonElement quotaInfo)
+                || quotaInfo.ValueKind != JsonValueKind.Object
+            )
+            {
+                continue;
+            }
+            double? remainingFraction = ReadDouble(quotaInfo, "remainingFraction");
+            if (
+                !remainingFraction.HasValue
+                || !double.IsFinite(remainingFraction.Value)
+                || remainingFraction.Value is < 0 or > 1
+            )
+            {
+                continue;
+            }
+
+            double usedPercent = 100 - remainingFraction.Value * 100;
+            if (!worstByFamily.TryGetValue(family, out var current) || usedPercent > current.UsedPercent)
+            {
+                worstByFamily[family] = (usedPercent, ReadDate(quotaInfo, "resetTime"));
+            }
+        }
+
+        // Per-model rows only ever carry the session window; the weekly window
+        // exists solely in the quota summary, so it is left out rather than guessed.
+        return worstByFamily
+            .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+            .Select(entry =>
+                BuildMeter(
+                    $"antigravity:{entry.Key.ToLowerInvariant()}-5h",
+                    $"{entry.Key} 5-hour",
+                    entry.Value.UsedPercent,
+                    TimeSpan.FromHours(5),
+                    entry.Value.ResetsAt,
+                    "$.userStatus.cascadeModelConfigData.clientModelConfigs[].quotaInfo",
+                    observedAt
+                )
+            )
+            .ToList();
+    }
+
+    private UsageMeter BuildMeter(
+        string key,
+        string displayName,
+        double usedPercent,
+        TimeSpan? duration,
+        DateTimeOffset? resetsAt,
+        string sourcePath,
+        DateTimeOffset observedAt
+    ) =>
+        new(
+            new MeterKey(key),
+            displayName,
+            MeterScope.Feature,
+            MeterUnit.Percent,
+            (decimal)usedPercent,
+            100m,
+            usedPercent,
+            duration,
+            resetsAt,
+            null,
+            StatusFor(usedPercent),
+            new MeterProvenance(Id, sourcePath, observedAt, IsAuthoritative: true)
+        );
+
+    /// <summary>
+    /// Prompt and flow credits, which are a separate purse from the rate-limit
+    /// windows above and so are reported as balances rather than meters.
+    /// </summary>
+    private static IReadOnlyList<BalanceMetric> ReadBalances(JsonElement? identityRoot)
+    {
+        if (
+            identityRoot is not { ValueKind: JsonValueKind.Object } root
+            || !root.TryGetProperty("userStatus", out JsonElement status)
+            || status.ValueKind != JsonValueKind.Object
+            || !status.TryGetProperty("planStatus", out JsonElement planStatus)
+            || planStatus.ValueKind != JsonValueKind.Object
+        )
+        {
+            return Array.Empty<BalanceMetric>();
+        }
+
+        List<BalanceMetric> balances = new();
+        AddBalance(balances, planStatus, "availablePromptCredits", "prompt_credits", "Prompt");
+        AddBalance(balances, planStatus, "availableFlowCredits", "flow_credits", "Flow");
+        return balances;
+    }
+
+    private static void AddBalance(
+        List<BalanceMetric> balances,
+        JsonElement planStatus,
+        string property,
+        string key,
+        string displayName
+    )
+    {
+        double? value = ReadDouble(planStatus, property);
+        if (value is null || !double.IsFinite(value.Value) || value.Value < 0)
+        {
+            return;
+        }
+        // No FormattedValue: the shell renders one verbatim, which would drop the
+        // name and the localized "credits" suffix every other provider shows.
+        balances.Add(new BalanceMetric(key, displayName, (decimal)value.Value, MeterUnit.Credits));
+    }
+
+    private async Task<JsonElement> PostAsync(
+        string scheme,
+        int port,
+        string path,
+        object body,
+        CancellationToken cancellationToken
+    )
+    {
         using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(RequestTimeout);
-        using HttpRequestMessage request = new(HttpMethod.Post, $"https://127.0.0.1:{port}{path}");
+        using HttpRequestMessage request = new(HttpMethod.Post, $"{scheme}://127.0.0.1:{port}{path}");
         request.Content = JsonContent.Create(body);
         request.Headers.TryAddWithoutValidation("Connect-Protocol-Version", "1");
         using HttpResponseMessage response = await _httpClient
@@ -271,6 +473,8 @@ internal sealed class AgyLimitStrategy : ILimitFetchStrategy
         {
             AllowAutoRedirect = false,
             UseProxy = false,
+            // The CLI serves a self-signed certificate. Trusting it is only ever
+            // safe because the request never leaves the loopback interface.
             ServerCertificateCustomValidationCallback = (request, _, _, _) =>
                 request.RequestUri is { Scheme: "https", Host: "127.0.0.1" },
         };
@@ -351,12 +555,12 @@ internal sealed class AgyLimitStrategy : ILimitFetchStrategy
         return value.Trim();
     }
 
-    private static TimeSpan? ResolveWindowDuration(string bucketId, string displayName)
+    private static TimeSpan? ResolveWindowDuration(string window, string bucketId, string displayName)
     {
-        string candidate = $"{bucketId} {displayName}".Replace('_', '-').ToLowerInvariant();
+        string candidate = $"{window} {bucketId} {displayName}".Replace('_', '-').ToLowerInvariant();
         if (candidate.Contains("weekly", StringComparison.Ordinal))
             return TimeSpan.FromDays(7);
-        string[] sessionAliases = { "session", "5h", "5-hour", "five hour", "five-hour" };
+        string[] sessionAliases = ["session", "5h", "5-hour", "five hour", "five-hour"];
         return sessionAliases.Any(alias => candidate.Contains(alias, StringComparison.Ordinal))
             ? TimeSpan.FromHours(5)
             : null;

@@ -269,6 +269,33 @@
                         </StackPanel>
                         <ToggleSwitch x:Uid="Settings_AlertsToggle" x:Name="QuotaAlertsToggle" Grid.Column="1" Toggled="OnQuotaAlertsToggled" OffContent="Off" OnContent="On"/>
                     </Grid>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="200"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Uid="Settings_AlertWarnLabel" Text="Warn threshold (%)" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Uid="Settings_AlertWarnDescription" Text="First notification when usage crosses this share of the limit" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <NumberBox x:Name="AlertWarnThresholdBox" Grid.Column="1" Width="130" Minimum="1" Maximum="99" SmallChange="1" LargeChange="5"
+                                   ValueChanged="OnAlertSettingChanged" SpinButtonPlacementMode="Compact"/>
+                    </Grid>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="200"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Uid="Settings_AlertCriticalLabel" Text="Critical threshold (%)" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Uid="Settings_AlertCriticalDescription" Text="Second notification when usage crosses this share of the limit" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <NumberBox x:Name="AlertCriticalThresholdBox" Grid.Column="1" Width="130" Minimum="2" Maximum="100" SmallChange="1" LargeChange="5"
+                                   ValueChanged="OnAlertSettingChanged" SpinButtonPlacementMode="Compact"/>
+                    </Grid>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" MinWidth="200"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Uid="Settings_AlertResetLabel" Text="Reset reminder (minutes)" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Uid="Settings_AlertResetDescription" Text="Notify this many minutes before a quota resets; 0 turns the reminder off" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <NumberBox x:Name="AlertResetReminderBox" Grid.Column="1" Width="130" Minimum="0" Maximum="1440" SmallChange="5" LargeChange="15"
+                                   ValueChanged="OnAlertSettingChanged" SpinButtonPlacementMode="Compact"/>
+                    </Grid>
                     <InfoBar x:Uid="Settings_AlertDedup" IsOpen="True" Severity="Informational" Message="Each provider, account, meter, threshold, and reset cycle notifies exactly once." />
                 </StackPanel>
             </Border>

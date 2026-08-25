@@ -1,0 +1,6 @@
+{
+  "configProperties": {
+    "System.Runtime.GC.ServerGarbageCollection": false,
+    "System.Runtime.GC.ConcurrentGarbageCollection": true
+  }
+}

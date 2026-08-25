@@ -60,7 +60,7 @@ public sealed class AgyProviderTests
             """
         );
         DateTimeOffset now = new(2026, 7, 18, 10, 0, 0, TimeSpan.Zero);
-        AgyLimitStrategy strategy = new(new FixedClock(now), new AgyProcessDiscovery());
+        AgyLimitStrategy strategy = new(new FixedClock(now), AgyTestSession.Idle());
 
         ProviderSnapshot snapshot = strategy.BuildSnapshot(
             new AccountKey(new ProviderId("antigravity"), "default"),
@@ -101,7 +101,7 @@ public sealed class AgyProviderTests
             }
             """
         );
-        AgyLimitStrategy strategy = new(new FixedClock(), new AgyProcessDiscovery());
+        AgyLimitStrategy strategy = new(new FixedClock(), AgyTestSession.Idle());
 
         ProviderSnapshot snapshot = strategy.BuildSnapshot(
             new AccountKey(new ProviderId("antigravity"), "default"),
@@ -119,7 +119,7 @@ public sealed class AgyProviderTests
     public async Task OptionalIdentityTimeoutKeepsSuccessfulQuota()
     {
         using HttpClient client = new(new IdentityTimeoutHandler());
-        AgyLimitStrategy strategy = new(new FixedClock(), () => new[] { 12345 }, client);
+        AgyLimitStrategy strategy = new(new FixedClock(), AgyTestSession.Listening(12345), client);
         ProviderAccount account = new(
             new AccountKey(new ProviderId("antigravity"), "default"),
             "Google Antigravity",
@@ -143,7 +143,7 @@ public sealed class AgyProviderTests
     {
         using JsonDocument quota = ValidQuota();
         using JsonDocument identity = JsonDocument.Parse(identityJson);
-        AgyLimitStrategy strategy = new(new FixedClock(), new AgyProcessDiscovery());
+        AgyLimitStrategy strategy = new(new FixedClock(), AgyTestSession.Idle());
 
         ProviderSnapshot snapshot = strategy.BuildSnapshot(
             new AccountKey(new ProviderId("antigravity"), "default"),
@@ -175,7 +175,7 @@ public sealed class AgyProviderTests
             }
             """
         );
-        AgyLimitStrategy strategy = new(new FixedClock(), new AgyProcessDiscovery());
+        AgyLimitStrategy strategy = new(new FixedClock(), AgyTestSession.Idle());
 
         Assert.Throws<JsonException>(() =>
             strategy.BuildSnapshot(

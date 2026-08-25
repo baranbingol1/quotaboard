@@ -56,6 +56,60 @@ public sealed class AdaptiveRefreshPolicyTests
     }
 
     [Theory]
+    [InlineData(null, 30)] // never touched: long idle
+    [InlineData(240, 30)] // four hours old: long idle
+    [InlineData(61, 15)] // one hour old: idle
+    public void AgentActivityCapsIdleCadenceAtFiveMinutes(int? ageMinutes, int expectedWithoutActivityMinutes)
+    {
+        DateTimeOffset? interaction = ageMinutes.HasValue ? Now.AddMinutes(-ageMinutes.Value) : null;
+
+        var withoutActivity = _policy.NextDelay(Now, interaction, energySaverEnabled: false);
+        var withActivity = _policy.NextDelay(Now, interaction, energySaverEnabled: false, recentAgentActivity: true);
+
+        Assert.Equal(TimeSpan.FromMinutes(expectedWithoutActivityMinutes), withoutActivity.Delay);
+        Assert.Equal(TimeSpan.FromMinutes(5), withActivity.Delay);
+        Assert.Equal(AdaptiveRefreshPolicy.Reason.AgentActive, withActivity.Reason);
+    }
+
+    [Fact]
+    public void AgentActivityNeverPullsAFasterDecisionLater()
+    {
+        var decision = _policy.NextDelay(Now, Now.AddMinutes(-1), energySaverEnabled: false, recentAgentActivity: true);
+
+        Assert.Equal(TimeSpan.FromMinutes(2), decision.Delay);
+        Assert.Equal(AdaptiveRefreshPolicy.Reason.RecentInteraction, decision.Reason);
+    }
+
+    [Fact]
+    public void EnergySaverStillBeatsAgentActivity()
+    {
+        var decision = _policy.NextDelay(
+            Now,
+            Now.AddMinutes(-240),
+            energySaverEnabled: true,
+            recentAgentActivity: true
+        );
+
+        Assert.Equal(TimeSpan.FromMinutes(30), decision.Delay);
+        Assert.Equal(AdaptiveRefreshPolicy.Reason.Constrained, decision.Reason);
+    }
+
+    [Fact]
+    public void AgentActivityCapIsExactlyTheWarmDelay()
+    {
+        // Warm already refreshes every five minutes, so the cap is a no-op there.
+        var decision = _policy.NextDelay(
+            Now,
+            Now.AddMinutes(-30),
+            energySaverEnabled: false,
+            recentAgentActivity: true
+        );
+
+        Assert.Equal(TimeSpan.FromMinutes(5), decision.Delay);
+        Assert.Equal(AdaptiveRefreshPolicy.Reason.Warm, decision.Reason);
+    }
+
+    [Theory]
     [InlineData(1, 15)]
     [InlineData(2, 45)]
     [InlineData(3, 120)]

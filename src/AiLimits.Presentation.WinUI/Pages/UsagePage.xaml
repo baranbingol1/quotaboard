@@ -63,8 +63,13 @@
                 <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom" Spacing="7">
                     <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                         <Button x:Uid="Usage_ResetQuery" x:Name="ResetQueryButton" Content="Reset query" Click="OnResetQuery" />
+                        <Button x:Uid="Usage_Export" x:Name="ExportButton" Content="Export" Click="OnExportUsage" IsEnabled="False" />
                         <Button x:Uid="Usage_RefreshData" Content="Refresh data" Command="{x:Bind ViewModel.RefreshCommand}" Style="{StaticResource AccentButtonStyle}" />
                     </StackPanel>
+                    <!-- An export can fail for reasons the picker cannot rule
+                         out (removed drive, read-only path). Say so here rather
+                         than letting the handler take the app down. -->
+                    <InfoBar x:Name="ExportFailureInfo" IsOpen="False" Severity="Error" IsClosable="True" MaxWidth="360" />
                     <!-- Same live progress strip as Overview: a refresh takes
                          long enough that a disabled gray button reads as a
                          hang rather than as work in flight. -->

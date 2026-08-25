@@ -75,6 +75,13 @@ public partial class App : Microsoft.UI.Xaml.Application
                 {
                     scheduler.NoteRetryAfter(retryAfterHint);
                 }
+                // Agent-aware cadence: a scan that found new local usage rows
+                // means an agent is burning limits right now, so the idle
+                // cadence tightens until it goes quiet again.
+                if (dataSource.TelemetryScanEmittedEvents)
+                {
+                    scheduler.NoteAgentActivity();
+                }
                 return outcome;
             },
             IsEnergySaverOn,

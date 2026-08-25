@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+﻿// SPDX-License-Identifier: Apache-2.0
 using AiLimits.Presentation.WinUI;
 using AiLimits.Presentation.WinUI.Shell;
 using AiLimits.Presentation.WinUI.Theming;
@@ -20,6 +20,8 @@ public sealed partial class MainWindow : Window
     )
     {
         InitializeComponent();
+        // File pickers opened from pages need this window's HWND as owner.
+        MainWindowHandle.Register(WinRT.Interop.WindowNative.GetWindowHandle(this));
         ThemeService.Applied += StyleTitleBar;
         // Keep custom chrome/tray in sync when the OS theme flips in System mode.
         Root.ActualThemeChanged += (_, _) => ThemeService.NotifySystemThemeChanged();

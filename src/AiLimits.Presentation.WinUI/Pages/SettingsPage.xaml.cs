@@ -1,4 +1,5 @@
 ﻿// SPDX-License-Identifier: Apache-2.0
+using AiLimits.Application.Alerts;
 using AiLimits.Application.Pricing;
 using AiLimits.Presentation.WinUI.Localization;
 using AiLimits.Presentation.WinUI.ViewModels;
@@ -75,6 +76,10 @@ public sealed partial class SettingsPage : Page
         AbsoluteResetToggle.IsOn = display.ShowResetTimeAsAbsolute;
         HideZeroToggle.IsOn = display.HideZeroOrNotApplicableMeters;
         QuotaAlertsToggle.IsOn = QuotaAlertPreference.LoadEnabled();
+        AlertPolicyOptions alertOptions = QuotaAlertPreference.Load();
+        AlertWarnThresholdBox.Value = alertOptions.WarnThresholdPercent;
+        AlertCriticalThresholdBox.Value = alertOptions.CriticalThresholdPercent;
+        AlertResetReminderBox.Value = alertOptions.ResetReminderMinutes;
         BlurEmailsToggle.IsOn = EmailPrivacyPreference.Enabled;
         LanguageRestartInfo.Message = LocalizationService.GetString("Language_RestartRequired");
         UpdateVersionText.Text = string.Format(
@@ -465,6 +470,38 @@ public sealed partial class SettingsPage : Page
     private void OnQuotaAlertsToggled(object sender, RoutedEventArgs e)
     {
         if (!_initializing) QuotaAlertPreference.SaveEnabled(QuotaAlertsToggle.IsOn);
+    }
+
+    // All three NumberBoxes share one handler: every change persists the full
+    // policy, with Clamped() guaranteeing warn < critical and bounded values.
+    private void OnAlertSettingChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        if (_initializing)
+        {
+            return;
+        }
+        AlertPolicyOptions saved = new AlertPolicyOptions(
+            QuotaAlertsToggle.IsOn,
+            (int)Math.Round(AlertWarnThresholdBox.Value),
+            (int)Math.Round(AlertCriticalThresholdBox.Value),
+            (int)Math.Round(AlertResetReminderBox.Value)
+        ).Clamped();
+        QuotaAlertPreference.Save(saved);
+
+        // Clamped() can raise critical above what the user typed (it enforces
+        // warn < critical). Echo the stored values back, or the box keeps
+        // showing a threshold that is not the one alerts actually fire at.
+        _initializing = true;
+        try
+        {
+            AlertWarnThresholdBox.Value = saved.WarnThresholdPercent;
+            AlertCriticalThresholdBox.Value = saved.CriticalThresholdPercent;
+            AlertResetReminderBox.Value = saved.ResetReminderMinutes;
+        }
+        finally
+        {
+            _initializing = false;
+        }
     }
 
     private void OnBlurEmailsToggled(object sender, RoutedEventArgs e)

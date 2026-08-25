@@ -228,9 +228,15 @@
   <data name="Settings_NoProviders.Text" xml:space="preserve"><value>Henüz bağlı sağlayıcı algılanmadı. Önce Genel Bakış'ta canlı verileri yenileyin.</value></data>
   <data name="Settings_Alerts.Text" xml:space="preserve"><value>Uyarılar</value></data>
   <data name="Settings_QuotaAlertsLabel.Text" xml:space="preserve"><value>Kota uyarıları</value></data>
-  <data name="Settings_QuotaAlertsDescription.Text" xml:space="preserve"><value>%80, %95 ve sıfırlamadan 30 dakika önce bildirim gönder</value></data>
+  <data name="Settings_QuotaAlertsDescription.Text" xml:space="preserve"><value>Kullanım eşiklerinizi aşarken ve bir kota sıfırlanmadan önce bildirim gönder</value></data>
   <data name="Settings_AlertsToggle.OffContent" xml:space="preserve"><value>Kapalı</value></data>
   <data name="Settings_AlertsToggle.OnContent" xml:space="preserve"><value>Açık</value></data>
+  <data name="Settings_AlertWarnLabel.Text" xml:space="preserve"><value>Uyarı eşiği (%)</value></data>
+  <data name="Settings_AlertWarnDescription.Text" xml:space="preserve"><value>Kullanım limitin bu oranını aşınca ilk bildirim</value></data>
+  <data name="Settings_AlertCriticalLabel.Text" xml:space="preserve"><value>Kritik eşik (%)</value></data>
+  <data name="Settings_AlertCriticalDescription.Text" xml:space="preserve"><value>Kullanım limitin bu oranını aşınca ikinci bildirim</value></data>
+  <data name="Settings_AlertResetLabel.Text" xml:space="preserve"><value>Sıfırlama hatırlatması (dakika)</value></data>
+  <data name="Settings_AlertResetDescription.Text" xml:space="preserve"><value>Bir kota sıfırlanmadan bu kadar dakika önce bildir; 0 hatırlatmayı kapatır</value></data>
   <data name="Settings_AlertDedup.Message" xml:space="preserve"><value>Her sağlayıcı, hesap, sayaç, eşik ve sıfırlama döngüsü tam bir kez bildirilir.</value></data>
   <data name="Settings_Privacy.Text" xml:space="preserve"><value>Gizlilik</value></data>
   <data name="Settings_BlurEmailsLabel.Text" xml:space="preserve"><value>Hesap e-postalarını gizle</value></data>
@@ -242,6 +248,11 @@
   <data name="Usage_Title.Text" xml:space="preserve"><value>Kullanımınızı filtreleyin ve detaylandırın.</value></data>
   <data name="Usage_QuerySummary.Text" xml:space="preserve"><value>Son 30 gün · tüm etkinlik</value></data>
   <data name="Usage_ResetQuery.Content" xml:space="preserve"><value>Sorguyu sıfırla</value></data>
+  <data name="Usage_Export.Content" xml:space="preserve"><value>Dışa aktar</value></data>
+  <data name="Usage_Export.AutomationProperties.Name" xml:space="preserve"><value>Eşleşen kullanım satırlarını dışa aktar</value></data>
+  <data name="Usage_ExportCsvType" xml:space="preserve"><value>CSV (virgülle ayrılmış)</value></data>
+  <data name="Usage_ExportJsonType" xml:space="preserve"><value>JSON</value></data>
+  <data name="Usage_ExportFailed" xml:space="preserve"><value>Dışa aktarma başarısız: {0}</value></data>
   <data name="Usage_RefreshData.Content" xml:space="preserve"><value>Verileri yenile</value></data>
   <data name="Usage_QueryEyebrow.Text" xml:space="preserve"><value>SORGU</value></data>
   <data name="Usage_QueryTitle.Text" xml:space="preserve"><value>Defteri filtrele</value></data>
@@ -343,6 +354,7 @@
   <data name="Usage_ComparisonNew" xml:space="preserve"><value>Önceki döneme göre yeni</value></data>
   <data name="Usage_ComparisonNoBaseline" xml:space="preserve"><value>Önceki dönem temeli yok</value></data>
   <data name="Usage_ComparisonChange" xml:space="preserve"><value>Önceki döneme göre %{0:+0.#;-0.#;0}</value></data>
+  <data name="Usage_ComparisonCostChange" xml:space="preserve"><value>API maliyeti %{0:+0.#;-0.#;0}</value></data>
   <data name="Common_Unknown" xml:space="preserve"><value>Bilinmiyor</value></data>
   <data name="Countdown_Now" xml:space="preserve"><value>şimdi</value></data>
   <data name="Countdown_Minutes" xml:space="preserve"><value>{0} dk içinde</value></data>

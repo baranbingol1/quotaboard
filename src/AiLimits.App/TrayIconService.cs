@@ -177,7 +177,11 @@ internal sealed class TrayIconService : IDisposable
                 };
                 var detail = new TextBlock
                 {
-                    Text = $"{meter.DisplayUsageLabel} · {meter.DisplayResetLabel}",
+                    // The pace projection is appended only when it exists, so
+                    // the tray stays one line per meter otherwise.
+                    Text = string.IsNullOrEmpty(meter.PaceLabel)
+                        ? $"{meter.DisplayUsageLabel} · {meter.DisplayResetLabel}"
+                        : $"{meter.DisplayUsageLabel} · {meter.DisplayResetLabel} · {meter.PaceLabel}",
                     Foreground = StatusBrush(meter.Status),
                     FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                 };

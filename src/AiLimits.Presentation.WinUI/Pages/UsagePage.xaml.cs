@@ -1,13 +1,17 @@
 ﻿// SPDX-License-Identifier: Apache-2.0
 using System.Globalization;
+using AiLimits.Application.Diagnostics;
 using AiLimits.Application.Presentation;
 using AiLimits.Application.Usage;
 using AiLimits.Presentation.WinUI.Localization;
+using AiLimits.Presentation.WinUI.Shell;
 using AiLimits.Presentation.WinUI.ViewModels;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Windows.Storage;
+using Windows.Storage.Pickers;
 
 namespace AiLimits.Presentation.WinUI.Pages;
 
@@ -24,6 +28,7 @@ public sealed partial class UsagePage : Page
     private readonly HashSet<string> _projects = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _models = new(StringComparer.OrdinalIgnoreCase);
     private UsageAnalyticsResult? _lastResult;
+    private UsageAnalyticsQuery? _lastQuery;
     private bool _pageReady;
     private bool _updatingFacets;
     private DateOnly _from;
@@ -294,6 +299,67 @@ public sealed partial class UsagePage : Page
         RenderModelMixPage();
     }
 
+    /// <summary>
+    /// Saves the current filtered usage rows to a user-chosen CSV or JSON file.
+    /// The picker owns the choice of location; QuotaBoard never writes anywhere
+    /// else, and the export contains only the ledger rows already on screen.
+    /// </summary>
+    private async void OnExportUsage(object sender, RoutedEventArgs args)
+    {
+        if (_lastResult is null || _lastQuery is null || _lastResult.Records.Count == 0)
+        {
+            return;
+        }
+
+        // Snapshot what is on screen now. The picker is modal for the user but
+        // not for the refresh loop, so reading these after the await could pair
+        // one filter's rows with another filter's file name.
+        UsageAnalyticsResult result = _lastResult;
+        UsageAnalyticsQuery query = _lastQuery;
+        string suggestedName = $"quotaboard-usage-{_from:yyyy-MM-dd}_{_through:yyyy-MM-dd}";
+
+        // async void: nothing above this frame can catch, and WinUI has no
+        // Application.UnhandledException handler here, so an unwritable path or
+        // a yanked drive would take the whole app down instead of one export.
+        ExportButton.IsEnabled = false;
+        try
+        {
+            var picker = new FileSavePicker
+            {
+                SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+                SuggestedFileName = suggestedName,
+            };
+            picker.FileTypeChoices.Add(L("Usage_ExportCsvType"), new List<string> { ".csv" });
+            picker.FileTypeChoices.Add(L("Usage_ExportJsonType"), new List<string> { ".json" });
+            if (MainWindowHandle.Current == IntPtr.Zero)
+            {
+                // Without an owner HWND the picker throws rather than opening.
+                return;
+            }
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, MainWindowHandle.Current);
+
+            StorageFile? file = await picker.PickSaveFileAsync();
+            if (file is null)
+            {
+                return;
+            }
+
+            string content = string.Equals(file.FileType, ".json", StringComparison.OrdinalIgnoreCase)
+                ? UsageExport.Json(result.Records, query)
+                : UsageExport.Csv(result.Records);
+            await FileIO.WriteTextAsync(file, content);
+        }
+        catch (Exception exception)
+        {
+            ExportFailureInfo.Message = F("Usage_ExportFailed", DiagnosticRedactor.Redact(exception.Message));
+            ExportFailureInfo.IsOpen = true;
+        }
+        finally
+        {
+            ExportButton.IsEnabled = true;
+        }
+    }
+
     private void OnResetQuery(object sender, RoutedEventArgs args)
     {
         _pageReady = false;
@@ -337,6 +403,7 @@ public sealed partial class UsagePage : Page
             ComparePicker.SelectedItem is ComboBoxItem { Tag: "previous" },
             _chartSeriesDimension);
         _lastResult = ViewModel.QueryUsage(query);
+        _lastQuery = query;
         RenderResult(_lastResult);
     }
 
@@ -345,6 +412,9 @@ public sealed partial class UsagePage : Page
         RenderFacets(result.Facets);
         TotalTokensText.Text = FormatTokens(result.TotalTokens);
         ApiEquivalentText.Text = FormatUsd(result.ApiEquivalentCostUsd);
+        // Export writes exactly the matching rows, so it needs the same
+        // "nothing to export" state as the chart below.
+        ExportButton.IsEnabled = result.Records.Count > 0;
         RenderMatchingData(result);
         WindowLabelText.Text = RangeLabel(result.From, result.Through).ToUpper(CultureInfo.CurrentCulture);
         ComparisonText.Text = ComparisonLabel(result.Comparison);
@@ -532,7 +602,7 @@ public sealed partial class UsagePage : Page
                     segment.Label,
                     FormatTokens(segment.Tokens),
                     segment.Tokens,
-                    PlotHeight * segment.Tokens / maximum,
+                    UsageChartLayout.SegmentHeight(segment.Tokens, maximum, PlotHeight),
                     seriesBrushes[segment.Key]))
                 .ToArray();
 
@@ -551,7 +621,7 @@ public sealed partial class UsagePage : Page
                 range,
                 tokens,
                 F("Usage_BarAutomation", range, tokens),
-                bucket.Tokens == 0 ? 0 : Math.Max(2, PlotHeight * bucket.Tokens / maximum),
+                UsageChartLayout.BarHeight(bucket.Tokens, maximum, PlotHeight),
                 geometry.ItemWidth,
                 geometry.BarWidth,
                 segments,
@@ -749,7 +819,12 @@ public sealed partial class UsagePage : Page
         if (comparison is null) return L("Usage_ComparisonOff");
         if (comparison.IsNew) return L("Usage_ComparisonNew");
         if (!comparison.PercentChange.HasValue) return L("Usage_ComparisonNoBaseline");
-        return F("Usage_ComparisonChange", comparison.PercentChange.Value);
+        string tokenLabel = F("Usage_ComparisonChange", comparison.PercentChange.Value);
+        // The cost line appears only when both windows priced something; a
+        // missing catalog on one side is silence, not a 100% drop.
+        return comparison.CostPercentChange.HasValue
+            ? $"{tokenLabel} · {F("Usage_ComparisonCostChange", comparison.CostPercentChange.Value)}"
+            : tokenLabel;
     }
 
 

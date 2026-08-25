@@ -212,6 +212,69 @@ public sealed class UsageAnalyticsQueryTests
     }
 
     [Fact]
+    public void Cost_comparison_uses_priced_rows_from_both_windows()
+    {
+        UsageAnalyticsRecord[] records = [Row(-1, tokens: 100, cost: 1m), Row(0, tokens: 200, cost: 3m)];
+
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query());
+
+        Assert.NotNull(result.Comparison);
+        Assert.Equal(3m, result.Comparison!.CurrentCostUsd);
+        Assert.Equal(1m, result.Comparison.PreviousCostUsd);
+        Assert.Equal(200, result.Comparison.CostPercentChange);
+    }
+
+    [Fact]
+    public void Cost_comparison_is_silent_when_either_window_is_unpriced()
+    {
+        UsageAnalyticsRecord[] records = [Row(-1, tokens: 100, cost: 1m), Row(0, tokens: 200, cost: null)];
+
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query());
+
+        Assert.NotNull(result.Comparison);
+        Assert.Null(result.Comparison!.CostPercentChange);
+    }
+
+    [Fact]
+    public void Cost_comparison_is_silent_when_the_two_windows_priced_different_shares()
+    {
+        // Last window fully priced, this window only half — the unpriced half
+        // is a catalog blind spot, not a spend cut, and reporting -50% here
+        // would tell the user the opposite of what happened.
+        UsageAnalyticsRecord[] records =
+        [
+            Row(-1, tokens: 100, cost: 10m),
+            Row(0, modelKey: "gpt", tokens: 50, cost: 5m),
+            Row(0, modelKey: "unpriced-model", tokens: 50, cost: null),
+        ];
+
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query());
+
+        Assert.NotNull(result.Comparison);
+        Assert.Null(result.Comparison!.CostPercentChange);
+        // The totals still surface; only the derived delta is withheld.
+        Assert.Equal(5m, result.Comparison.CurrentCostUsd);
+        Assert.Equal(10m, result.Comparison.PreviousCostUsd);
+    }
+
+    [Fact]
+    public void Cost_comparison_still_reports_when_both_windows_are_priced_alike()
+    {
+        UsageAnalyticsRecord[] records =
+        [
+            Row(-1, modelKey: "gpt", tokens: 50, cost: 5m),
+            Row(-1, modelKey: "unpriced-model", tokens: 50, cost: null),
+            Row(0, modelKey: "gpt", tokens: 50, cost: 10m),
+            Row(0, modelKey: "unpriced-model", tokens: 50, cost: null),
+        ];
+
+        UsageAnalyticsResult result = UsageAnalyticsQueryEngine.Run(records, Query());
+
+        Assert.NotNull(result.Comparison);
+        Assert.Equal(100, result.Comparison!.CostPercentChange);
+    }
+
+    [Fact]
     public void Breakdown_always_covers_the_whole_window()
     {
         UsageAnalyticsRecord[] records =

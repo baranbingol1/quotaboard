@@ -45,6 +45,8 @@ public sealed class RefreshScheduler : IDisposable
 
     private DateTimeOffset? _lastInteractionAt;
 
+    private DateTimeOffset? _lastAgentActivityAt;
+
     private DateTimeOffset? _lastAttemptAt;
 
     private DateTimeOffset? _notBefore;
@@ -118,6 +120,21 @@ public sealed class RefreshScheduler : IDisposable
     }
 
     /// <summary>
+    /// Record that local agent telemetry was just observed (a scan found new
+    /// usage rows). Agent-aware cadence caps otherwise idle decisions at
+    /// <see cref="AdaptiveRefreshPolicy.AgentActiveDelay"/>, and can pull an
+    /// already-pending longer sleep forward — never postpone an earlier one.
+    /// </summary>
+    public void NoteAgentActivity()
+    {
+        lock (_gate)
+        {
+            _lastAgentActivityAt = _clock.UtcNow;
+        }
+        Wake();
+    }
+
+    /// <summary>
     /// Honor a provider Retry-After: no scheduled refresh runs before the given
     /// delay has elapsed. User-initiated refreshes bypass the scheduler and are
     /// unaffected. Later hints only ever push the floor further out.
@@ -155,7 +172,14 @@ public sealed class RefreshScheduler : IDisposable
     {
         lock (_gate)
         {
-            AdaptiveRefreshPolicy.Decision decision = _policy.NextDelay(now, _lastInteractionAt, SafeEnergySaver());
+            bool agentActive =
+                _lastAgentActivityAt is { } activity && now - activity <= AdaptiveRefreshPolicy.AgentActivityWindow;
+            AdaptiveRefreshPolicy.Decision decision = _policy.NextDelay(
+                now,
+                _lastInteractionAt,
+                SafeEnergySaver(),
+                agentActive
+            );
             if (_transientRetryAttempt > 0)
             {
                 TimeSpan? retry = AdaptiveRefreshPolicy.TransientRetryDelay(_transientRetryAttempt);

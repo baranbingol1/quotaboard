@@ -134,7 +134,14 @@ public sealed record MeterViewModel(
                 _ => LocalizationService.GetString("Meter_StatusOnTrack"),
             };
     public Visibility NewVisibility => IsNew ? Visibility.Visible : Visibility.Collapsed;
-    public string AutomationName => $"{DisplayName}, {DisplayUsageLabel}, {DisplayResetLabel}, {StatusLabel}";
+    public string AutomationName
+    {
+        get
+        {
+            string name = $"{DisplayName}, {DisplayUsageLabel}, {DisplayResetLabel}, {StatusLabel}";
+            return string.IsNullOrEmpty(PaceLabel) ? name : $"{name}, {PaceLabel}";
+        }
+    }
 }
 
 public sealed record ResetHorizonItemViewModel(

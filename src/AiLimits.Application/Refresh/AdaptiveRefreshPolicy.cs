@@ -19,6 +19,7 @@ public sealed class AdaptiveRefreshPolicy
         Idle,
         LongIdle,
         Constrained,
+        AgentActive,
     }
 
     public readonly record struct Decision(TimeSpan Delay, Reason Reason);
@@ -32,6 +33,15 @@ public sealed class AdaptiveRefreshPolicy
     private static readonly TimeSpan IdleDelay = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan LongIdleDelay = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan ConstrainedDelay = TimeSpan.FromMinutes(30);
+
+    /// <summary>
+    /// While local agents keep writing telemetry, even an idle app stays this
+    /// fresh, because limits move fastest while an agent is burning them.
+    /// </summary>
+    public static readonly TimeSpan AgentActiveDelay = TimeSpan.FromMinutes(5);
+
+    /// <summary>How long after an observed agent write the activity still counts.</summary>
+    public static readonly TimeSpan AgentActivityWindow = TimeSpan.FromMinutes(6);
 
     public Decision NextDelay(DateTimeOffset now, DateTimeOffset? lastInteractionAt, bool energySaverEnabled)
     {
@@ -59,6 +69,29 @@ public sealed class AdaptiveRefreshPolicy
             return new Decision(IdleDelay, Reason.Idle);
         }
         return new Decision(LongIdleDelay, Reason.LongIdle);
+    }
+
+    /// <summary>
+    /// Agent-aware cadence (ported from CodexBar's decision record): recent
+    /// local agent telemetry caps otherwise slower unconstrained decisions at
+    /// <see cref="AgentActiveDelay"/>. It can only pull a refresh earlier,
+    /// never postpone one, and energy saver still wins.
+    /// </summary>
+    public Decision NextDelay(
+        DateTimeOffset now,
+        DateTimeOffset? lastInteractionAt,
+        bool energySaverEnabled,
+        bool recentAgentActivity
+    )
+    {
+        Decision decision = NextDelay(now, lastInteractionAt, energySaverEnabled);
+        // Battery preservation outranks freshness: energy saver keeps its
+        // slowest cadence even while agents are active.
+        if (recentAgentActivity && decision.Reason is not Reason.Constrained && decision.Delay > AgentActiveDelay)
+        {
+            return new Decision(AgentActiveDelay, Reason.AgentActive);
+        }
+        return decision;
     }
 
     /// <summary>

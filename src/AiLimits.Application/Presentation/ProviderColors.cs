@@ -32,6 +32,7 @@ public static class ProviderColors
 
     // ClinePass blue (CodexBar's ClinePass accent).
     public const string Cline = "#61A3FA";
+
     public const string Neutral = "#7E878B";
 
     // Keyed by Normalize(): lowercase letters+digits only, so "Z.AI", "z-ai"
