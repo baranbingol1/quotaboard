@@ -27,7 +27,7 @@ internal interface IAgyProcessHost
 /// localhost server answers the same quota endpoints as the Antigravity app's
 /// language server.
 ///
-/// Two launch details are load-bearing and were established by observation
+/// Three launch details are load-bearing and were established by observation
 /// rather than documentation:
 ///
 /// <list type="bullet">
@@ -37,9 +37,21 @@ internal interface IAgyProcessHost
 /// alive but never starts its quota server, so probing would time out every time.
 /// </item>
 /// <item>
-/// <c>CreateNoWindow</c> is what keeps it invisible. Letting it inherit a console
-/// instead leaves the CLI fighting over a terminal it does not own, and it again
-/// never binds a port.
+/// <c>CreateNoWindow</c> keeps this process off screen. Letting it inherit a
+/// console instead leaves the CLI fighting over a terminal it does not own, and
+/// it again never binds a port.
+/// </item>
+/// <item>
+/// <c>CreateNoWindow</c> reaches this process and nothing it spawns, so it is not
+/// on its own enough. <c>agy</c>'s auto-updater launches <c>agy --bg-updater</c>,
+/// which runs <c>agy --version</c> in a console of its own; where Windows Terminal
+/// is the default terminal, that is a real window opening and closing on the
+/// user's screen. Refreshing more often than the CLI's fifteen-minute update
+/// throttle turns it into a flash every quarter of an hour, all day.
+/// <c>AGY_CLI_DISABLE_AUTO_UPDATE</c> is what stops it, and suppressing the check
+/// is the honest behaviour besides: the updater rewrites <c>agy.exe</c> in place,
+/// which is not a quota dashboard's call to make, and a headless check consumes
+/// the same throttle the user's own <c>agy</c> sessions rely on.
 /// </item>
 /// </list>
 ///
@@ -51,6 +63,9 @@ internal sealed class AgyProcessHost : IAgyProcessHost, IDisposable
 {
     private const int JobObjectExtendedLimitInformationClass = 9;
     private const uint JobObjectLimitKillOnJobClose = 0x2000;
+
+    /// <summary>Set on the child alone, so the user's own CLI still self-updates.</summary>
+    internal const string DisableAutoUpdateVariable = "AGY_CLI_DISABLE_AUTO_UPDATE";
 
     private readonly AgyProcessDiscovery _discovery;
     private readonly object _sync = new();
@@ -72,17 +87,9 @@ internal sealed class AgyProcessHost : IAgyProcessHost, IDisposable
             return null;
         }
 
-        ProcessStartInfo startInfo = new()
-        {
-            FileName = binaryPath,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            WorkingDirectory = Path.GetDirectoryName(binaryPath) ?? string.Empty,
-        };
-
         try
         {
-            using Process? process = Process.Start(startInfo);
+            using Process? process = Process.Start(CreateStartInfo(binaryPath));
             if (process is null)
             {
                 return null;
@@ -99,6 +106,25 @@ internal sealed class AgyProcessHost : IAgyProcessHost, IDisposable
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// The launch parameters, split out from the launch itself so the rules that
+    /// keep <c>agy</c> and its children off screen can be asserted without
+    /// starting a real process.
+    /// </summary>
+    internal static ProcessStartInfo CreateStartInfo(string binaryPath)
+    {
+        ProcessStartInfo startInfo = new()
+        {
+            FileName = binaryPath,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = Path.GetDirectoryName(binaryPath) ?? string.Empty,
+        };
+        // Scoped to this process's environment block; the user's shell is untouched.
+        startInfo.Environment[DisableAutoUpdateVariable] = "true";
+        return startInfo;
     }
 
     public bool IsAlive(int processId)
