@@ -134,3 +134,42 @@ A publish is required only when the change needs a running window
 `scripts/drive-app.ps1` can drive the published exe over UIA.
 
 Privacy and no-telemetry: `PRIVACY.md`. Vulnerability reports: `SECURITY.md`.
+
+## Cursor Cloud specific instructions
+
+Cloud Agents run on Linux (Ubuntu), so the full Windows workflow above does
+not apply. WinUI 3 / Windows App SDK is Windows-only: the XAML compiler is a
+Windows `.exe` and fails on Linux with `Exec format error`. On a Cloud Agent
+you can develop, build, and test the cross-platform core, but not the GUI.
+
+Runs on Linux (`net10.0`):
+
+- `src/AiLimits.Domain`, `src/AiLimits.Application`, `src/AiLimits.Infrastructure`.
+- `src/AiLimits.Platform.Windows` (`net10.0-windows`, no WinUI) — builds with
+  the Windows-targeting flag; its Win32/Credential-Manager paths only run on Windows.
+- `tests/AiLimits.IntegrationTests` — real SQLite + refresh pipeline. It is
+  `net10.0-windows` but references only cross-platform projects, so it builds
+  and runs on Linux with `-p:EnableWindowsTargeting=true`.
+
+Windows-only (do not attempt on a Cloud Agent):
+
+- `src/AiLimits.Presentation.WinUI`, `src/AiLimits.App`, and the WinUI-referencing
+  `tests/AiLimits.Tests` (needs the XAML compiler).
+- `./scripts/publish-ai-limits.ps1` (needs the Windows XAML toolchain) and
+  `./scripts/invoke-quality-gates.ps1` (PowerShell is not installed).
+- Launching or driving `QuotaBoard.exe` — there is no Windows GUI on Linux.
+
+The SDK pinned in `global.json` (`10.0.301`) is installed under `~/.dotnet` and
+is on `PATH` in login shells. Supported Cloud loop:
+
+```bash
+dotnet tool restore
+dotnet csharpier check src tests
+dotnet build src/AiLimits.Infrastructure/AiLimits.Infrastructure.csproj -c Release
+dotnet test tests/AiLimits.IntegrationTests/AiLimits.IntegrationTests.csproj -c Release -p:EnableWindowsTargeting=true
+```
+
+`EnableWindowsTargeting` is a build flag only — never add it to a `.csproj`.
+Changes that touch WinUI, publishing, or quality-gate scripts still need
+Windows verification per the sections above; a green Cloud loop is not enough
+for those.
