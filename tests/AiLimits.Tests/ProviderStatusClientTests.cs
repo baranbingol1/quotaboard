@@ -43,7 +43,6 @@ public sealed class ProviderStatusClientTests
             ["claude"] = new("https://anthropic.statuspage.io/api/v2/status.json"),
             ["droid"] = new("https://status.factory.ai/api/v2/status.json"),
             ["amp"] = new("https://ampcodestatus.com/api/v2/status.json"),
-            ["copilot"] = new("https://www.githubstatus.com/api/v2/status.json"),
             ["cursor"] = new("https://status.cursor.com/api/v2/status.json"),
         };
 

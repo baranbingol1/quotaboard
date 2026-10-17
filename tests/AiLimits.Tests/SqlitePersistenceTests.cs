@@ -51,14 +51,15 @@ public sealed class SqlitePersistenceTests
             DataConfidence.Exact,
             new Dictionary<string, JsonElement> { ["source"] = JsonSerializer.SerializeToElement("fixture") }
         );
-        await snapshots.SaveAsync(snapshot, 7, default);
+        await snapshots.SaveAsync(snapshot, 7, account.ConfigurationRevision, default);
 
-        var loaded = await snapshots.GetLatestAsync(account.Key, default);
+        var loaded = await snapshots.GetLatestAsync(account.Key, account.ConfigurationRevision, default);
         Assert.NotNull(loaded);
         Assert.Equal("Never Seen Before", Assert.Single(loaded.Meters).DisplayName);
         Assert.True(loaded.Meters[0].IsNew);
         Assert.Equal(12.5m, Assert.Single(loaded.Balances).Value);
         Assert.Equal("fixture", loaded.Extensions["source"].GetString());
+        Assert.Null(await snapshots.GetLatestAsync(account.Key, account.ConfigurationRevision + 1, default));
     }
 
     [Fact]

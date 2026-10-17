@@ -60,6 +60,7 @@ public sealed class SqlitePersistenceIntegrationTests
                 new Dictionary<string, JsonElement> { ["source"] = JsonSerializer.SerializeToElement("live") }
             ),
             generation: 1,
+            configurationRevision: account.ConfigurationRevision,
             default
         );
         await usage.AddEventsAsync(
@@ -82,9 +83,10 @@ public sealed class SqlitePersistenceIntegrationTests
         );
 
         ProviderAccount? loadedAccount = await accounts.GetAsync(account.Key, default);
-        ProviderSnapshot? latest = await snapshots.GetLatestAsync(account.Key, default);
+        ProviderSnapshot? latest = await snapshots.GetLatestAsync(account.Key, account.ConfigurationRevision, default);
         IReadOnlyList<ProviderSnapshot> history = await snapshots.GetHistoryAsync(
             account.Key,
+            account.ConfigurationRevision,
             observed.AddHours(-1),
             default
         );
@@ -122,13 +124,24 @@ public sealed class SqlitePersistenceIntegrationTests
         await accounts.UpsertAsync(account, default);
 
         DateTimeOffset now = new(2026, 7, 22, 12, 0, 0, TimeSpan.Zero);
-        await snapshots.SaveAsync(EmptySnapshot(account.Key, now.AddDays(-200)), 1, default);
-        await snapshots.SaveAsync(EmptySnapshot(account.Key, now.AddDays(-1)), 2, default);
+        await snapshots.SaveAsync(
+            EmptySnapshot(account.Key, now.AddDays(-200)),
+            1,
+            account.ConfigurationRevision,
+            default
+        );
+        await snapshots.SaveAsync(
+            EmptySnapshot(account.Key, now.AddDays(-1)),
+            2,
+            account.ConfigurationRevision,
+            default
+        );
 
         await new SqliteRetention(database).PruneAsync(now);
 
         IReadOnlyList<ProviderSnapshot> remaining = await snapshots.GetHistoryAsync(
             account.Key,
+            account.ConfigurationRevision,
             DateTimeOffset.UnixEpoch,
             default
         );

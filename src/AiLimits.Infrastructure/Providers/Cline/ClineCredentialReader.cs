@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace AiLimits.Infrastructure.Providers.Cline;
@@ -21,8 +23,27 @@ public sealed record ClineCredential(
     DateTimeOffset? ExpiresAt = null,
     string? RefreshToken = null,
     bool IsWorkOsSession = false,
-    string? Email = null
+    string? Email = null,
+    string? AccountFingerprint = null,
+    ClineBillingScope? BillingScope = null
 );
+
+/// <summary>
+/// The Cline billing account the local session is currently using. A user can
+/// switch personal and organization billing without changing <c>userInfo.id</c>
+/// or email, so identity alone is not enough to reuse a cached session.
+/// </summary>
+public abstract record ClineBillingScope
+{
+    private ClineBillingScope() { }
+
+    public sealed record Personal : ClineBillingScope
+    {
+        public static readonly Personal Instance = new();
+    }
+
+    public sealed record Organization(string OrganizationId) : ClineBillingScope;
+}
 
 /// <summary>
 /// Resolves the ClinePass bearer token. Precedence: CLINE_API_KEY, then
@@ -35,7 +56,10 @@ public sealed record ClineCredential(
 /// </summary>
 internal static class ClineCredentialReader
 {
-    internal static ClineCredential? Resolve() => ResolveEnvironment() ?? ResolveSecrets(DefaultSecretsPath());
+    internal static ClineCredential? Resolve()
+    {
+        return ResolveEnvironment() ?? ResolveSecrets(DefaultSecretsPath(), DefaultProvidersPath());
+    }
 
     internal static ClineCredential? ResolveEnvironment()
     {
@@ -52,7 +76,7 @@ internal static class ClineCredentialReader
         return null;
     }
 
-    internal static ClineCredential? ResolveSecrets(string path)
+    internal static ClineCredential? ResolveSecrets(string path, string? providersPath = null)
     {
         if (!File.Exists(path))
         {
@@ -69,7 +93,7 @@ internal static class ClineCredentialReader
                 && !string.IsNullOrWhiteSpace(value.GetString())
             )
             {
-                return ExtractCredential(value.GetString()!.Trim());
+                return ExtractCredential(value.GetString()!.Trim(), providersPath);
             }
         }
         catch (IOException) { }
@@ -84,75 +108,283 @@ internal static class ClineCredentialReader
     // used as-is. Anything that cannot ride in an ASCII-only Authorization
     // header (the blob itself can hold a non-ASCII displayName) is not a
     // usable credential.
-    private static ClineCredential? ExtractCredential(string stored)
+    private static ClineCredential? ExtractCredential(string stored, string? providersPath)
     {
-        string candidate = stored;
-        string? refreshToken = null;
-        string? email = null;
-        DateTimeOffset? expiresAt = null;
-        bool workOsSession = false;
-        if (stored.StartsWith('{'))
-        {
-            try
-            {
-                using JsonDocument blob = JsonDocument.Parse(stored);
-                if (blob.RootElement.ValueKind == JsonValueKind.Object)
-                {
-                    foreach (string field in new[] { "idToken", "accessToken" })
-                    {
-                        if (
-                            blob.RootElement.TryGetProperty(field, out JsonElement nested)
-                            && nested.ValueKind == JsonValueKind.String
-                            && !string.IsNullOrWhiteSpace(nested.GetString())
-                        )
-                        {
-                            candidate = nested.GetString()!.Trim();
-                            workOsSession = true;
-                            break;
-                        }
-                    }
-                    if (
-                        blob.RootElement.TryGetProperty("refreshToken", out JsonElement refresh)
-                        && refresh.ValueKind == JsonValueKind.String
-                        && !string.IsNullOrWhiteSpace(refresh.GetString())
-                    )
-                    {
-                        refreshToken = refresh.GetString()!.Trim();
-                    }
-                    expiresAt = ParseExpiry(blob.RootElement);
-                    email = ReadEmail(blob.RootElement);
-                }
-            }
-            catch (JsonException)
-            {
-                // Not a blob after all; the stored value is the token.
-            }
-        }
+        ParsedSessionBlob parsed = TryParseSessionBlob(stored, providersPath);
+        string candidate = parsed.Token ?? stored;
         // A bare stored value can be either a pasted dashboard API key or a raw
         // session token; only the JWT shape gets the WorkOS scheme.
-        return IsHeaderSafe(candidate)
-            ? new ClineCredential(
-                candidate,
-                "Cline CLI account",
-                expiresAt,
-                refreshToken,
-                workOsSession || LooksLikeJwt(candidate),
-                email
-            )
+        if (!IsHeaderSafe(candidate))
+        {
+            return null;
+        }
+
+        return new ClineCredential(
+            candidate,
+            SourceLabelFor(parsed.BillingScope),
+            parsed.ExpiresAt,
+            parsed.RefreshToken,
+            parsed.IsWorkOsSession || LooksLikeJwt(candidate),
+            parsed.Email,
+            parsed.AccountFingerprint,
+            parsed.BillingScope
+        );
+    }
+
+    private readonly record struct ParsedSessionBlob(
+        string? Token,
+        string? RefreshToken,
+        string? Email,
+        string? AccountFingerprint,
+        ClineBillingScope? BillingScope,
+        DateTimeOffset? ExpiresAt,
+        bool IsWorkOsSession
+    );
+
+    private static ParsedSessionBlob TryParseSessionBlob(string stored, string? providersPath)
+    {
+        if (!LooksLikeJsonObject(stored))
+        {
+            return default;
+        }
+
+        try
+        {
+            using JsonDocument blob = JsonDocument.Parse(stored);
+            if (blob.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return default;
+            }
+
+            string? token = ReadSessionToken(blob.RootElement);
+            string? email = ReadEmail(blob.RootElement);
+            ClineBillingScope? billingScope = ReadBillingScope(blob.RootElement, providersPath);
+            return new ParsedSessionBlob(
+                token,
+                ReadOptionalString(blob.RootElement, "refreshToken"),
+                email,
+                ReadAccountFingerprint(blob.RootElement, email, billingScope),
+                billingScope,
+                ParseExpiry(blob.RootElement),
+                token is not null
+            );
+        }
+        catch (JsonException)
+        {
+            // Not a blob after all; the stored value is the token.
+            return default;
+        }
+    }
+
+    private static string? ReadSessionToken(JsonElement root)
+    {
+        foreach (string field in new[] { "idToken", "accessToken" })
+        {
+            if (ReadOptionalString(root, field) is { } token)
+            {
+                return token;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? ReadOptionalString(JsonElement root, string name)
+    {
+        return
+            root.TryGetProperty(name, out JsonElement value)
+            && value.ValueKind == JsonValueKind.String
+            && !string.IsNullOrWhiteSpace(value.GetString())
+            ? value.GetString()!.Trim()
             : null;
     }
 
-    private static string? ReadEmail(JsonElement root) =>
-        root.TryGetProperty("userInfo", out JsonElement userInfo)
-        && userInfo.ValueKind == JsonValueKind.Object
-        && userInfo.TryGetProperty("email", out JsonElement email)
-        && email.ValueKind == JsonValueKind.String
-        && !string.IsNullOrWhiteSpace(email.GetString())
+    private static string? ReadEmail(JsonElement root)
+    {
+        return
+            root.TryGetProperty("userInfo", out JsonElement userInfo)
+            && userInfo.ValueKind == JsonValueKind.Object
+            && userInfo.TryGetProperty("email", out JsonElement email)
+            && email.ValueKind == JsonValueKind.String
+            && !string.IsNullOrWhiteSpace(email.GetString())
             ? email.GetString()!.Trim()
             : null;
+    }
 
-    private static bool LooksLikeJwt(string value) =>
-        value.Count(c => c == '.') == 2 && !value.StartsWith('.') && !value.EndsWith('.');
+    internal static string SourceLabelFor(ClineBillingScope? billingScope)
+    {
+        return billingScope switch
+        {
+            ClineBillingScope.Organization => "Cline CLI account (organization)",
+            ClineBillingScope.Personal => "Cline CLI account (personal)",
+            _ => "Cline CLI account",
+        };
+    }
+
+    private static string? ReadAccountFingerprint(JsonElement root, string? email, ClineBillingScope? billingScope)
+    {
+        // User id/email stay the same when Cline switches personal and
+        // organization billing. The fingerprint must include that scope, or
+        // the session store will reuse the previous billing account's token.
+        if (billingScope is null)
+        {
+            return null;
+        }
+
+        string? identity = null;
+        if (
+            root.TryGetProperty("userInfo", out JsonElement userInfo)
+            && userInfo.ValueKind == JsonValueKind.Object
+            && userInfo.TryGetProperty("id", out JsonElement id)
+            && id.ValueKind == JsonValueKind.String
+            && !string.IsNullOrWhiteSpace(id.GetString())
+        )
+        {
+            identity = "id:" + id.GetString()!.Trim().ToLowerInvariant();
+        }
+        else if (!string.IsNullOrWhiteSpace(email))
+        {
+            identity = "email:" + email.Trim().ToLowerInvariant();
+        }
+        if (identity is null)
+        {
+            return null;
+        }
+
+        string scopedIdentity = billingScope switch
+        {
+            ClineBillingScope.Organization organization => identity
+                + "|org:"
+                + organization.OrganizationId.Trim().ToLowerInvariant(),
+            _ => identity + "|personal",
+        };
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(scopedIdentity)));
+    }
+
+    internal static ClineBillingScope? ReadBillingScope(JsonElement sessionRoot, string? providersPath)
+    {
+        if (TryReadPersistedOrganizationId(providersPath) is { } persistedOrganizationId)
+        {
+            return new ClineBillingScope.Organization(persistedOrganizationId);
+        }
+
+        if (TryReadSessionOrganizations(sessionRoot, out ClineBillingScope? sessionScope))
+        {
+            return sessionScope;
+        }
+
+        return providersPath is not null && File.Exists(providersPath) ? ClineBillingScope.Personal.Instance : null;
+    }
+
+    private static bool TryReadSessionOrganizations(JsonElement sessionRoot, out ClineBillingScope? billingScope)
+    {
+        billingScope = null;
+        if (
+            !sessionRoot.TryGetProperty("userInfo", out JsonElement userInfo)
+            || userInfo.ValueKind != JsonValueKind.Object
+            || !userInfo.TryGetProperty("organizations", out JsonElement organizations)
+            || organizations.ValueKind != JsonValueKind.Array
+        )
+        {
+            return false;
+        }
+
+        foreach (JsonElement organization in organizations.EnumerateArray())
+        {
+            if (!IsActiveOrganization(organization))
+            {
+                continue;
+            }
+
+            if (ReadOptionalString(organization, "organizationId") is { } organizationId)
+            {
+                billingScope = new ClineBillingScope.Organization(organizationId);
+                return true;
+            }
+
+            return true;
+        }
+
+        billingScope = ClineBillingScope.Personal.Instance;
+        return true;
+    }
+
+    private static bool IsActiveOrganization(JsonElement organization)
+    {
+        return organization.ValueKind == JsonValueKind.Object
+            && organization.TryGetProperty("active", out JsonElement active)
+            && active.ValueKind == JsonValueKind.True;
+    }
+
+    private static string? TryReadPersistedOrganizationId(string? providersPath)
+    {
+        if (string.IsNullOrWhiteSpace(providersPath) || !File.Exists(providersPath))
+        {
+            return null;
+        }
+        try
+        {
+            using FileStream stream = new(providersPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using JsonDocument document = JsonDocument.Parse(stream);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+            foreach (string providerId in new[] { "cline", "cline-pass" })
+            {
+                if (ReadProviderOrganizationId(document.RootElement, providerId) is { } organizationId)
+                {
+                    return organizationId;
+                }
+            }
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+        catch (JsonException) { }
+        return null;
+    }
+
+    private static string? ReadProviderOrganizationId(JsonElement root, string providerId)
+    {
+        if (
+            !root.TryGetProperty("providers", out JsonElement providers)
+            || providers.ValueKind != JsonValueKind.Object
+            || !providers.TryGetProperty(providerId, out JsonElement provider)
+            || provider.ValueKind != JsonValueKind.Object
+        )
+        {
+            return null;
+        }
+        JsonElement settings = provider;
+        if (
+            provider.TryGetProperty("settings", out JsonElement nestedSettings)
+            && nestedSettings.ValueKind == JsonValueKind.Object
+        )
+        {
+            settings = nestedSettings;
+        }
+        if (
+            !settings.TryGetProperty("auth", out JsonElement auth)
+            || auth.ValueKind != JsonValueKind.Object
+            || !auth.TryGetProperty("organizationId", out JsonElement organizationId)
+            || organizationId.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(organizationId.GetString())
+        )
+        {
+            return null;
+        }
+        return organizationId.GetString()!.Trim();
+    }
+
+    private static bool LooksLikeJsonObject(string value)
+    {
+        return value.Length > 0 && value[0] == (char)123;
+    }
+
+    private static bool LooksLikeJwt(string value)
+    {
+        return value.Count(c => c == '.') == 2 && !value.StartsWith('.') && !value.EndsWith('.');
+    }
 
     // The CLI writes expiresAt as unix seconds; tolerate milliseconds and ISO
     // strings so a CLI format change degrades to "expiry unknown", not a
@@ -191,16 +423,31 @@ internal static class ClineCredentialReader
         return null;
     }
 
-    private static bool IsHeaderSafe(string value) =>
-        value.Length > 0 && value.All(c => c is >= (char)33 and <= (char)126);
+    private static bool IsHeaderSafe(string value)
+    {
+        return value.Length > 0 && value.All(c => c is >= (char)33 and <= (char)126);
+    }
 
-    private static string DefaultSecretsPath() =>
-        Path.Combine(
+    private static string DefaultSecretsPath()
+    {
+        return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             ".cline",
             "data",
             "secrets.json"
         );
+    }
+
+    private static string DefaultProvidersPath()
+    {
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".cline",
+            "data",
+            "settings",
+            "providers.json"
+        );
+    }
 
     private static string? ReadEnvironmentVariable(string name)
     {

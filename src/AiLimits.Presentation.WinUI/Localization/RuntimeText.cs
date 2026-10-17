@@ -47,7 +47,6 @@ public static class RuntimeText
             "claude" => L("Runtime_AuthClaude"),
             "opencode" => L("Runtime_AuthOpenCode"),
             "droid" => L("Runtime_AuthDroid"),
-            "copilot" => L("Runtime_AuthCopilot"),
             "amp" => L("Runtime_AuthAmp"),
             "cursor" => L("Runtime_AuthCursor"),
             _ => L("Common_Unknown"),
